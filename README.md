@@ -8,11 +8,11 @@ Interactive Music を、手作業の積み上げから「聴いて決めて渡�
 
 **DAW で設計した音楽の構造を、そのまま Wwise の Interactive Music へ運ぶ**ためのツールです。
 
-Authoring 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、正確でも時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を EXPORT 一発で Wwise へ揃えられます。**手作業での実装より大幅に時短**できます。
+Authoring 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を EXPORT 一発で Wwise へ揃えられます。**手作業での実装より大幅に時短**できます。
 
 **それらの DAW（Nuendo／Cubase）を使っていなくても大丈夫です。** Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やセット移動があり、**波形エディタすら必須ではありません**——これも大きな魅力の一つです。
 
-**Nuendo／Cubase があると非常に強力です。** マーカートラックをエクスポートした XML があれば、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように重ねられ、Entry／Exit／ループ設計を視覚的に進められます。
+**Nuendo／Cubase があると非常に強力です。** マーカートラックをエクスポートした XML があれば、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように打つことができ、Entry／Exit／ループ設計を視覚的に進められます。
 
 **Wwise に実装したデータをマスター波形として扱う**想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。
 
