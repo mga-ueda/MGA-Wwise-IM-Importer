@@ -4,7 +4,9 @@ using MgaWwiseIMImporter.UI;
 namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
-/// ITU-R BS.1770-4 相当の Integrated Loudness（LKFS）測定と、パート単位の正規化ゲイン計算。
+/// ITU-R BS.1770-4 相当の Integrated Loudness（LKFS）測定と、
+/// グループ内レイヤーの相対バランス用ゲイン計算。
+/// ゲインは Music Track の Make-Up Gain へ載せる用途（WAV には焼き込まない）。
 /// </summary>
 internal static class LoudnessMeter
 {
@@ -33,124 +35,133 @@ internal static class LoudnessMeter
     }
 
     /// <summary>
-    /// 各パートのゲイン（線形）を計算する。
-    /// Preserve Group Balance 時は、グループ内で最も大きい LKFS をターゲットへ合わせ、
-    /// 同じゲインをメンバー全体へ適用する。
+    /// グループ（2 パート以上）内の相対バランス用ゲイン（線形）を計算する。
+    /// 有効グループのメンバーだけを計測し、グループ内で最も大きい LKFS のパートは 1.0（0 dB）、
+    /// それ以外は相対差だけ下げる。未グループ／1 件だけのグループは計測もゲインも行わない。
     /// </summary>
-    public static Dictionary<int, float> ComputePartGains(
+    public static Dictionary<int, float> ComputeGroupBalanceGains(
         string sourcePath,
         WavFileInfo info,
         IReadOnlyList<WaveformOutputPart> parts,
         IReadOnlyDictionary<int, int>? partGroupIds,
-        double targetLkfs,
-        bool preserveGroupBalance,
         Action<string>? log = null)
     {
-        var loudnessByPart = new Dictionary<int, double>(parts.Count);
-        foreach (var part in parts)
+        var gains = new Dictionary<int, float>();
+        if (partGroupIds is null || partGroupIds.Count == 0 || parts.Count == 0)
         {
-            var partSource = part.ResolveSourcePath(sourcePath);
-            var localStart = part.ResolveLocalStart();
-            var localEnd = part.ResolveLocalEnd();
-            var partInfo = part.HasDedicatedSource
-                ? WavFileInfo.Read(partSource)
-                : info;
-
-            var lkfs = MeasureIntegratedLkfs(
-                partSource,
-                partInfo,
-                localStart,
-                localEnd);
-            loudnessByPart[part.Number] = lkfs;
-            log?.Invoke(
-                double.IsInfinity(lkfs)
-                    ? UiStrings.LogLoudnessPartSilence(part.Number)
-                    : UiStrings.LogLoudnessPartValue(part.Number, lkfs));
-        }
-
-        var gains = new Dictionary<int, float>(parts.Count);
-        if (!preserveGroupBalance || partGroupIds is null || partGroupIds.Count == 0)
-        {
-            foreach (var part in parts)
-            {
-                gains[part.Number] = GainToTarget(loudnessByPart[part.Number], targetLkfs);
-            }
-
             return gains;
         }
 
+        var partByNumber = parts.ToDictionary(part => part.Number);
         var membersByGroup = new Dictionary<int, List<int>>();
-        var ungrouped = new List<int>();
         foreach (var part in parts)
         {
-            if (partGroupIds.TryGetValue(part.Number, out var groupId) && groupId > 0)
+            if (!partGroupIds.TryGetValue(part.Number, out var groupId) || groupId <= 0)
             {
-                if (!membersByGroup.TryGetValue(groupId, out var list))
-                {
-                    list = [];
-                    membersByGroup[groupId] = list;
-                }
-
-                list.Add(part.Number);
+                continue;
             }
-            else
+
+            if (!membersByGroup.TryGetValue(groupId, out var list))
             {
-                ungrouped.Add(part.Number);
+                list = [];
+                membersByGroup[groupId] = list;
             }
-        }
 
-        foreach (var partNumber in ungrouped)
-        {
-            gains[partNumber] = GainToTarget(loudnessByPart[partNumber], targetLkfs);
+            list.Add(part.Number);
         }
 
         foreach (var (groupId, members) in membersByGroup)
         {
-            // 1 件だけの「グループ」は単独正規化と同じ。
             if (members.Count < 2)
             {
-                foreach (var partNumber in members)
+                continue;
+            }
+
+            var loudnessByPart = new Dictionary<int, double>(members.Count);
+            foreach (var partNumber in members)
+            {
+                if (!partByNumber.TryGetValue(partNumber, out var part))
                 {
-                    gains[partNumber] = GainToTarget(loudnessByPart[partNumber], targetLkfs);
+                    continue;
                 }
 
+                var partSource = part.ResolveSourcePath(sourcePath);
+                var localStart = part.ResolveLocalStart();
+                var localEnd = part.ResolveLocalEnd();
+                var partInfo = part.HasDedicatedSource
+                    ? WavFileInfo.Read(partSource)
+                    : info;
+
+                var lkfs = MeasureIntegratedLkfs(
+                    partSource,
+                    partInfo,
+                    localStart,
+                    localEnd);
+                loudnessByPart[partNumber] = lkfs;
+                log?.Invoke(
+                    double.IsInfinity(lkfs)
+                        ? UiStrings.LogLoudnessPartSilence(partNumber)
+                        : UiStrings.LogLoudnessPartValue(partNumber, lkfs));
+            }
+
+            if (loudnessByPart.Count == 0)
+            {
                 continue;
             }
 
             var maxLkfs = double.NegativeInfinity;
-            foreach (var partNumber in members)
+            foreach (var lkfs in loudnessByPart.Values)
             {
-                var lkfs = loudnessByPart[partNumber];
                 if (lkfs > maxLkfs)
                 {
                     maxLkfs = lkfs;
                 }
             }
 
-            var sharedGain = GainToTarget(maxLkfs, targetLkfs);
             log?.Invoke(
                 double.IsInfinity(maxLkfs)
-                    ? UiStrings.LogLoudnessGroupSilence(groupId, sharedGain)
-                    : UiStrings.LogLoudnessGroupValue(groupId, maxLkfs, sharedGain));
-            foreach (var partNumber in members)
+                    ? UiStrings.LogLoudnessGroupSilence(groupId)
+                    : UiStrings.LogLoudnessGroupValue(groupId, maxLkfs));
+
+            foreach (var (partNumber, lkfs) in loudnessByPart)
             {
-                gains[partNumber] = sharedGain;
+                var gain = GainRelativeToPeak(lkfs, maxLkfs);
+                gains[partNumber] = gain;
+                log?.Invoke(
+                    UiStrings.LogLoudnessPartGain(partNumber, LinearGainToDb(gain)));
             }
         }
 
         return gains;
     }
 
-    private static float GainToTarget(double measuredLkfs, double targetLkfs)
+    /// <summary>
+    /// グループ内ピーク基準の相対ゲイン。ピークは 1.0、より小さい LKFS は 1 未満。
+    /// </summary>
+    private static float GainRelativeToPeak(double measuredLkfs, double peakLkfs)
     {
-        if (double.IsInfinity(measuredLkfs) || double.IsNaN(measuredLkfs))
+        if (double.IsInfinity(peakLkfs)
+            || double.IsInfinity(measuredLkfs)
+            || double.IsNaN(measuredLkfs)
+            || double.IsNaN(peakLkfs))
         {
             return 1f;
         }
 
-        var db = targetLkfs - measuredLkfs;
+        var db = measuredLkfs - peakLkfs;
+        if (Math.Abs(db) < 1e-6)
+        {
+            return 1f;
+        }
+
         return (float)Math.Pow(10.0, db / 20.0);
     }
+
+    /// <summary>線形ゲイン → Make-Up Gain（dB）。</summary>
+    public static float LinearGainToDb(float linearGain) =>
+        linearGain <= 0f || Math.Abs(linearGain - 1f) < 1e-6f
+            ? 0f
+            : (float)(20.0 * Math.Log10(linearGain));
 
     private static double MeasureIntegratedLkfs(
         float[] interleaved,
@@ -304,7 +315,7 @@ internal static class LoudnessMeter
         return interleaved;
     }
 
-    internal static long FindDataChunk(BinaryReader reader, Stream source, out uint dataSize)
+    private static long FindDataChunk(BinaryReader reader, Stream source, out uint dataSize)
     {
         source.Position = 0;
         if (ReadFourCc(reader) != "RIFF")
@@ -341,7 +352,7 @@ internal static class LoudnessMeter
         throw new InvalidDataException(UiStrings.ErrDataChunkMissing);
     }
 
-    internal static PcmSampleFormat ResolvePcmFormat(WavFileInfo info)
+    private static PcmSampleFormat ResolvePcmFormat(WavFileInfo info)
     {
         if (info.AudioFormat == 3 && info.BitsPerSample == 32)
         {
@@ -363,7 +374,7 @@ internal static class LoudnessMeter
         throw new NotSupportedException(UiStrings.ErrUnsupportedWavFormat(info.AudioFormatName));
     }
 
-    internal static float DecodeSample(byte[] frame, int offset, PcmSampleFormat format) =>
+    private static float DecodeSample(byte[] frame, int offset, PcmSampleFormat format) =>
         format switch
         {
             PcmSampleFormat.Pcm16 => BitConverter.ToInt16(frame, offset) / 32768f,
@@ -375,46 +386,10 @@ internal static class LoudnessMeter
             _ => 0f,
         };
 
-    internal static void EncodeSample(float sample, byte[] frame, int offset, PcmSampleFormat format)
-    {
-        sample = Math.Clamp(sample, -1f, 1f);
-        switch (format)
-        {
-            case PcmSampleFormat.Pcm16:
-            {
-                var value = (short)Math.Round(sample * 32767f, MidpointRounding.AwayFromZero);
-                frame[offset] = (byte)(value & 0xFF);
-                frame[offset + 1] = (byte)((value >> 8) & 0xFF);
-                break;
-            }
-            case PcmSampleFormat.Pcm24:
-            {
-                var value = (int)Math.Round(sample * 8388607f, MidpointRounding.AwayFromZero);
-                frame[offset] = (byte)(value & 0xFF);
-                frame[offset + 1] = (byte)((value >> 8) & 0xFF);
-                frame[offset + 2] = (byte)((value >> 16) & 0xFF);
-                break;
-            }
-            case PcmSampleFormat.Pcm32:
-            {
-                var value = (int)Math.Round(sample * 2147483647f, MidpointRounding.AwayFromZero);
-                var bytes = BitConverter.GetBytes(value);
-                Buffer.BlockCopy(bytes, 0, frame, offset, 4);
-                break;
-            }
-            case PcmSampleFormat.Float32:
-            {
-                var bytes = BitConverter.GetBytes(sample);
-                Buffer.BlockCopy(bytes, 0, frame, offset, 4);
-                break;
-            }
-        }
-    }
-
     private static string ReadFourCc(BinaryReader reader) =>
         Encoding.ASCII.GetString(reader.ReadBytes(4));
 
-    internal enum PcmSampleFormat
+    private enum PcmSampleFormat
     {
         Pcm16,
         Pcm24,

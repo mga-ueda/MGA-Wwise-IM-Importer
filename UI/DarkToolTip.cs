@@ -1,4 +1,6 @@
 ﻿using System.ComponentModel;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -6,16 +8,24 @@ namespace MgaWwiseIMImporter.UI;
 /// UiColors に追従するダーク配色の ToolTip。
 /// OwnerDraw で背景・枠・文字色を描き、複数行テキストにも対応する。
 /// Popup でサイズを確定し、OS 既定（白背景）描画へ落ちないよう OwnerDraw を都度再確認する。
+/// ToolTipSize 変更後に OS が位置を直さないため、描画時にカーソル付近へ再配置する。
 /// </summary>
 internal sealed class DarkToolTip : ToolTip
 {
     private const int MaxTipWidth = 420;
     private const int PadX = 8;
     private const int PadY = 6;
+    private const int CursorOffsetX = 16;
+    private const int CursorOffsetY = 16;
 
     private static readonly List<WeakReference<DarkToolTip>> Instances = [];
+    private static readonly PropertyInfo? HandleProperty = typeof(ToolTip).GetProperty(
+        "Handle",
+        BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
     private static bool _globalActive = true;
     private bool _respectsGlobalActive = true;
+    private Point? _desiredScreenLocation;
 
     /// <summary>
     /// アプリ全体のツールチップ表示。false で <see cref="RespectsGlobalActive"/> が true の
@@ -94,6 +104,7 @@ internal sealed class DarkToolTip : ToolTip
 
     private void OnPopup(object? sender, PopupEventArgs e)
     {
+        _desiredScreenLocation = null;
         if (_respectsGlobalActive && !_globalActive)
         {
             e.Cancel = true;
@@ -117,7 +128,9 @@ internal sealed class DarkToolTip : ToolTip
         try
         {
             var size = MeasureTip(text, font);
-            e.ToolTipSize = new Size(size.Width + PadX * 2, size.Height + PadY * 2);
+            var tipSize = new Size(size.Width + PadX * 2, size.Height + PadY * 2);
+            e.ToolTipSize = tipSize;
+            _desiredScreenLocation = ResolveScreenLocation(e.AssociatedControl, tipSize);
         }
         finally
         {
@@ -131,6 +144,12 @@ internal sealed class DarkToolTip : ToolTip
     private void OnDraw(object? sender, DrawToolTipEventArgs e)
     {
         ApplyOwnerDrawMode();
+
+        if (_desiredScreenLocation is { } location)
+        {
+            // Popup 時点の位置は変更前サイズ基準のため、長い Tip だと画面端／遠い位置に残る。
+            MoveTipWindow(location, e.Bounds.Size);
+        }
 
         var backColor = UiColors.ForControlBack(UiColors.ToolTipBack);
         var borderColor = UiColors.ForControlBack(UiColors.ToolTipBorder);
@@ -173,6 +192,78 @@ internal sealed class DarkToolTip : ToolTip
             flags);
     }
 
+    /// <summary>カーソル付近を基本に、作業領域内へ収まる位置を返す。</summary>
+    private static Point ResolveScreenLocation(Control? control, Size tipSize)
+    {
+        var cursor = Control.MousePosition;
+        var working = control is { IsDisposed: false }
+            ? Screen.FromControl(control).WorkingArea
+            : Screen.FromPoint(cursor).WorkingArea;
+
+        var x = cursor.X + CursorOffsetX;
+        var y = cursor.Y + CursorOffsetY;
+
+        if (x + tipSize.Width > working.Right)
+        {
+            x = Math.Max(working.Left, cursor.X - tipSize.Width - CursorOffsetX);
+        }
+
+        if (y + tipSize.Height > working.Bottom)
+        {
+            y = Math.Max(working.Top, cursor.Y - tipSize.Height - CursorOffsetY);
+        }
+
+        if (x < working.Left)
+        {
+            x = working.Left;
+        }
+
+        if (y < working.Top)
+        {
+            y = working.Top;
+        }
+
+        if (x + tipSize.Width > working.Right)
+        {
+            x = Math.Max(working.Left, working.Right - tipSize.Width);
+        }
+
+        if (y + tipSize.Height > working.Bottom)
+        {
+            y = Math.Max(working.Top, working.Bottom - tipSize.Height);
+        }
+
+        return new Point(x, y);
+    }
+
+    private void MoveTipWindow(Point screenLocation, Size size)
+    {
+        var handle = GetTipHandle();
+        if (handle == IntPtr.Zero || size.Width <= 0 || size.Height <= 0)
+        {
+            return;
+        }
+
+        MoveWindow(handle, screenLocation.X, screenLocation.Y, size.Width, size.Height, false);
+    }
+
+    private IntPtr GetTipHandle()
+    {
+        try
+        {
+            if (HandleProperty?.GetValue(this) is IntPtr handle)
+            {
+                return handle;
+            }
+        }
+        catch
+        {
+            // 内部ハンドルが取れない環境では OS 位置のままにする。
+        }
+
+        return IntPtr.Zero;
+    }
+
     private static Size MeasureTip(string text, Font font)
     {
         const TextFormatFlags flags =
@@ -187,4 +278,13 @@ internal sealed class DarkToolTip : ToolTip
             new Size(MaxTipWidth, int.MaxValue),
             flags);
     }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool MoveWindow(
+        IntPtr hWnd,
+        int x,
+        int y,
+        int width,
+        int height,
+        bool repaint);
 }

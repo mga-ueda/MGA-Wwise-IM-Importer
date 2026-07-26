@@ -467,7 +467,11 @@ internal static class WwiseMusicPlanBuilder
                 sampleRate,
                 bars,
                 markers);
-            segments.Add(ToSingleTrackSegment(built, sourceWavPath, trackName: built.Name));
+            segments.Add(ToSingleTrackSegment(
+                built,
+                sourceWavPath,
+                trackName: built.Name,
+                part.Number));
         }
 
         return new WwisePlaylistPlan
@@ -590,6 +594,7 @@ internal static class WwiseMusicPlanBuilder
                 tracks.Add(new WwiseTrackPlan
                 {
                     Name = trackName,
+                    SourcePartNumber = member.Part.Number,
                     SourceWavPath = member.WavPath,
                     ClipStartMs = draft.ClipStartMs,
                     ClipEndMs = draft.ClipEndMs,
@@ -677,7 +682,8 @@ internal static class WwiseMusicPlanBuilder
     private static WwiseSegmentPlan ToSingleTrackSegment(
         PartSegmentDraft draft,
         string sourceWavPath,
-        string trackName) =>
+        string trackName,
+        int sourcePartNumber) =>
         new()
         {
             Name = draft.Name,
@@ -695,6 +701,7 @@ internal static class WwiseMusicPlanBuilder
                 new WwiseTrackPlan
                 {
                     Name = trackName,
+                    SourcePartNumber = sourcePartNumber,
                     SourceWavPath = sourceWavPath,
                     ClipStartMs = draft.ClipStartMs,
                     ClipEndMs = draft.ClipEndMs,

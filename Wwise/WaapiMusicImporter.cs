@@ -8,11 +8,14 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <summary>
 /// <see cref="WwiseMusicPlan"/> を WAAPI（ak.wwise.core.object.set）で Wwise へ流し込む。
 /// <para>
-/// 1. 各 Music Segment 用の WAV を用意する。複数波形で焼き込み不要なら元ファイルを
+/// 1. 各 Music Segment 用の WAV を用意する。複数波形なら可能なら元ファイルを
 ///    outputDirectory へコピーして共有し、MusicClip の Begin/End Offset で範囲を合わせる。
-///    ラウドネス焼き込みが必要なときだけ切り出し WAV を書く。
+///    それ以外はソースから範囲を切り出して書く（ゲインは焼き込まない）。
 /// 2. 複数パート時は State Group／State を作成または更新し、Music Switch Container に割当。
 /// 3. object.set で Playlist／Segment／Track（＋WAV）と Cue を作成。
+///    Layer Music Option（Keep Layer Balance）オン時は、グループ内の相対バランスを
+///    Music Track の Make-Up Gain へ載せる。
+///    Wwise の Loudness Normalization チェックは付けない。
 /// 4. グループ化 Playlist はグループ名の State Group（State A/B/C…）を作り、
 ///    Group Fade が全員同一なら Default Transition Time のみ、異なれば Custom Transition Time
 ///    （遷移先 State ごと。このとき Default は Wwise 既定 1 秒のまま）、
@@ -29,6 +32,12 @@ internal static class WaapiMusicImporter
     /// <summary>WAAPI が受け付ける MusicClip Fade Duration の上限（ミリ秒＝3.6 秒）。</summary>
     private const double WaapiMusicClipFadeMaxMs = 3600;
 
+    /// <summary>
+    /// Playlist 先頭セグメント（Zero latency）の Look-ahead Time（ms）。
+    /// 極端な音量低下時に減衰が追いつかないケースを避けるため 0 ではなく 50 を使う。
+    /// </summary>
+    private const int FirstSegmentLookAheadMs = 50;
+
     /// <summary>MusicClip FadeInMode / FadeOutMode: Manual。</summary>
     private const int MusicClipFadeModeManual = 1;
 
@@ -44,11 +53,7 @@ internal static class WaapiMusicImporter
         IReadOnlyList<WaveformOutputPart> outputParts,
         WavFileInfo wavInfo,
         IReadOnlyDictionary<int, int>? partGroupIds = null,
-        bool loudnessNormalizeEnabled = false,
-        double loudnessTargetLkfs = -24.0,
-        bool loudnessPreserveGroupBalance = true,
-        bool autoVolumeEnabled = true,
-        AutoVolumeTarget autoVolumeTarget = AutoVolumeTarget.MakeUpGain,
+        bool loudnessPreserveGroupBalance = false,
         bool updateExistingStateGroup = false,
         IReadOnlyList<RegionEdgeFade>? regionEdgeFades = null,
         IProgress<string>? progress = null,
@@ -96,35 +101,24 @@ internal static class WaapiMusicImporter
         }
 
         Dictionary<int, float>? partGains = null;
-        if (loudnessNormalizeEnabled)
+        if (loudnessPreserveGroupBalance)
         {
-            Log(UiStrings.LogLoudnessNormalizeOn(loudnessTargetLkfs, loudnessPreserveGroupBalance));
-            partGains = LoudnessMeter.ComputePartGains(
+            Log(UiStrings.LogLoudnessGroupBalanceOn);
+            partGains = LoudnessMeter.ComputeGroupBalanceGains(
                 sourceWavPath,
                 wavInfo,
                 outputParts,
                 partGroupIds,
-                loudnessTargetLkfs,
-                loudnessPreserveGroupBalance,
                 Log);
-            if (autoVolumeEnabled)
-            {
-                Log(
-                    UiStrings.LogAutoVolumeOn(
-                        autoVolumeTarget == AutoVolumeTarget.VoiceVolume
-                            ? UiStrings.LabelVoiceVolume
-                            : UiStrings.LabelMakeUpGain));
-            }
-            else
-            {
-                Log(UiStrings.LogAutoVolumeOff);
-            }
         }
 
-        var applyAutoVolume = loudnessNormalizeEnabled && autoVolumeEnabled && partGains is not null;
+        var applyMakeUpGain = loudnessPreserveGroupBalance
+            && partGains is not null
+            && partGains.Count > 0;
 
         // 中間パート WAV は作らず、元 WAV から最終セグメント WAV を直接切り出す。
         // リージョン端フェードは WAV へ焼き込まず、後段で MusicClip 非破壊フェードとして設定する。
+        // Layer Music Option は Make-Up Gain へ載せ、WAV ゲインは変えない。
         var fadesForClip = regionEdgeFades?
             .Select(fade => fade.Normalized())
             .Where(fade => fade.HasAnyFade)
@@ -138,7 +132,6 @@ internal static class WaapiMusicImporter
             sampleRate,
             blockAlign,
             wavInfo,
-            partGains,
             Log);
 
         // タイムアウトは import を含むので長めに取る
@@ -186,8 +179,7 @@ internal static class WaapiMusicImporter
                             playlist,
                             segmentMedia,
                             importSettings,
-                            applyAutoVolume,
-                            autoVolumeTarget,
+                            applyMakeUpGain,
                             partGains,
                             Log),
                         returnOptions,
@@ -231,8 +223,7 @@ internal static class WaapiMusicImporter
                         parentPath,
                         segmentMedia,
                         importSettings,
-                        applyAutoVolume,
-                        autoVolumeTarget,
+                        applyMakeUpGain,
                         partGains,
                         Log),
                     returnOptions,
@@ -781,7 +772,7 @@ internal static class WaapiMusicImporter
 
     /// <summary>
     /// 各トラックのメディアを用意する。返り値は TrackSliceKey → バインディング。
-    /// 複数波形で焼き込み不要なら元 WAV を outputDirectory へコピーして再利用する。
+    /// 複数波形で共有可能な場合は元 WAV を outputDirectory へコピーして再利用する。
     /// </summary>
     private static Dictionary<string, TrackMediaBinding> SliceSegmentWavs(
         WwiseMusicPlan plan,
@@ -791,7 +782,6 @@ internal static class WaapiMusicImporter
         uint sampleRate,
         ushort blockAlign,
         WavFileInfo wavInfo,
-        IReadOnlyDictionary<int, float>? partGains,
         Action<string> log)
     {
         Directory.CreateDirectory(outputDirectory);
@@ -842,13 +832,6 @@ internal static class WaapiMusicImporter
                                 $"{track.ClipStartMs}..{track.ClipEndMs} ms"));
                     }
 
-                    var gain = 1f;
-                    if (partGains is not null
-                        && partGains.TryGetValue(part.Number, out var partGain))
-                    {
-                        gain = partGain;
-                    }
-
                     var trackKey = TrackSliceKey(segment.Name, track.Name);
                     var sliceSourcePath = part.ResolveSourcePath(sourceWavPath);
                     var localStart = part.VirtualToLocal(startSample);
@@ -860,14 +843,13 @@ internal static class WaapiMusicImporter
                         ? sliceInfo.BlockAlign
                         : blockAlign;
 
-                    // 複数波形: 焼き込み不要なら元 WAV を outputDirectory へコピーして共有（2 本のまま）。
+                    // 複数波形: 元 WAV を outputDirectory へコピーして共有（2 本のまま）。
                     // セグメントごとの範囲は MusicClip Begin/End Offset で合わせる（手動作業の自動化）。
                     if (CanReuseDedicatedSourceWav(
                             part,
                             sliceSourcePath,
                             localStart,
                             localEnd,
-                            gain,
                             sliceInfo))
                     {
                         var desiredFileName = string.IsNullOrWhiteSpace(part.FileName)
@@ -921,7 +903,7 @@ internal static class WaapiMusicImporter
                         continue;
                     }
 
-                    // ラウドネス等のゲイン焼き込み時のみ切り出し。
+                    // 切り出し（ゲイン焼き込みなし。ラウドネスは Make-Up Gain）。
                     var desiredSliceName = string.IsNullOrWhiteSpace(part.FileName)
                         ? $"{track.Name}.wav"
                         : part.FileName;
@@ -937,9 +919,7 @@ internal static class WaapiMusicImporter
                         destSlice,
                         localStart,
                         localEnd,
-                        sliceBlockAlign,
-                        gain,
-                        sliceInfo);
+                        sliceBlockAlign);
                     var writtenInfo = WavFileInfo.Read(destSlice);
                     map[trackKey] = new TrackMediaBinding(
                         Path.GetFullPath(destSlice),
@@ -949,9 +929,7 @@ internal static class WaapiMusicImporter
                         writtenInfo.SampleRate != 0 ? writtenInfo.SampleRate : sampleRate,
                         ApplyClipTrim: false,
                         ReusedOriginal: false);
-                    log(Math.Abs(gain - 1f) < 0.000001f
-                        ? UiStrings.LogWavSliceWritten(fileName)
-                        : UiStrings.LogWavSliceWrittenWithGain(fileName, gain));
+                    log(UiStrings.LogWavSliceWritten(fileName));
                     log(
                         UiStrings.LogTrackMediaBinding(
                             segment.Name,
@@ -969,7 +947,7 @@ internal static class WaapiMusicImporter
     }
 
     /// <summary>
-    /// 複数波形の専用ソースで、焼き込みなしに元 WAV を共有できるか。
+    /// 複数波形の専用ソースで、元 WAV を共有できるか。
     /// 部分範囲は MusicClip トリムで合わせる前提（手動と同じ 2 波形構成）。
     /// </summary>
     private static bool CanReuseDedicatedSourceWav(
@@ -977,7 +955,6 @@ internal static class WaapiMusicImporter
         string sliceSourcePath,
         long localStart,
         long localEnd,
-        float gain,
         WavFileInfo sliceInfo)
     {
         if (!part.HasDedicatedSource || sliceInfo.FrameCount <= 0)
@@ -988,11 +965,6 @@ internal static class WaapiMusicImporter
         var localMin = part.ResolveLocalStart();
         var localMax = part.ResolveLocalEnd();
         if (localStart < localMin || localEnd > localMax || localEnd <= localStart)
-        {
-            return false;
-        }
-
-        if (Math.Abs(gain - 1f) >= 0.000001f)
         {
             return false;
         }
@@ -1014,9 +986,7 @@ internal static class WaapiMusicImporter
         string destinationPath,
         long startSample,
         long endSample,
-        ushort blockAlign,
-        float gain,
-        WavFileInfo wavInfo)
+        ushort blockAlign)
     {
         if (!string.Equals(
                 Path.GetFullPath(sourcePath),
@@ -1028,9 +998,7 @@ internal static class WaapiMusicImporter
                 destinationPath,
                 startSample,
                 endSample,
-                blockAlign,
-                gain,
-                wavInfo);
+                blockAlign);
             return;
         }
 
@@ -1042,9 +1010,7 @@ internal static class WaapiMusicImporter
                 temporaryPath,
                 startSample,
                 endSample,
-                blockAlign,
-                gain,
-                wavInfo);
+                blockAlign);
             File.Move(temporaryPath, destinationPath, overwrite: true);
         }
         finally
@@ -1642,8 +1608,7 @@ internal static class WaapiMusicImporter
         WwisePlaylistPlan playlist,
         IReadOnlyDictionary<string, TrackMediaBinding> segmentMedia,
         WwiseImportSettings importSettings,
-        bool applyAutoVolume,
-        AutoVolumeTarget autoVolumeTarget,
+        bool applyMakeUpGain,
         IReadOnlyDictionary<int, float>? partGains,
         Action<string> log) =>
         new()
@@ -1662,8 +1627,7 @@ internal static class WaapiMusicImporter
                             segmentMedia,
                             importSettings,
                             isMultiPart: true,
-                            applyAutoVolume,
-                            autoVolumeTarget,
+                            applyMakeUpGain,
                             partGains,
                             log),
                     },
@@ -1678,8 +1642,7 @@ internal static class WaapiMusicImporter
         string parentPath,
         IReadOnlyDictionary<string, TrackMediaBinding> segmentMedia,
         WwiseImportSettings importSettings,
-        bool applyAutoVolume,
-        AutoVolumeTarget autoVolumeTarget,
+        bool applyMakeUpGain,
         IReadOnlyDictionary<int, float>? partGains,
         Action<string> log)
     {
@@ -1700,8 +1663,7 @@ internal static class WaapiMusicImporter
                             segmentMedia,
                             importSettings,
                             isMultiPart: false,
-                            applyAutoVolume,
-                            autoVolumeTarget,
+                            applyMakeUpGain,
                             partGains,
                             log),
                     },
@@ -1719,8 +1681,7 @@ internal static class WaapiMusicImporter
         IReadOnlyDictionary<string, TrackMediaBinding> segmentMedia,
         WwiseImportSettings importSettings,
         bool isMultiPart,
-        bool applyAutoVolume,
-        AutoVolumeTarget autoVolumeTarget,
+        bool applyMakeUpGain,
         IReadOnlyDictionary<int, float>? partGains,
         Action<string> log)
     {
@@ -1742,7 +1703,10 @@ internal static class WaapiMusicImporter
                 isFirstSegment: i == 0,
                 streamEnabled,
                 lookAheadMs,
-                prefetchLengthMs));
+                prefetchLengthMs,
+                applyMakeUpGain,
+                partGains,
+                log));
             itemDefs.Add(new Dictionary<string, object?>
             {
                 ["type"] = "MusicPlaylistItem",
@@ -1754,7 +1718,7 @@ internal static class WaapiMusicImporter
         }
 
         var name = isMultiPart ? playlist.Name : plan.ContainerName;
-        var def = new Dictionary<string, object?>
+        return new Dictionary<string, object?>
         {
             ["type"] = "MusicPlaylistContainer",
             ["name"] = name,
@@ -1769,83 +1733,7 @@ internal static class WaapiMusicImporter
                 ["children"] = itemDefs,
             },
         };
-
-        if (applyAutoVolume && partGains is not null)
-        {
-            var compensationDb = ResolveAutoVolumeCompensationDb(playlist, partGains, log);
-            if (autoVolumeTarget == AutoVolumeTarget.VoiceVolume)
-            {
-                def["@Volume"] = compensationDb;
-                def["@MakeUpGain"] = 0f;
-                log(
-                    $"Auto Volume: playlist {name} → Voice Volume {compensationDb:0.##} dB"
-                    + " (Make-Up Gain = 0)");
-            }
-            else
-            {
-                def["@MakeUpGain"] = compensationDb;
-                def["@Volume"] = 0f;
-                log(
-                    $"Auto Volume: playlist {name} → Make-Up Gain {compensationDb:0.##} dB"
-                    + " (Voice Volume = 0)");
-            }
-        }
-
-        return def;
     }
-
-    /// <summary>
-    /// Playlist 構成パートの線形ゲインから補償 dB を求める。
-    /// 複数パートでゲインが食い違う場合は先頭メンバーを使い警告する。
-    /// </summary>
-    private static float ResolveAutoVolumeCompensationDb(
-        WwisePlaylistPlan playlist,
-        IReadOnlyDictionary<int, float> partGains,
-        Action<string> log)
-    {
-        if (playlist.SourcePartNumbers.Count == 0)
-        {
-            return 0f;
-        }
-
-        float? firstGain = null;
-        var mismatched = false;
-        foreach (var partNumber in playlist.SourcePartNumbers)
-        {
-            if (!partGains.TryGetValue(partNumber, out var gain))
-            {
-                continue;
-            }
-
-            if (firstGain is null)
-            {
-                firstGain = gain;
-                continue;
-            }
-
-            if (Math.Abs(gain - firstGain.Value) > 1e-4f)
-            {
-                mismatched = true;
-            }
-        }
-
-        if (firstGain is null)
-        {
-            return 0f;
-        }
-
-        if (mismatched)
-        {
-            log(UiStrings.LogAutoVolumeGainMismatch(playlist.Name, playlist.SourcePartNumbers[0]));
-        }
-
-        return CompensationDb(firstGain.Value);
-    }
-
-    private static float CompensationDb(float linearGain) =>
-        linearGain <= 0f || Math.Abs(linearGain - 1f) < 1e-6f
-            ? 0f
-            : (float)(-20.0 * Math.Log10(linearGain));
 
     private static Dictionary<string, object?> BuildSegmentDef(
         WwiseSegmentPlan segment,
@@ -1853,7 +1741,10 @@ internal static class WaapiMusicImporter
         bool isFirstSegment,
         bool streamEnabled,
         int lookAheadMs,
-        int prefetchLengthMs)
+        int prefetchLengthMs,
+        bool applyMakeUpGain,
+        IReadOnlyDictionary<int, float>? partGains,
+        Action<string> log)
     {
         // 切り出し WAV の先頭がセグメント 0。Cue は相対時刻。
         // 元 WAV 再利用時は作成後に MusicClip トリム＋WWU の PlayAt パッチで範囲を合わせる。
@@ -1873,7 +1764,8 @@ internal static class WaapiMusicImporter
             }
 
             // 先頭セグメント内の全トラック（グループ化レイヤー含む）に
-            // Zero latency ＋ Prefetch を付け、2 番目以降は Look-ahead のみ。
+            // Zero latency ＋ Prefetch を付け、Look-ahead は 50ms（減衰追従用）。
+            // 2 番目以降は Look-ahead のみ（UI 設定値）。
             var zeroLatency = streamEnabled && isFirstSegment;
             var trackProps = new Dictionary<string, object?>
             {
@@ -1891,7 +1783,7 @@ internal static class WaapiMusicImporter
             if (streamEnabled)
             {
                 trackProps["@IsZeroLatency"] = zeroLatency;
-                trackProps["@LookAheadTime"] = zeroLatency ? 0 : lookAheadMs;
+                trackProps["@LookAheadTime"] = zeroLatency ? FirstSegmentLookAheadMs : lookAheadMs;
                 if (zeroLatency)
                 {
                     trackProps["@PreFetchLength"] = prefetchLengthMs;
@@ -1903,7 +1795,7 @@ internal static class WaapiMusicImporter
 
         // Entry/Exit/Custom Cue は作成後に listMode=replaceAll で一括設定する
         // （ここへ @Cues を載せる・既定 Cue と二重になる）。
-        return new Dictionary<string, object?>
+        var def = new Dictionary<string, object?>
         {
             ["type"] = "MusicSegment",
             ["name"] = segment.Name,
@@ -1914,6 +1806,43 @@ internal static class WaapiMusicImporter
             ["@EndPosition"] = endLocal,
             ["children"] = trackDefs,
         };
+
+        if (applyMakeUpGain && partGains is not null)
+        {
+            ApplySegmentMakeUpGains(trackDefs, segment, partGains, log);
+        }
+
+        return def;
+    }
+
+    /// <summary>
+    /// グループ相対ゲインを各 Music Track の Make-Up Gain へ載せる。
+    /// </summary>
+    private static void ApplySegmentMakeUpGains(
+        List<object> trackDefs,
+        WwiseSegmentPlan segment,
+        IReadOnlyDictionary<int, float> partGains,
+        Action<string> log)
+    {
+        for (var i = 0; i < segment.Tracks.Count; i++)
+        {
+            var partNumber = segment.Tracks[i].SourcePartNumber;
+            if (!partGains.TryGetValue(partNumber, out var linearGain))
+            {
+                continue;
+            }
+
+            if (trackDefs[i] is not Dictionary<string, object?> trackProps)
+            {
+                continue;
+            }
+
+            var gainDb = LoudnessMeter.LinearGainToDb(linearGain);
+            trackProps["@MakeUpGain"] = gainDb;
+            log(UiStrings.LogLoudnessMakeUpGainApplied(
+                $"{segment.Name}/{segment.Tracks[i].Name}",
+                gainDb));
+        }
     }
 
     /// <summary>

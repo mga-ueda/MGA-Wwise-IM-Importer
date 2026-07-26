@@ -5,7 +5,7 @@ namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
 /// ソース WAV の指定サンプル範囲だけを切り出して書き出す（メタデータ埋め込みなし）。
-/// 線形ゲイン（例: Loudness Normalize）を適用できる。リージョン端フェードは焼き込まない。
+/// リージョン端フェードやラウドネス補正は焼き込まない。
 /// </summary>
 internal static class WavSegmentWriter
 {
@@ -17,9 +17,7 @@ internal static class WavSegmentWriter
         string destinationPath,
         long startSample,
         long endSample,
-        ushort blockAlign,
-        float gain = 1f,
-        WavFileInfo? formatInfo = null)
+        ushort blockAlign)
     {
         if (blockAlign == 0)
         {
@@ -109,61 +107,11 @@ internal static class WavSegmentWriter
         writer.Write(Encoding.ASCII.GetBytes("data"));
         writer.Write(segmentByteLength);
         source.Position = dataStart + startByte;
-
-        var applyConstantGain = Math.Abs(gain - 1f) >= 0.000001f;
-        if (!applyConstantGain)
-        {
-            CopyExact(source, dest, segmentByteLength);
-        }
-        else
-        {
-            var info = formatInfo ?? WavFileInfo.Read(sourcePath);
-            CopyWithConstantGain(source, dest, segmentByteLength, info, gain);
-        }
+        CopyExact(source, dest, segmentByteLength);
 
         if ((segmentByteLength & 1) == 1)
         {
             writer.Write((byte)0);
-        }
-    }
-
-    private static void CopyWithConstantGain(
-        Stream source,
-        Stream destination,
-        int byteCount,
-        WavFileInfo info,
-        float linearGain)
-    {
-        var format = LoudnessMeter.ResolvePcmFormat(info);
-        var bytesPerSample = info.BitsPerSample / 8;
-        var channels = info.Channels;
-        if (bytesPerSample <= 0 || info.BlockAlign != channels * bytesPerSample)
-        {
-            throw new InvalidDataException(UiStrings.ErrSampleFormatInvalid);
-        }
-
-        if (byteCount % info.BlockAlign != 0)
-        {
-            throw new InvalidDataException(UiStrings.ErrExportBytesNotBlockAligned);
-        }
-
-        var frame = new byte[info.BlockAlign];
-        var frames = byteCount / info.BlockAlign;
-        for (var i = 0; i < frames; i++)
-        {
-            var read = source.Read(frame, 0, frame.Length);
-            if (read != frame.Length)
-            {
-                throw new EndOfStreamException(UiStrings.ErrDataChunkTruncated);
-            }
-
-            for (var c = 0; c < channels; c++)
-            {
-                var sample = LoudnessMeter.DecodeSample(frame, c * bytesPerSample, format) * linearGain;
-                LoudnessMeter.EncodeSample(sample, frame, c * bytesPerSample, format);
-            }
-
-            destination.Write(frame, 0, frame.Length);
         }
     }
 

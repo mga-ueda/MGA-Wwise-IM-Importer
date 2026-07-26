@@ -134,6 +134,9 @@ internal sealed class WwiseTrackPlan
 {
     public required string Name { get; init; }
 
+    /// <summary>このトラックの元パート番号（Make-Up Gain 照合用）。</summary>
+    public required int SourcePartNumber { get; init; }
+
     /// <summary>エクスポートされたパート WAV のフルパス（コピー前）。</summary>
     public required string SourceWavPath { get; init; }
 

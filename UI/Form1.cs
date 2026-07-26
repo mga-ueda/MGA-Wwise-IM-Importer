@@ -2523,12 +2523,7 @@ public partial class Form1 : Form, IMessageFilter
                 profile.StreamEnabled,
                 profile.LookAheadMs,
                 profile.PrefetchLengthMs);
-            markerOptionsPanel.BindLoudness(
-                profile.LoudnessNormalizeEnabled,
-                profile.LoudnessTargetLkfs,
-                profile.LoudnessPreserveGroupBalance,
-                profile.AutoVolumeEnabled,
-                profile.AutoVolumeTarget);
+            markerOptionsPanel.BindLoudness(profile.LoudnessPreserveGroupBalance);
             markerOptionsPanel.BindMoreOptions(profile.MoreOptionsExpanded);
             waveformView.MarkerGridOverride = _markerSettings.GridOverride;
             if (_previewSession is { } session)
@@ -3250,11 +3245,7 @@ public partial class Form1 : Form, IMessageFilter
         profile.LookAheadMs = markerOptionsPanel.LookAheadMs;
         profile.PrefetchLengthMs = markerOptionsPanel.PrefetchLengthMs;
         profile.StreamEnabled = markerOptionsPanel.StreamEnabled;
-        profile.LoudnessNormalizeEnabled = markerOptionsPanel.LoudnessNormalizeEnabled;
-        profile.LoudnessTargetLkfs = markerOptionsPanel.LoudnessTargetLkfs;
         profile.LoudnessPreserveGroupBalance = markerOptionsPanel.LoudnessPreserveGroupBalance;
-        profile.AutoVolumeEnabled = markerOptionsPanel.AutoVolumeEnabled;
-        profile.AutoVolumeTarget = markerOptionsPanel.AutoVolumeTarget;
         profile.MoreOptionsExpanded = markerOptionsPanel.MoreOptionsExpanded;
         profile.KeepLastSession = keepLastSessionCheckBox.Checked;
         profile.AutoActive = waapiStatusBar.AutoActiveChecked;
@@ -4655,6 +4646,7 @@ public partial class Form1 : Form, IMessageFilter
         _playlistGroupPaintStickyGroupId = null;
         ApplyPlaylistGroupMarkerSharing();
         EndPlaylistGroupPaint();
+        UpdateLayerMusicOptionEnabled();
     }
 
     private void ClearPlaylistDisableState()
@@ -5092,6 +5084,7 @@ public partial class Form1 : Form, IMessageFilter
 
         ApplyPlaylistSelectorColors();
         UpdateExportButtonState();
+        UpdateLayerMusicOptionEnabled();
     }
 
     /// <summary>
@@ -5101,6 +5094,7 @@ public partial class Form1 : Form, IMessageFilter
     /// </summary>
     private void ApplyPlaylistGroupMarkerSharing()
     {
+        UpdateLayerMusicOptionEnabled();
         if (_previewSession is not { } session)
         {
             return;
@@ -5117,6 +5111,18 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         waveformView.SetMarkers(session.EffectiveMarkers);
+    }
+
+    /// <summary>
+    /// 有効なグループ（無効パートを除き 2 パート以上）があるときだけ
+    /// Layer Music Option を操作可能にする。
+    /// </summary>
+    private void UpdateLayerMusicOptionEnabled()
+    {
+        var hasEffectiveGroup = BuildEnabledPartGroupIds()
+            .GroupBy(pair => pair.Value)
+            .Any(group => group.Count() >= 2);
+        markerOptionsPanel.SetLayerMusicOptionEnabled(hasEffectiveGroup);
     }
 
     private Dictionary<int, int> BuildEnabledPartGroupIds() =>
@@ -5151,6 +5157,7 @@ public partial class Form1 : Form, IMessageFilter
 
         SyncTransitionSettingsForGroup(groupId);
         UpdateGroupFadeRadioEnabled();
+        UpdateLayerMusicOptionEnabled();
     }
 
     /// <summary>
@@ -5204,6 +5211,7 @@ public partial class Form1 : Form, IMessageFilter
 
         DiscardPlaylistGroupIfEmpty(groupId);
         UpdateGroupFadeRadioEnabled();
+        UpdateLayerMusicOptionEnabled();
     }
 
     private void DiscardPlaylistGroupIfEmpty(int groupId)
@@ -8989,11 +8997,7 @@ public partial class Form1 : Form, IMessageFilter
                 snapshot.Parts,
                 preview.WavInfo,
                 snapshot.PartGroupIds,
-                markerOptionsPanel.LoudnessNormalizeEnabled,
-                markerOptionsPanel.LoudnessTargetLkfs,
                 markerOptionsPanel.LoudnessPreserveGroupBalance,
-                markerOptionsPanel.AutoVolumeEnabled,
-                markerOptionsPanel.AutoVolumeTarget,
                 updateExistingStateGroup,
                 _previewSession?.RegionEdgeFades,
                 progress));

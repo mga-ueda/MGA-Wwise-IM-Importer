@@ -461,13 +461,23 @@ internal static class UiStrings
 
     public static string TipLookAheadLabel => Get(
         "2 番目以降のセグメントの Look-ahead Time（ms、0〜9999。既定 500）。"
-        + " Stream オン時のみ有効。先頭セグメント内の全トラック（グループ化レイヤー含む）は Zero latency のため 0 固定です。",
+        + " Stream オン時のみ有効。"
+        + " 先頭セグメント内の全トラック（グループ化レイヤー含む）は Zero latency のため UI 値ではなく 50ms 固定です"
+        + "（極端な音量低下時の減衰追従用）。",
         "Look-ahead Time for the 2nd and later segments (ms, 0–9999, default 500)."
-        + " Only when Stream is on. All tracks in the first segment (including layered groups) use Zero latency (0).");
+        + " Only when Stream is on."
+        + " All tracks in the first segment (including layered groups) use Zero latency with a fixed 50 ms"
+        + " Look-ahead (not the UI value), to keep up with extreme volume drops.");
 
     public static string TipLookAheadBox => Get(
-        "Look-ahead Time（ms）。0〜9999。既定は 500 です。Stream オン時のみ有効。",
-        "Look-ahead Time (ms). 0–9999. Default 500. Only when Stream is on.");
+        "Look-ahead Time（ms）。0〜9999。既定は 500 です。Stream オン時のみ有効。"
+        + " 先頭セグメントには適用されません（固定 50ms）。",
+        "Look-ahead Time (ms). 0–9999. Default 500. Only when Stream is on."
+        + " Not applied to the first segment (fixed 50 ms).");
+
+    public static string TipLookAheadUnit => Get(
+        "単位はミリ秒（ms）です。",
+        "Unit is milliseconds (ms).");
 
     public static string TipPrefetchLabel => Get(
         "Playlist 先頭セグメント内の全トラック（グループ化レイヤー含む）の Prefetch Length（ms、0〜9999。既定 500）。"
@@ -481,69 +491,39 @@ internal static class UiStrings
         "Prefetch Length (ms). 0–9999. Default 500."
         + " Applied to all tracks in the first playlist segment. Only when Stream is on.");
 
+    public static string TipPrefetchUnit => Get(
+        "単位はミリ秒（ms）です。",
+        "Unit is milliseconds (ms).");
+
     public static string TipLoudnessHeader => Get(
-        "このアプリ独自のラウドネス正規化です（Wwise の非破壊 Loudness Normalize とは無関係）。"
-        + " EXPORT 時に分割 WAV へ破壊編集でゲインを焼き込みます。",
-        "App-specific loudness normalization (unrelated to Wwise’s non-destructive Loudness Normalize)."
-        + " On EXPORT, gain is baked into split WAVs.");
-
-    public static string TipLoudnessEnabled => Get(
-        "オンの場合、EXPORT で分割した各 WAV の音量を Target LKFS へ破壊的に正規化します"
-        + "（既定オフ。Wwise 標準機能ではなく、このアプリ独自の処理です）。"
-        + " 元の連続波形は変更せず、書き出すセパレート WAV のみを書き換えます。",
-        "When on, destructively normalize each split WAV to Target LKFS on EXPORT"
-        + " (default off; app-specific, not a Wwise feature)."
-        + " The original continuous wave is unchanged; only exported separate WAVs are rewritten.");
-
-    public static string TipLoudnessTarget => Get(
-        "正規化の目標ラウドネス（LKFS、−70〜0。既定 −24）。Normalize オン時のみ有効。",
-        "Target loudness (LKFS, −70 to 0, default −24). Only when Normalize is on.");
-
-    public static string TipLoudnessTargetBox => Get(
-        "目標ラウドネス（LKFS）。−70〜0。既定は −24 です。Normalize オン時のみ有効。",
-        "Target loudness (LKFS). −70 to 0. Default −24. Only when Normalize is on.");
-
-    public static string TipLoudnessUnit => Get(
-        "単位は LKFS（ITU-R BS.1770 / LUFS と同値）です。",
-        "Unit is LKFS (same scale as ITU-R BS.1770 / LUFS).");
+        "Layer Music Option。"
+        + " Wwise の Loudness Normalization を利用しているときはオンを推奨します。"
+        + " グループ内の相対バランスを、Music Track の Make-Up Gain で維持します。",
+        "Layer Music Option."
+        + " Recommended on when using Wwise Loudness Normalization."
+        + " Keeps relative balance within a group via Music Track Make-Up Gain.");
 
     public static string TipLoudnessGroupBalance => Get(
-        "オンの場合、グループ内で最も大きい音量のファイルを Target に合わせ、"
-        + "他メンバーは相対バランスを保ったまま同じゲインを破壊編集で適用します（既定オン）。"
-        + " オフでは各ファイルを個別に Target へ正規化します。",
-        "When on, match the loudest file in a group to Target and apply the same gain to members"
-        + " to keep relative balance (default on)."
-        + " When off, normalize each file to Target individually.");
-
-    public static string TipAutoVolume => Get(
-        "オンの場合、Loudness Normalize で変化した音量の逆を Music Playlist の"
-        + " Make-Up Gain または Voice Volume へ書き戻します（既定オフ）。Normalize オン時のみ有効。",
-        "When on, write the inverse of Loudness Normalize gain back to the Music Playlist"
-        + " Make-Up Gain or Voice Volume (default off). Only when Normalize is on.");
-
-    public static string TipAutoVolumeMakeUpGain => Get(
-        "Auto Volume の補償を Music Playlist の Make-Up Gain へ設定します（既定）。"
-        + " Voice Volume は 0 にします。",
-        "Apply Auto Volume compensation to Music Playlist Make-Up Gain (default)."
-        + " Voice Volume is set to 0.");
-
-    public static string TipAutoVolumeVoiceVolume => Get(
-        "Auto Volume の補償を Music Playlist の Voice Volume へ設定します。"
-        + " Make-Up Gain は 0 にします。",
-        "Apply Auto Volume compensation to Music Playlist Voice Volume."
-        + " Make-Up Gain is set to 0.");
-
-    public static string TipAutoVolumeHeader => Get(
-        "Loudness Normalize のゲイン変化を Music Playlist の音量プロパティで打ち消します。",
-        "Compensate Loudness Normalize gain changes via Music Playlist volume properties.");
+        "オンの場合、グループ内各パートの Integrated Loudness（LKFS）を計測し、"
+        + "最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差だけ下げます（既定オフ）。"
+        + " Wwise の Loudness Normalization 利用時にオンを推奨。"
+        + " 補正は Music Track の Make-Up Gain へ書き込みます。"
+        + " グループ（2 パート以上）が無いときは操作できません。",
+        "When on, measures each grouped part’s Integrated Loudness (LKFS),"
+        + " sets Make-Up Gain of the loudest part to 0 dB and lowers the others by the relative difference"
+        + " (default off)."
+        + " Recommended when using Wwise Loudness Normalization."
+        + " Writes Make-Up Gain on the Music Track."
+        + " Disabled when no group of 2+ parts exists.");
 
     public static string TipMoreOptionsHeader => Get(
-        "Stream／Loudness Normalize／Auto Volume／Marker Grid／Marker Comment を開閉します（既定は開いた状態）。"
+        "Stream／Layer Music Option／Marker Comment／Marker Grid を開閉します（既定は開いた状態）。"
         + " 開閉状態はプロジェクト設定へ自動保存されます。"
         + " 開閉しても Music Playlist の高さは変わりません。",
-        "Expand/collapse Stream / Loudness Normalize / Auto Volume / Marker Grid / Marker Comment (default open)."
+        "Expand/collapse Stream / Layer Music Option / Marker Comment / Marker Grid (default open)."
         + " Expansion is saved per project."
         + " Playlist height is unchanged when toggling.");
+
 
     public static string TipMarkerGridHeader => Get(
         "マーカーをドラッグで付与するときのスナップ間隔を指定します。縦線の描画には影響しません。",
@@ -1751,12 +1731,6 @@ internal static class UiStrings
         trackName,
         rangeMs);
 
-    public static string LogAutoVolumeGainMismatch(string playlistName, int partNumber) => Format(
-        "Auto Volume: playlist {0} のレイヤーゲインが不一致のため 先頭パート {1} の補償を使用",
-        "Auto Volume: playlist {0} layer gains differ; using compensation from first part {1}",
-        playlistName,
-        partNumber);
-
     public static string ErrSlicedWavMissing(string segmentName, string trackName) => Format(
         "切り出し WAV が見つかりません: {0}/{1}",
         "Sliced WAV not found: {0}/{1}",
@@ -1880,10 +1854,6 @@ internal static class UiStrings
     public static string ErrSampleFormatInvalid => Get(
         "WAV のサンプル形式が不正です。",
         "WAV sample format is invalid.");
-
-    public static string ErrExportBytesNotBlockAligned => Get(
-        "書き出しバイト数が BlockAlign の倍数ではありません。",
-        "Export byte count is not a multiple of BlockAlign.");
 
     public static string ErrPcmBitUnsupported(int bits) => Format(
         "{0} bit PCM は未対応です。",
@@ -2037,14 +2007,11 @@ internal static class UiStrings
     public static string LabelStream => Get("Stream", "Stream");
     public static string LabelPrefetchLength => Get("Prefetch Length", "Prefetch Length");
     public static string LabelLookAheadTime => Get("Look-ahead Time", "Look-ahead Time");
-    public static string LabelLoudnessNormalize => Get("Loudness Normalize", "Loudness Normalize");
-    public static string LabelNormalize => Get("Normalize", "Normalize");
-    public static string LabelTarget => Get("Target", "Target");
-    public static string LabelLkfsUnit => Get("LKFS", "LKFS");
-    public static string LabelPreserveGroupBalance => Get("Preserve Group Balance", "Preserve Group Balance");
-    public static string LabelAutoVolume => Get("Auto Volume", "Auto Volume");
-    public static string LabelMakeUpGain => Get("Make-Up Gain", "Make-Up Gain");
-    public static string LabelVoiceVolume => Get("Voice Volume", "Voice Volume");
+    public static string LabelMsUnit => Get("ms", "ms");
+    public static string LabelLayerMusicOption => Get(
+        "Layer Music Option",
+        "Layer Music Option");
+    public static string LabelKeepLayerBalance => Get("Keep Layer Balance", "Keep Layer Balance");
     public static string LabelMarkerGridHeader => Get("Marker Grid", "Marker Grid");
     public static string LabelMarkerComment => Get("Marker Comment", "Marker Comment");
     public static string LabelDigits => Get("Digits", "Digits");
@@ -2425,13 +2392,6 @@ internal static class UiStrings
         "State Group is available.",
         "State Group is available.");
 
-    public static string LogAutoVolumeOn(string target) => Format(
-        "Auto Volume: ON → {0}",
-        "Auto Volume: ON → {0}",
-        target);
-
-    public static string LogAutoVolumeOff => Get("Auto Volume: OFF", "Auto Volume: OFF");
-
     public static string LogPlaylistSummary(string name, int segmentCount) => Format(
         "--- Playlist: {0} ({1} segments) ---",
         "--- Playlist: {0} ({1} segments) ---",
@@ -2448,12 +2408,6 @@ internal static class UiStrings
         "WAV: {0} (copied original to output)",
         fileName);
 
-    public static string LogWavSliceWrittenWithGain(string fileName, double gain) => Format(
-        "WAV: {0} (gain {1:0.000})",
-        "WAV: {0} (gain {1:0.000})",
-        fileName,
-        gain);
-
     public static string LogXmlPresence(string path, bool present) => Format(
         "Xml  : {0} ({1})",
         "Xml  : {0} ({1})",
@@ -2467,38 +2421,46 @@ internal static class UiStrings
         bucketCount,
         frameCount);
 
-    public static string LogLoudnessNormalizeOn(double targetLkfs, bool preserveGroupBalance) => Format(
-        "Loudness: Normalize ON → target {0:0.##} LKFS{1}",
-        "Loudness: Normalize ON → target {0:0.##} LKFS{1}",
-        targetLkfs,
-        preserveGroupBalance ? " (Preserve Group Balance)" : string.Empty);
+    public static string LogLoudnessGroupBalanceOn => Get(
+        "Layer Music Option: Keep Layer Balance ON → Make-Up Gain (Music Track)",
+        "Layer Music Option: Keep Layer Balance ON → Make-Up Gain (Music Track)");
 
     public static string LabelMusicSwitchContainer => Get("Music Switch Container", "Music Switch Container");
     public static string LabelMusicPlaylistContainer => Get("Music Playlist Container", "Music Playlist Container");
 
     public static string LogLoudnessPartSilence(int partNumber) => Format(
-        "Loudness: part {0} = (silence)",
-        "Loudness: part {0} = (silence)",
+        "Layer Music Option: part {0} = (silence)",
+        "Layer Music Option: part {0} = (silence)",
         partNumber);
 
     public static string LogLoudnessPartValue(int partNumber, double lkfs) => Format(
-        "Loudness: part {0} = {1:0.00} LKFS",
-        "Loudness: part {0} = {1:0.00} LKFS",
+        "Layer Music Option: part {0} = {1:0.00} LKFS",
+        "Layer Music Option: part {0} = {1:0.00} LKFS",
         partNumber,
         lkfs);
 
-    public static string LogLoudnessGroupSilence(int groupId, double gain) => Format(
-        "Loudness: group {0} peak = (silence) → gain {1:0.000}",
-        "Loudness: group {0} peak = (silence) → gain {1:0.000}",
-        groupId,
-        gain);
+    public static string LogLoudnessPartGain(int partNumber, float makeUpGainDb) => Format(
+        "Layer Music Option: part {0} → Make-Up Gain {1:0.##} dB",
+        "Layer Music Option: part {0} → Make-Up Gain {1:0.##} dB",
+        partNumber,
+        makeUpGainDb);
 
-    public static string LogLoudnessGroupValue(int groupId, double maxLkfs, double gain) => Format(
-        "Loudness: group {0} peak = {1:0.00} LKFS → gain {2:0.000}",
-        "Loudness: group {0} peak = {1:0.00} LKFS → gain {2:0.000}",
+    public static string LogLoudnessMakeUpGainApplied(string objectName, float makeUpGainDb) => Format(
+        "Layer Music Option: {0} → Make-Up Gain {1:0.##} dB",
+        "Layer Music Option: {0} → Make-Up Gain {1:0.##} dB",
+        objectName,
+        makeUpGainDb);
+
+    public static string LogLoudnessGroupSilence(int groupId) => Format(
+        "Layer Music Option: group {0} peak = (silence)",
+        "Layer Music Option: group {0} peak = (silence)",
+        groupId);
+
+    public static string LogLoudnessGroupValue(int groupId, double maxLkfs) => Format(
+        "Layer Music Option: group {0} peak = {1:0.00} LKFS (Make-Up Gain 0 dB)",
+        "Layer Music Option: group {0} peak = {1:0.00} LKFS (Make-Up Gain 0 dB)",
         groupId,
-        maxLkfs,
-        gain);
+        maxLkfs);
 
     // WavFileInfo report（元から Yes / No）
     public static string BoolYes => Get("Yes", "Yes");

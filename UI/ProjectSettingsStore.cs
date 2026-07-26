@@ -53,26 +53,20 @@ internal sealed class ProjectProfile
     /// <summary>EXPORT 完了時に Wwise を前面化するか（既定オン）。</summary>
     public bool AutoActive { get; set; } = true;
 
-    /// <summary>2 番目以降のセグメントの Look-ahead time（ms）。</summary>
+    /// <summary>
+    /// 2 番目以降のセグメントの Look-ahead time（ms）。
+    /// 先頭セグメント（Zero latency）は固定 50ms のため、この値は使わない。
+    /// </summary>
     public int LookAheadMs { get; set; } = 500;
 
     /// <summary>Playlist 先頭セグメント内全トラックの Prefetch Length（ms）。</summary>
     public int PrefetchLengthMs { get; set; } = 500;
 
-    /// <summary>EXPORT 時のラウドネス正規化（既定オフ）。</summary>
-    public bool LoudnessNormalizeEnabled { get; set; }
-
-    /// <summary>正規化ターゲット（LKFS。既定 −24）。</summary>
-    public double LoudnessTargetLkfs { get; set; } = -24.0;
-
-    /// <summary>グループ内の相対バランスを保って正規化するか（既定オン）。</summary>
-    public bool LoudnessPreserveGroupBalance { get; set; } = true;
-
-    /// <summary>正規化ゲインの逆を Music Playlist へ戻すか（既定オフ）。</summary>
-    public bool AutoVolumeEnabled { get; set; } = false;
-
-    /// <summary>Auto Volume の書き戻し先（既定 Make-Up Gain）。</summary>
-    public AutoVolumeTarget AutoVolumeTarget { get; set; } = AutoVolumeTarget.MakeUpGain;
+    /// <summary>
+    /// Layer Music Option / Keep Layer Balance（既定オフ）。
+    /// グループ内相対バランスを Music Track の Make-Up Gain で維持する。
+    /// </summary>
+    public bool LoudnessPreserveGroupBalance { get; set; }
 
     /// <summary>More Options パネルを開いた状態にするか（既定オン）。</summary>
     public bool MoreOptionsExpanded { get; set; } = true;
@@ -122,11 +116,7 @@ internal sealed class ProjectProfile
         AutoActive = AutoActive,
         LookAheadMs = LookAheadMs,
         PrefetchLengthMs = PrefetchLengthMs,
-        LoudnessNormalizeEnabled = LoudnessNormalizeEnabled,
-        LoudnessTargetLkfs = LoudnessTargetLkfs,
         LoudnessPreserveGroupBalance = LoudnessPreserveGroupBalance,
-        AutoVolumeEnabled = AutoVolumeEnabled,
-        AutoVolumeTarget = AutoVolumeTarget,
         MoreOptionsExpanded = MoreOptionsExpanded,
         KeepLastSession = KeepLastSession,
         LastWavePath = LastWavePath,
@@ -210,11 +200,7 @@ internal sealed class ProjectSettingsStore
         AutoActive = true,
         LookAheadMs = 500,
         PrefetchLengthMs = 500,
-        LoudnessNormalizeEnabled = false,
-        LoudnessTargetLkfs = -24.0,
-        LoudnessPreserveGroupBalance = true,
-        AutoVolumeEnabled = false,
-        AutoVolumeTarget = AutoVolumeTarget.MakeUpGain,
+        LoudnessPreserveGroupBalance = false,
         MoreOptionsExpanded = true,
         KeepLastSession = true,
         LastWavePath = string.Empty,
@@ -577,12 +563,7 @@ internal sealed class ProjectSettingsStore
                 .ToString(CultureInfo.InvariantCulture),
             ["PrefetchLengthMs"] = Math.Clamp(profile.PrefetchLengthMs, 0, 9999)
                 .ToString(CultureInfo.InvariantCulture),
-            ["LoudnessNormalizeEnabled"] = profile.LoudnessNormalizeEnabled ? "1" : "0",
-            ["LoudnessTargetLkfs"] = Math.Clamp(profile.LoudnessTargetLkfs, -70.0, 0.0)
-                .ToString("0.###", CultureInfo.InvariantCulture),
             ["LoudnessPreserveGroupBalance"] = profile.LoudnessPreserveGroupBalance ? "1" : "0",
-            ["AutoVolumeEnabled"] = profile.AutoVolumeEnabled ? "1" : "0",
-            ["AutoVolumeTarget"] = profile.AutoVolumeTarget.ToString(),
             ["MoreOptionsExpanded"] = profile.MoreOptionsExpanded ? "1" : "0",
             ["KeepLastSession"] = profile.KeepLastSession ? "1" : "0",
             ["LastWavePath"] = profile.LastWavePath,
@@ -692,34 +673,10 @@ internal sealed class ProjectSettingsStore
             profile.PrefetchLengthMs = Math.Clamp(prefetchMs, 0, 9999);
         }
 
-        profile.LoudnessNormalizeEnabled = ReadBool(
-            values,
-            "LoudnessNormalizeEnabled",
-            defaultValue: false);
-        if (values.TryGetValue("LoudnessTargetLkfs", out var loudnessTargetText)
-            && double.TryParse(
-                loudnessTargetText,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out var loudnessTarget))
-        {
-            profile.LoudnessTargetLkfs = Math.Clamp(loudnessTarget, -70.0, 0.0);
-        }
-
         profile.LoudnessPreserveGroupBalance = ReadBool(
             values,
             "LoudnessPreserveGroupBalance",
-            defaultValue: true);
-
-        profile.AutoVolumeEnabled = ReadBool(
-            values,
-            "AutoVolumeEnabled",
             defaultValue: false);
-        if (values.TryGetValue("AutoVolumeTarget", out var autoVolumeTargetText)
-            && Enum.TryParse<AutoVolumeTarget>(autoVolumeTargetText, ignoreCase: true, out var autoVolumeTarget))
-        {
-            profile.AutoVolumeTarget = autoVolumeTarget;
-        }
 
         profile.MoreOptionsExpanded = ReadBool(
             values,

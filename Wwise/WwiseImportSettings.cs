@@ -13,7 +13,10 @@ internal sealed class WwiseImportSettings
     /// <summary>Music Track のストリーミング有効（既定オン）。</summary>
     public bool StreamEnabled { get; init; } = true;
 
-    /// <summary>2 番目以降のセグメントの Look-ahead time（ms）。</summary>
+    /// <summary>
+    /// 2 番目以降のセグメントの Look-ahead time（ms）。
+    /// 先頭セグメント（Zero latency）は固定 50ms のため、この値は使わない。
+    /// </summary>
     public int LookAheadMs { get; init; } = DefaultLookAheadMs;
 
     /// <summary>Playlist 先頭セグメント内全トラックの Prefetch Length（ms）。ストリーミング時に有効。</summary>
