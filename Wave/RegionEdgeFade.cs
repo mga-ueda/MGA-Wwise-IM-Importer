@@ -16,7 +16,9 @@ internal enum RegionFadeCurveKind
 
 /// <summary>
 /// 連続リージョン固まり（非除外ラン）のイン／アウト端フェード。
-/// ソース WAV は非破壊。プレビュー表示・再生に適用し、EXPORT 時は分割 WAV へ焼き込む。
+/// ソース WAV・EXPORT 分割 WAV とも非破壊。プレビュー表示・再生と MusicClip Fade に適用する。
+/// Fade In は固まり先頭 Music Segment 内、Fade Out は末尾 Music Segment 内に制限する
+/// （<c>-A</c>／<c>-E</c> は隣接リージョンと同一セグメントのため、その範囲もフェード可能）。
 /// </summary>
 internal readonly record struct RegionEdgeFade(
     long InSample,
@@ -69,8 +71,14 @@ internal readonly record struct RegionEdgeFade(
 
     public bool HasAnyFade => HasFadeIn || HasFadeOut;
 
-    /// <summary>食い込みを解消した正規化済みフェードを返す。</summary>
-    public RegionEdgeFade Normalized()
+    /// <summary>
+    /// 食い込みを解消した正規化済みフェードを返す。
+    /// <paramref name="firstSegmentEndSample"/> / <paramref name="lastSegmentStartSample"/> があるとき、
+    /// Fade In は先頭 Music Segment 末尾まで、Fade Out は末尾 Music Segment 先頭からに制限する。
+    /// </summary>
+    public RegionEdgeFade Normalized(
+        long? firstSegmentEndSample = null,
+        long? lastSegmentStartSample = null)
     {
         if (OutSample <= InSample)
         {
@@ -79,11 +87,38 @@ internal readonly record struct RegionEdgeFade(
 
         var fadeInEnd = EffectiveFadeInEnd;
         var fadeOutStart = EffectiveFadeOutStart;
+
+        if (firstSegmentEndSample is { } firstEnd)
+        {
+            var clampEnd = Math.Clamp(firstEnd, InSample, OutSample);
+            fadeInEnd = Math.Min(fadeInEnd, clampEnd);
+        }
+
+        if (lastSegmentStartSample is { } lastStart)
+        {
+            var clampStart = Math.Clamp(lastStart, InSample, OutSample);
+            fadeOutStart = Math.Max(fadeOutStart, clampStart);
+        }
+
         if (fadeInEnd > fadeOutStart)
         {
             var mid = InSample + (OutSample - InSample) / 2;
-            fadeInEnd = Math.Min(fadeInEnd, mid);
-            fadeOutStart = Math.Max(fadeOutStart, mid);
+            if (firstSegmentEndSample is { } fe && lastSegmentStartSample is { } ls
+                && fe <= ls)
+            {
+                // セグメント境界が分かれているときは跨ぎを優先して解消する。
+                fadeInEnd = Math.Min(fadeInEnd, Math.Clamp(fe, InSample, OutSample));
+                fadeOutStart = Math.Max(fadeOutStart, Math.Clamp(ls, InSample, OutSample));
+                if (fadeInEnd > fadeOutStart)
+                {
+                    fadeInEnd = fadeOutStart;
+                }
+            }
+            else
+            {
+                fadeInEnd = Math.Min(fadeInEnd, mid);
+                fadeOutStart = Math.Max(fadeOutStart, mid);
+            }
         }
 
         fadeInEnd = Math.Clamp(fadeInEnd, InSample, OutSample);
@@ -104,6 +139,21 @@ internal readonly record struct RegionEdgeFade(
 
     public RegionEdgeFade WithCurves(RegionFadeCurveKind fadeInCurve, RegionFadeCurveKind fadeOutCurve) =>
         new(InSample, OutSample, FadeInEndSample, FadeOutStartSample, fadeInCurve, fadeOutCurve);
+
+    /// <summary>Wwise MusicClip FadeInShape / FadeOutShape の列挙値。</summary>
+    public static int ToWwiseShape(RegionFadeCurveKind kind) => kind switch
+    {
+        RegionFadeCurveKind.LogarithmicBase3 => 0,
+        RegionFadeCurveKind.SineConstantPowerFadeIn => 1,
+        RegionFadeCurveKind.LogarithmicBase141 => 2,
+        RegionFadeCurveKind.InvertedSCurve => 3,
+        RegionFadeCurveKind.Linear => 4,
+        RegionFadeCurveKind.SCurve => 6,
+        RegionFadeCurveKind.ExponentialBase141 => 7,
+        RegionFadeCurveKind.SineConstantPowerFadeOut => 8,
+        RegionFadeCurveKind.ExponentialBase3 => 9,
+        _ => 6,
+    };
 
     /// <summary>
     /// [startSample, endSample) がいずれかのフェード区間と重なるか。
@@ -236,45 +286,141 @@ internal readonly record struct RegionEdgeFade(
         return 1f;
     }
 
+    /// <summary>
+    /// 除外で区切られた連続リージョン固まり。
+    /// Fade In 上限＝先頭 Music Segment 終端、Fade Out 下限＝末尾 Music Segment 始端。
+    /// Music Segment は <c>-A</c>／<c>-E</c> を隣接リージョンと束ねた単位（独立リージョンではない）。
+    /// </summary>
+    public readonly record struct RunSegmentLimits(
+        long InSample,
+        long OutSample,
+        long FirstSegmentEndSample,
+        long LastSegmentStartSample);
+
     /// <summary>除外で区切られた連続リージョン固まりの (In, Out) 一覧。</summary>
     public static IReadOnlyList<(long InSample, long OutSample)> CollectRunBounds(
         IReadOnlyList<WaveformRegionMark> regions)
     {
-        var bounds = new List<(long, long)>();
-        long? runIn = null;
-        long runOut = 0;
+        return CollectRunSegmentLimits(regions)
+            .Select(run => (run.InSample, run.OutSample))
+            .ToList();
+    }
+
+    /// <summary>
+    /// 固まり境界と、先頭／末尾 Music Segment 境界を返す。
+    /// セグメント束ねは Wwise 取り込みと同じ（<c>-A</c> は次と、<c>-E</c> は直前と同グループ）。
+    /// </summary>
+    public static IReadOnlyList<RunSegmentLimits> CollectRunSegmentLimits(
+        IReadOnlyList<WaveformRegionMark> regions)
+    {
+        var runs = new List<RunSegmentLimits>();
+        List<WaveformRegionMark>? current = null;
         foreach (var region in regions)
         {
             if (region.IsExcluded)
             {
-                if (runIn is { } inSample && runOut > inSample)
+                if (current is { Count: > 0 })
                 {
-                    bounds.Add((inSample, runOut));
+                    runs.Add(BuildRunSegmentLimits(current));
                 }
 
-                runIn = null;
+                current = null;
                 continue;
             }
 
-            if (runIn is null)
+            current ??= [];
+            current.Add(region);
+        }
+
+        if (current is { Count: > 0 })
+        {
+            runs.Add(BuildRunSegmentLimits(current));
+        }
+
+        return runs;
+    }
+
+    private static RunSegmentLimits BuildRunSegmentLimits(IReadOnlyList<WaveformRegionMark> runRegions)
+    {
+        var inSample = runRegions[0].StartSampleOffset;
+        var outSample = runRegions[^1].EndSampleOffset;
+        var segments = GroupRegionsIntoMusicSegments(runRegions);
+        var first = segments[0];
+        var last = segments[^1];
+        return new RunSegmentLimits(
+            inSample,
+            outSample,
+            first[^1].EndSampleOffset,
+            last[0].StartSampleOffset);
+    }
+
+    /// <summary>
+    /// リージョンを Music Segment 単位に束ねる。<c>-A</c> は次と、続く <c>-E</c> は同グループへ。
+    /// Wwise 取り込み時のセグメント分割と同じ規則。
+    /// </summary>
+    public static List<List<WaveformRegionMark>> GroupRegionsIntoMusicSegments(
+        IReadOnlyList<WaveformRegionMark> regions)
+    {
+        var groups = new List<List<WaveformRegionMark>>();
+        var i = 0;
+        while (i < regions.Count)
+        {
+            var group = new List<WaveformRegionMark> { regions[i] };
+
+            if (IsAnacrusisRegion(regions[i]) && i + 1 < regions.Count)
             {
-                runIn = region.StartSampleOffset;
+                i++;
+                group.Add(regions[i]);
             }
 
-            runOut = region.EndSampleOffset;
+            if (i + 1 < regions.Count && IsExitTailRegion(regions[i + 1]))
+            {
+                i++;
+                group.Add(regions[i]);
+            }
+
+            groups.Add(group);
+            i++;
         }
 
-        if (runIn is { } lastIn && runOut > lastIn)
+        return groups;
+    }
+
+    private static bool IsAnacrusisRegion(WaveformRegionMark region) =>
+        region.NameSuffix.Equals(
+            WaveformRegionBuilder.AnacrusisSuffix,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsExitTailRegion(WaveformRegionMark region) =>
+        region.NameSuffix.Equals(
+            WaveformRegionBuilder.LoopEndSuffix,
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 指定固まりの先頭／末尾セグメント境界を探す。見つからなければ false。
+    /// </summary>
+    public static bool TryGetRunSegmentLimits(
+        IReadOnlyList<WaveformRegionMark> regions,
+        long inSample,
+        long outSample,
+        out RunSegmentLimits limits)
+    {
+        foreach (var run in CollectRunSegmentLimits(regions))
         {
-            bounds.Add((lastIn, runOut));
+            if (run.InSample == inSample && run.OutSample == outSample)
+            {
+                limits = run;
+                return true;
+            }
         }
 
-        return bounds;
+        limits = default;
+        return false;
     }
 
     /// <summary>
     /// 現在の固まり境界に合わせてフェードを再マップする。
-    /// In/Out が一致するものだけ残し、それ以外は破棄。
+    /// In/Out が一致するものだけ残し、セグメント跨ぎはクランプして破棄判定する。
     /// </summary>
     public static IReadOnlyList<RegionEdgeFade> RemapToRuns(
         IReadOnlyList<RegionEdgeFade> existing,
@@ -285,22 +431,24 @@ internal readonly record struct RegionEdgeFade(
             return [];
         }
 
-        var runs = CollectRunBounds(regions);
+        var runs = CollectRunSegmentLimits(regions);
         if (runs.Count == 0)
         {
             return [];
         }
 
-        var runSet = runs.ToHashSet();
+        var runByBounds = runs.ToDictionary(r => (r.InSample, r.OutSample));
         var kept = new List<RegionEdgeFade>();
         foreach (var fade in existing)
         {
-            if (!runSet.Contains((fade.InSample, fade.OutSample)))
+            if (!runByBounds.TryGetValue((fade.InSample, fade.OutSample), out var limits))
             {
                 continue;
             }
 
-            var normalized = fade.Normalized();
+            var normalized = fade.Normalized(
+                limits.FirstSegmentEndSample,
+                limits.LastSegmentStartSample);
             if (normalized.HasAnyFade)
             {
                 kept.Add(normalized);
@@ -316,7 +464,9 @@ internal readonly record struct RegionEdgeFade(
         long fadeInEnd,
         long? fadeOutStart,
         RegionFadeCurveKind fadeInCurve = RegionFadeCurveKind.SCurve,
-        RegionFadeCurveKind fadeOutCurve = RegionFadeCurveKind.SCurve)
+        RegionFadeCurveKind fadeOutCurve = RegionFadeCurveKind.SCurve,
+        long? firstSegmentEndSample = null,
+        long? lastSegmentStartSample = null)
     {
         return new RegionEdgeFade(
             inSample,
@@ -324,7 +474,7 @@ internal readonly record struct RegionEdgeFade(
             fadeInEnd,
             fadeOutStart,
             fadeInCurve,
-            fadeOutCurve).Normalized();
+            fadeOutCurve).Normalized(firstSegmentEndSample, lastSegmentStartSample);
     }
 
     public static RegionEdgeFade WithFadeOutStart(
@@ -333,7 +483,9 @@ internal readonly record struct RegionEdgeFade(
         long? fadeInEnd,
         long fadeOutStart,
         RegionFadeCurveKind fadeInCurve = RegionFadeCurveKind.SCurve,
-        RegionFadeCurveKind fadeOutCurve = RegionFadeCurveKind.SCurve)
+        RegionFadeCurveKind fadeOutCurve = RegionFadeCurveKind.SCurve,
+        long? firstSegmentEndSample = null,
+        long? lastSegmentStartSample = null)
     {
         return new RegionEdgeFade(
             inSample,
@@ -341,7 +493,7 @@ internal readonly record struct RegionEdgeFade(
             fadeInEnd,
             fadeOutStart,
             fadeInCurve,
-            fadeOutCurve).Normalized();
+            fadeOutCurve).Normalized(firstSegmentEndSample, lastSegmentStartSample);
     }
 }
 

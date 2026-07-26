@@ -280,20 +280,24 @@ internal static class UiStrings
         + "C / .: center the view on the seek position (seek unchanged)");
 
     public static string TipWaveformRegionFadeHandle => Get(
-        "白三角をドラッグ: リージョン端フェード（非破壊プレビュー）"
+        "白三角をドラッグ: リージョン端フェード（非破壊）"
         + Environment.NewLine
         + "フェード範囲を右クリック: カーブを選択（Wwise と同じ名前・並び）"
         + Environment.NewLine
-        + "EXPORT 時に分割 WAV へ焼き込み（破壊編集。MusicClip プロパティは変更しません）"
+        + "Fade In は先頭 Music Segment 内、Fade Out は末尾 Music Segment 内に制限（-A/-E は同一セグメント）"
+        + Environment.NewLine
+        + "EXPORT 時は MusicClip の非破壊フェードとして設定（WAV へ焼き込みません）"
         + Environment.NewLine
         + "Playlist 遷移フェードとは別物で、重ねがけされます"
         + Environment.NewLine
         + "Ctrl+Z / Ctrl+Y: Undo / Redo",
-        "Drag white triangle: region-edge fade (non-destructive preview)"
+        "Drag white triangle: region-edge fade (non-destructive)"
         + Environment.NewLine
         + "Right-click fade area: choose curve (same names/order as Wwise)"
         + Environment.NewLine
-        + "On EXPORT, baked into sliced WAVs (destructive; MusicClip props unchanged)"
+        + "Fade In stays in the first Music Segment; Fade Out in the last (-A/-E are one segment)"
+        + Environment.NewLine
+        + "On EXPORT, applied as MusicClip non-destructive fades (not baked into WAVs)"
         + Environment.NewLine
         + "Independent from Playlist transition fades; gains multiply"
         + Environment.NewLine
@@ -1980,6 +1984,57 @@ internal static class UiStrings
         segmentName,
         beginMs,
         endMs);
+
+    public static string LogMusicClipFadeCatalog(int count) => Format(
+        "Message : MusicClip を {0} 件検出しました（リージョン端フェード設定用）。",
+        "Message : Found {0} MusicClip(s) for region-edge fade lookup.",
+        count);
+
+    public static string LogMusicClipFadeApplied(
+        string trackName,
+        string segmentName,
+        double? fadeInMs,
+        double? fadeOutMs)
+    {
+        var inText = fadeInMs is { } fi ? $"In={fi:0.###}ms" : "In=-";
+        var outText = fadeOutMs is { } fo ? $"Out={fo:0.###}ms" : "Out=-";
+        return Format(
+            "Message : Clip fade → {0} @ {1}  {2}  {3}",
+            "Message : Clip fade → {0} @ {1}  {2}  {3}",
+            trackName,
+            segmentName,
+            inText,
+            outText);
+    }
+
+    public static string LogMusicClipFadeExceedsWaapi(int count, double maxMs) => Format(
+        "Message : Fade Duration が WAAPI 上限（{1:0.#}ms）を超えるクリップが {0} 件あります。WWU 直接編集で本値を設定します。",
+        "Message : {0} clip(s) exceed WAAPI Fade Duration limit ({1:0.#}ms). True values will be patched via WWU.",
+        count,
+        maxMs);
+
+    public static string LogMusicClipWorkUnitPatchStart(int playAtCount, int fadeCount) => Format(
+        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Fade Duration 超過={1} 件）。保存→クローズ→パッチ→再オープンを行います。",
+        "Message : Starting WWU patch (PlayAt={0}, Fade Duration over limit={1}). save → close → patch → reopen.",
+        playAtCount,
+        fadeCount);
+
+    public static string LogMusicClipWorkUnitPatchDone(int count) => Format(
+        "Message : MusicClip WWU パッチ完了（{0} クリップ）。",
+        "Message : MusicClip WWU patch done ({0} clip(s)).",
+        count);
+
+    public static string ErrMusicClipFadeVerifyFailed(
+        string clipId,
+        string property,
+        double expected,
+        double? actual) => Format(
+        "{0} の検証に失敗しました（clip={1} 期待値={2:0.###}ms 実値={3}）。WWU フォーマットが変更された可能性があります。",
+        "{0} verification failed (clip={1} expected={2:0.###}ms actual={3}). The WWU format may have changed.",
+        property,
+        clipId,
+        expected,
+        actual is null ? "(なし)" : actual.Value.ToString("0.###") + "ms");
 
     public static string LogPlayAtPatchStart(int count) => Format(
         "Message : 負の PlayAt を {0} 件設定します（WAAPI 非対応のため、保存→WWU 直接編集→再オープンを行います）",

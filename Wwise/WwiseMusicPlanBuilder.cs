@@ -581,34 +581,8 @@ internal static class WwiseMusicPlanBuilder
     /// <summary>
     /// リージョンをセグメント単位に束ねる。-A は次と、続く -E は同グループへ。
     /// </summary>
-    private static List<List<WaveformRegionMark>> GroupRegions(List<WaveformRegionMark> partRegions)
-    {
-        var groups = new List<List<WaveformRegionMark>>();
-        var i = 0;
-        while (i < partRegions.Count)
-        {
-            var group = new List<WaveformRegionMark> { partRegions[i] };
-
-            // -A は次のリージョンを取り込む（次が無い場合は単独のまま）
-            if (IsAnacrusis(partRegions[i]) && i + 1 < partRegions.Count)
-            {
-                i++;
-                group.Add(partRegions[i]);
-            }
-
-            // 直後の -E は同じグループに取り込む
-            if (i + 1 < partRegions.Count && IsExitTail(partRegions[i + 1]))
-            {
-                i++;
-                group.Add(partRegions[i]);
-            }
-
-            groups.Add(group);
-            i++;
-        }
-
-        return groups;
-    }
+    private static List<List<WaveformRegionMark>> GroupRegions(List<WaveformRegionMark> partRegions) =>
+        RegionEdgeFade.GroupRegionsIntoMusicSegments(partRegions);
 
     private static List<WwiseCustomCue> BuildCustomCues(
         long groupStartAbs,

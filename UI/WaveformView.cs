@@ -2778,7 +2778,21 @@ internal sealed class WaveformView : Control
         var next = isFadeIn
             ? fade.WithCurves(kind, fade.FadeOutCurve)
             : fade.WithCurves(fade.FadeInCurve, kind);
-        RegionFadeChanged?.Invoke(this, new RegionFadeChangedEventArgs(next.Normalized()));
+        long? firstEnd = null;
+        long? lastStart = null;
+        if (RegionEdgeFade.TryGetRunSegmentLimits(
+                _regions,
+                fade.InSample,
+                fade.OutSample,
+                out var limits))
+        {
+            firstEnd = limits.FirstSegmentEndSample;
+            lastStart = limits.LastSegmentStartSample;
+        }
+
+        RegionFadeChanged?.Invoke(
+            this,
+            new RegionFadeChangedEventArgs(next.Normalized(firstEnd, lastStart)));
     }
 
     /// <summary>
@@ -2903,7 +2917,19 @@ internal sealed class WaveformView : Control
                 && preview.InSample == _fadeDragInSample
                 && preview.OutSample == _fadeDragOutSample))
         {
-            list.Add(preview.Normalized());
+            long? firstEnd = null;
+            long? lastStart = null;
+            if (RegionEdgeFade.TryGetRunSegmentLimits(
+                    _regions,
+                    preview.InSample,
+                    preview.OutSample,
+                    out var limits))
+            {
+                firstEnd = limits.FirstSegmentEndSample;
+                lastStart = limits.LastSegmentStartSample;
+            }
+
+            list.Add(preview.Normalized(firstEnd, lastStart));
         }
 
         return list;
@@ -2926,6 +2952,18 @@ internal sealed class WaveformView : Control
             return;
         }
 
+        RegionEdgeFade.TryGetRunSegmentLimits(
+            _regions,
+            inSample,
+            outSample,
+            out var limits);
+        long? firstSegmentEnd = limits.OutSample > limits.InSample
+            ? limits.FirstSegmentEndSample
+            : null;
+        long? lastSegmentStart = limits.OutSample > limits.InSample
+            ? limits.LastSegmentStartSample
+            : null;
+
         RegionEdgeFade next;
         var inCurve = _fadeDragPreview?.FadeInCurve ?? RegionFadeCurveKind.SCurve;
         var outCurve = _fadeDragPreview?.FadeOutCurve ?? RegionFadeCurveKind.SCurve;
@@ -2934,6 +2972,11 @@ internal sealed class WaveformView : Control
             var maxEnd = _fadeDragOtherHandleSample is { } other && other > inSample
                 ? other
                 : outSample;
+            if (firstSegmentEnd is { } segmentEnd)
+            {
+                maxEnd = Math.Min(maxEnd, segmentEnd);
+            }
+
             var fadeInEnd = Math.Clamp(sampleOffset, inSample, maxEnd);
             next = RegionEdgeFade.WithFadeInEnd(
                 inSample,
@@ -2941,13 +2984,20 @@ internal sealed class WaveformView : Control
                 fadeInEnd,
                 _fadeDragOtherHandleSample is { } o && o < outSample ? o : null,
                 inCurve,
-                outCurve);
+                outCurve,
+                firstSegmentEnd,
+                lastSegmentStart);
         }
         else
         {
             var minStart = _fadeDragOtherHandleSample is { } other && other < outSample
                 ? other
                 : inSample;
+            if (lastSegmentStart is { } segmentStart)
+            {
+                minStart = Math.Max(minStart, segmentStart);
+            }
+
             var fadeOutStart = Math.Clamp(sampleOffset, minStart, outSample);
             next = RegionEdgeFade.WithFadeOutStart(
                 inSample,
@@ -2955,7 +3005,9 @@ internal sealed class WaveformView : Control
                 _fadeDragOtherHandleSample is { } o && o > inSample ? o : null,
                 fadeOutStart,
                 inCurve,
-                outCurve);
+                outCurve,
+                firstSegmentEnd,
+                lastSegmentStart);
         }
 
         if (_fadeDragPreview is { } current
@@ -3110,7 +3162,21 @@ internal sealed class WaveformView : Control
 
             if (fadeMoved && preview is { } fade)
             {
-                RegionFadeChanged?.Invoke(this, new RegionFadeChangedEventArgs(fade.Normalized()));
+                long? firstEnd = null;
+                long? lastStart = null;
+                if (RegionEdgeFade.TryGetRunSegmentLimits(
+                        _regions,
+                        fade.InSample,
+                        fade.OutSample,
+                        out var limits))
+                {
+                    firstEnd = limits.FirstSegmentEndSample;
+                    lastStart = limits.LastSegmentStartSample;
+                }
+
+                RegionFadeChanged?.Invoke(
+                    this,
+                    new RegionFadeChangedEventArgs(fade.Normalized(firstEnd, lastStart)));
             }
             else
             {

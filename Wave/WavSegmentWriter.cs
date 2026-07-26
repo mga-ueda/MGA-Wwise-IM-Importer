@@ -5,13 +5,14 @@ namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
 /// ソース WAV の指定サンプル範囲だけを切り出して書き出す（メタデータ埋め込みなし）。
-/// 線形ゲインおよびリージョン端フェード（サンプル単位）を適用できる。
+/// 線形ゲイン（例: Loudness Normalize）を適用できる。リージョン端フェードは焼き込まない。
 /// </summary>
 internal static class WavSegmentWriter
 {
     /// <summary>
     /// ソース WAV の指定サンプル範囲を切り出して書き出す。
-    /// <paramref name="regionEdgeFades"/> がある場合は絶対サンプル位置でゲインを乗算する（破壊編集）。
+    /// <paramref name="regionEdgeFades"/> がある場合は絶対サンプル位置でゲインを乗算する
+    /// （互換用。現行 EXPORT はリージョン端フェードを MusicClip 非破壊フェードへ渡すため渡さない）。
     /// </summary>
     public static void WriteSegment(
         string sourcePath,

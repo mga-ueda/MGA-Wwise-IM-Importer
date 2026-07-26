@@ -10,14 +10,20 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <para>
 /// 1. 各 Music Segment 用の WAV を用意する。複数波形で焼き込み不要なら元ファイルを
 ///    outputDirectory へコピーして共有し、MusicClip の Begin/End Offset で範囲を合わせる。
-///    フェード／ラウドネス焼き込みが必要なときだけ切り出し WAV を書く。
+///    ラウドネス焼き込みが必要なときだけ切り出し WAV を書く。
 /// 2. 複数パート時は State Group／State を作成または更新し、Music Switch Container に割当。
 /// 3. object.set で Playlist／Segment／Track（＋WAV）と Cue を作成。
-/// 4. 必要なら MusicClip トリムを設定する。
+/// 4. 必要なら MusicClip トリムとリージョン端フェード（非破壊）を設定する。
+///    Fade Duration が WAAPI 上限（3.6 秒）を超える場合は WWU 直接編集で本値を書く。
 /// </para>
 /// </summary>
 internal static class WaapiMusicImporter
 {
+    /// <summary>WAAPI が受け付ける MusicClip Fade Duration の上限（ミリ秒＝3.6 秒）。</summary>
+    private const double WaapiMusicClipFadeMaxMs = 3600;
+
+    /// <summary>MusicClip FadeInMode / FadeOutMode: Manual。</summary>
+    private const int MusicClipFadeModeManual = 1;
     public static async Task<string> ImportAsync(
         WaapiSettings waapiSettings,
         WwiseImportSettings importSettings,
@@ -108,7 +114,8 @@ internal static class WaapiMusicImporter
         var applyAutoVolume = loudnessNormalizeEnabled && autoVolumeEnabled && partGains is not null;
 
         // 中間パート WAV は作らず、元 WAV から最終セグメント WAV を直接切り出す。
-        var fadesForBake = regionEdgeFades?
+        // リージョン端フェードは WAV へ焼き込まず、後段で MusicClip 非破壊フェードとして設定する。
+        var fadesForClip = regionEdgeFades?
             .Select(fade => fade.Normalized())
             .Where(fade => fade.HasAnyFade)
             .ToList() ?? [];
@@ -122,7 +129,6 @@ internal static class WaapiMusicImporter
             blockAlign,
             wavInfo,
             partGains,
-            fadesForBake,
             Log);
 
         // タイムアウトは import を含むので長めに取る
@@ -245,11 +251,22 @@ internal static class WaapiMusicImporter
                 cancellationToken)
             .ConfigureAwait(false);
 
-        // 負の PlayAt は WAAPI では設定不可のため、プロジェクトを保存→クローズし、
-        // WWU（XML）を直接書き換えてから再オープンする。
-        await ApplyPlayAtFixesViaWorkUnitAsync(
+        var fadeDurationFixes = await ApplyMusicClipFadesAsync(
+                client,
+                plan,
+                musicRootPath,
+                segmentMedia,
+                fadesForClip,
+                Log,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // 負の PlayAt、および WAAPI 上限を超える Fade Duration は
+        // プロジェクトを保存→クローズし、WWU（XML）を直接書き換えてから再オープンする。
+        await ApplyMusicClipWorkUnitPatchesAsync(
                 client,
                 playAtFixes,
+                fadeDurationFixes,
                 Log,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -579,7 +596,6 @@ internal static class WaapiMusicImporter
         ushort blockAlign,
         WavFileInfo wavInfo,
         IReadOnlyDictionary<int, float>? partGains,
-        IReadOnlyList<RegionEdgeFade>? regionEdgeFades,
         Action<string> log)
     {
         Directory.CreateDirectory(outputDirectory);
@@ -647,7 +663,6 @@ internal static class WaapiMusicImporter
                     var sliceBlockAlign = sliceInfo.BlockAlign != 0
                         ? sliceInfo.BlockAlign
                         : blockAlign;
-                    var localFades = RemapFadesToLocal(regionEdgeFades, part);
 
                     // 複数波形: 焼き込み不要なら元 WAV を outputDirectory へコピーして共有（2 本のまま）。
                     // セグメントごとの範囲は MusicClip Begin/End Offset で合わせる（手動作業の自動化）。
@@ -657,7 +672,6 @@ internal static class WaapiMusicImporter
                             localStart,
                             localEnd,
                             gain,
-                            localFades,
                             sliceInfo))
                     {
                         var desiredFileName = string.IsNullOrWhiteSpace(part.FileName)
@@ -711,7 +725,7 @@ internal static class WaapiMusicImporter
                         continue;
                     }
 
-                    // フェード／ゲイン焼き込み時のみ切り出し（仕様上やむを得ない例外）。
+                    // ラウドネス等のゲイン焼き込み時のみ切り出し。
                     var desiredSliceName = string.IsNullOrWhiteSpace(part.FileName)
                         ? $"{track.Name}.wav"
                         : part.FileName;
@@ -729,8 +743,7 @@ internal static class WaapiMusicImporter
                         localEnd,
                         sliceBlockAlign,
                         gain,
-                        sliceInfo,
-                        localFades);
+                        sliceInfo);
                     var writtenInfo = WavFileInfo.Read(destSlice);
                     map[trackKey] = new TrackMediaBinding(
                         Path.GetFullPath(destSlice),
@@ -769,7 +782,6 @@ internal static class WaapiMusicImporter
         long localStart,
         long localEnd,
         float gain,
-        IReadOnlyList<RegionEdgeFade>? localFades,
         WavFileInfo sliceInfo)
     {
         if (!part.HasDedicatedSource || sliceInfo.FrameCount <= 0)
@@ -789,12 +801,6 @@ internal static class WaapiMusicImporter
             return false;
         }
 
-        if (localFades is { Count: > 0 }
-            && RegionEdgeFade.OverlapsRange(localStart, localEnd, localFades))
-        {
-            return false;
-        }
-
         return File.Exists(sliceSourcePath);
     }
 
@@ -807,40 +813,6 @@ internal static class WaapiMusicImporter
         bool ApplyClipTrim,
         bool ReusedOriginal);
 
-    private static IReadOnlyList<RegionEdgeFade>? RemapFadesToLocal(
-        IReadOnlyList<RegionEdgeFade>? regionEdgeFades,
-        WaveformOutputPart part)
-    {
-        if (regionEdgeFades is null || regionEdgeFades.Count == 0 || !part.HasDedicatedSource)
-        {
-            return regionEdgeFades;
-        }
-
-        var offset = part.StartSampleOffset - part.LocalStartSample;
-        if (offset == 0)
-        {
-            return regionEdgeFades;
-        }
-
-        var remapped = new List<RegionEdgeFade>(regionEdgeFades.Count);
-        foreach (var fade in regionEdgeFades)
-        {
-            remapped.Add(fade with
-            {
-                InSample = fade.InSample - offset,
-                OutSample = fade.OutSample - offset,
-                FadeInEndSample = fade.FadeInEndSample is long fadeIn
-                    ? fadeIn - offset
-                    : null,
-                FadeOutStartSample = fade.FadeOutStartSample is long fadeOut
-                    ? fadeOut - offset
-                    : null,
-            });
-        }
-
-        return remapped;
-    }
-
     private static void WriteSegmentSafely(
         string sourcePath,
         string destinationPath,
@@ -848,8 +820,7 @@ internal static class WaapiMusicImporter
         long endSample,
         ushort blockAlign,
         float gain,
-        WavFileInfo wavInfo,
-        IReadOnlyList<RegionEdgeFade>? regionEdgeFades)
+        WavFileInfo wavInfo)
     {
         if (!string.Equals(
                 Path.GetFullPath(sourcePath),
@@ -863,8 +834,7 @@ internal static class WaapiMusicImporter
                 endSample,
                 blockAlign,
                 gain,
-                wavInfo,
-                regionEdgeFades);
+                wavInfo);
             return;
         }
 
@@ -878,8 +848,7 @@ internal static class WaapiMusicImporter
                 endSample,
                 blockAlign,
                 gain,
-                wavInfo,
-                regionEdgeFades);
+                wavInfo);
             File.Move(temporaryPath, destinationPath, overwrite: true);
         }
         finally
@@ -1427,42 +1396,267 @@ internal static class WaapiMusicImporter
 
     private readonly record struct MusicClipPlayAtFix(string ClipId, double PlayAtMs);
 
+    private readonly record struct MusicClipFadeDurationFix(
+        string ClipId,
+        double? FadeInDurationMs,
+        double? FadeOutDurationMs);
+
     /// <summary>
-    /// 負の PlayAt を WWU 直接編集で設定する。
-    /// WAAPI の PlayAt は制約 [0, 1e10] のため、手動編集と同じ結果
-    /// （頭トリムしたクリップをタイムライン 0 に配置）を API 経由では作れない。
-    /// 手順: project.save → 対象 WWU 特定 → project.close → XML パッチ → project.open。
+    /// リージョン端フェードを MusicClip の非破壊 Fade として設定する。
+    /// WAAPI 上限（3.6 秒）までの Duration と Mode／Shape は API で書き、
+    /// 超過分は WWU パッチ用に返す。
     /// </summary>
-    private static async Task ApplyPlayAtFixesViaWorkUnitAsync(
+    private static async Task<List<MusicClipFadeDurationFix>> ApplyMusicClipFadesAsync(
         WaapiHttpClient client,
-        IReadOnlyList<MusicClipPlayAtFix> fixes,
+        WwiseMusicPlan plan,
+        string musicRootPath,
+        IReadOnlyDictionary<string, TrackMediaBinding> segmentMedia,
+        IReadOnlyList<RegionEdgeFade> fades,
         Action<string> log,
         CancellationToken cancellationToken)
     {
-        if (fixes.Count == 0)
+        var durationFixes = new List<MusicClipFadeDurationFix>();
+        if (fades.Count == 0)
+        {
+            return durationFixes;
+        }
+
+        var allClips = await QueryAllMusicClipsAsync(client, cancellationToken)
+            .ConfigureAwait(false);
+        log(UiStrings.LogMusicClipFadeCatalog(allClips.Count));
+
+        var pendingByClip = new Dictionary<string, MusicClipFadeDurationFix>(
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (var playlist in plan.Playlists)
+        {
+            var playlistPath = plan.IsMultiPart
+                ? $"{musicRootPath}\\{playlist.Name}"
+                : musicRootPath;
+            foreach (var segment in playlist.Segments)
+            {
+                var segmentPath = $"{playlistPath}\\{segment.Name}";
+                foreach (var track in segment.Tracks)
+                {
+                    var key = TrackSliceKey(segment.Name, track.Name);
+                    if (!segmentMedia.TryGetValue(key, out var media))
+                    {
+                        continue;
+                    }
+
+                    var rate = media.SampleRate;
+                    if (rate == 0)
+                    {
+                        continue;
+                    }
+
+                    RegionEdgeFade? matchedFadeIn = null;
+                    RegionEdgeFade? matchedFadeOut = null;
+                    foreach (var fade in fades)
+                    {
+                        if (fade.HasFadeIn && track.AbsoluteStartSample == fade.InSample)
+                        {
+                            matchedFadeIn = fade;
+                        }
+
+                        if (fade.HasFadeOut && track.AbsoluteEndSample == fade.OutSample)
+                        {
+                            matchedFadeOut = fade;
+                        }
+                    }
+
+                    if (matchedFadeIn is null && matchedFadeOut is null)
+                    {
+                        continue;
+                    }
+
+                    var trackPath = $"{segmentPath}\\{track.Name}";
+                    var clipIds = FindMusicClipsForTrack(
+                        allClips,
+                        trackPath,
+                        Path.GetFileNameWithoutExtension(media.WavPath));
+                    if (clipIds.Count == 0)
+                    {
+                        var guessed = await TryGetObjectIdAsync(
+                                client,
+                                $"{trackPath}\\{Path.GetFileNameWithoutExtension(media.WavPath)}",
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        if (!string.IsNullOrEmpty(guessed))
+                        {
+                            clipIds.Add(guessed);
+                        }
+                    }
+
+                    if (clipIds.Count == 0)
+                    {
+                        throw new InvalidOperationException(
+                            UiStrings.ErrMusicClipNotFound(trackPath));
+                    }
+
+                    if (clipIds.Count > 1)
+                    {
+                        throw new InvalidOperationException(
+                            UiStrings.ErrMusicClipAmbiguous(trackPath, clipIds.Count));
+                    }
+
+                    var clipId = clipIds[0];
+                    double? trueFadeInMs = null;
+                    double? trueFadeOutMs = null;
+                    double? loggedFadeInMs = null;
+                    double? loggedFadeOutMs = null;
+
+                    if (matchedFadeIn is { } fadeIn)
+                    {
+                        var samples = fadeIn.EffectiveFadeInEnd - fadeIn.InSample;
+                        loggedFadeInMs = samples * 1000.0 / rate;
+                        var waapiMs = Math.Min(loggedFadeInMs.Value, WaapiMusicClipFadeMaxMs);
+                        await SetClipPropertyAsync(
+                                client, clipId, "FadeInMode", MusicClipFadeModeManual, cancellationToken)
+                            .ConfigureAwait(false);
+                        await SetClipPropertyAsync(
+                                client,
+                                clipId,
+                                "FadeInShape",
+                                RegionEdgeFade.ToWwiseShape(fadeIn.FadeInCurve),
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        await SetClipPropertyAsync(
+                                client, clipId, "FadeInDuration", waapiMs, cancellationToken)
+                            .ConfigureAwait(false);
+                        if (loggedFadeInMs.Value > WaapiMusicClipFadeMaxMs)
+                        {
+                            trueFadeInMs = loggedFadeInMs;
+                        }
+                    }
+
+                    if (matchedFadeOut is { } fadeOut)
+                    {
+                        var samples = fadeOut.OutSample - fadeOut.EffectiveFadeOutStart;
+                        loggedFadeOutMs = samples * 1000.0 / rate;
+                        var waapiMs = Math.Min(loggedFadeOutMs.Value, WaapiMusicClipFadeMaxMs);
+                        await SetClipPropertyAsync(
+                                client, clipId, "FadeOutMode", MusicClipFadeModeManual, cancellationToken)
+                            .ConfigureAwait(false);
+                        await SetClipPropertyAsync(
+                                client,
+                                clipId,
+                                "FadeOutShape",
+                                RegionEdgeFade.ToWwiseShape(fadeOut.FadeOutCurve),
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        await SetClipPropertyAsync(
+                                client, clipId, "FadeOutDuration", waapiMs, cancellationToken)
+                            .ConfigureAwait(false);
+                        if (loggedFadeOutMs.Value > WaapiMusicClipFadeMaxMs)
+                        {
+                            trueFadeOutMs = loggedFadeOutMs;
+                        }
+                    }
+
+                    log(
+                        UiStrings.LogMusicClipFadeApplied(
+                            track.Name,
+                            segment.Name,
+                            loggedFadeInMs,
+                            loggedFadeOutMs));
+
+                    if (trueFadeInMs is not null || trueFadeOutMs is not null)
+                    {
+                        if (pendingByClip.TryGetValue(clipId, out var existing))
+                        {
+                            pendingByClip[clipId] = new MusicClipFadeDurationFix(
+                                clipId,
+                                trueFadeInMs ?? existing.FadeInDurationMs,
+                                trueFadeOutMs ?? existing.FadeOutDurationMs);
+                        }
+                        else
+                        {
+                            pendingByClip[clipId] = new MusicClipFadeDurationFix(
+                                clipId,
+                                trueFadeInMs,
+                                trueFadeOutMs);
+                        }
+                    }
+                }
+            }
+        }
+
+        durationFixes.AddRange(pendingByClip.Values);
+        if (durationFixes.Count > 0)
+        {
+            log(UiStrings.LogMusicClipFadeExceedsWaapi(durationFixes.Count, WaapiMusicClipFadeMaxMs));
+        }
+
+        return durationFixes;
+    }
+
+    /// <summary>
+    /// 負の PlayAt および WAAPI 上限超の Fade Duration を WWU 直接編集で設定する。
+    /// 手順: project.save → 対象 WWU 特定 → project.close → XML パッチ → project.open。
+    /// </summary>
+    private static async Task ApplyMusicClipWorkUnitPatchesAsync(
+        WaapiHttpClient client,
+        IReadOnlyList<MusicClipPlayAtFix> playAtFixes,
+        IReadOnlyList<MusicClipFadeDurationFix> fadeFixes,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        if (playAtFixes.Count == 0 && fadeFixes.Count == 0)
         {
             return;
         }
 
-        log(UiStrings.LogPlayAtPatchStart(fixes.Count));
+        var patches = new Dictionary<string, MusicClipWorkUnitPatch>(StringComparer.OrdinalIgnoreCase);
+        foreach (var fix in playAtFixes)
+        {
+            if (!patches.TryGetValue(fix.ClipId, out var patch))
+            {
+                patch = new MusicClipWorkUnitPatch(fix.ClipId);
+                patches[fix.ClipId] = patch;
+            }
 
-        // クリップの属する WWU ファイルとプロジェクト（.wproj）パスを先に取得する。
+            patch.PlayAtMs = fix.PlayAtMs;
+        }
+
+        foreach (var fix in fadeFixes)
+        {
+            if (!patches.TryGetValue(fix.ClipId, out var patch))
+            {
+                patch = new MusicClipWorkUnitPatch(fix.ClipId);
+                patches[fix.ClipId] = patch;
+            }
+
+            if (fix.FadeInDurationMs is { } fadeIn)
+            {
+                patch.FadeInDurationMs = fadeIn;
+            }
+
+            if (fix.FadeOutDurationMs is { } fadeOut)
+            {
+                patch.FadeOutDurationMs = fadeOut;
+            }
+        }
+
+        var patchList = patches.Values.ToList();
+        log(UiStrings.LogMusicClipWorkUnitPatchStart(playAtFixes.Count, fadeFixes.Count));
+
         var clipFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var fix in fixes)
+        foreach (var patch in patchList)
         {
             var filePath = await QuerySingleReturnStringAsync(
                     client,
-                    $"$ \"{fix.ClipId}\"",
+                    $"$ \"{patch.ClipId}\"",
                     "filePath",
                     cancellationToken)
                 .ConfigureAwait(false);
             if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             {
                 throw new InvalidOperationException(
-                    UiStrings.ErrPlayAtWorkUnitNotFound(fix.ClipId));
+                    UiStrings.ErrPlayAtWorkUnitNotFound(patch.ClipId));
             }
 
-            clipFiles[fix.ClipId] = filePath;
+            clipFiles[patch.ClipId] = filePath;
         }
 
         var projectPath = await QuerySingleReturnStringAsync(
@@ -1476,14 +1670,11 @@ internal static class WaapiMusicImporter
             throw new InvalidOperationException(UiStrings.ErrPlayAtProjectPathUnknown);
         }
 
-        // 未保存の変更（今回の作成分を含む）を WWU へ書き出してから閉じる。
         await client.CallAsync(
                 "ak.wwise.core.project.save",
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        // ここから先は途中中断するとプロジェクトが閉じたままになるため、
-        // キャンセル要求があっても再オープンまで完走させる。
         await client.CallAsync(
                 "ak.wwise.ui.project.close",
                 new Dictionary<string, object?> { ["bypassSave"] = true },
@@ -1492,19 +1683,15 @@ internal static class WaapiMusicImporter
 
         try
         {
-            // close は非同期に進行する。Wwise がまだ WWU を掴んでいる間に
-            // 書き換えると、パッチが失われたり Wwise 本体が落ちることがある。
-            // プロジェクトが完全に閉じるまで待ってからパッチする。
             await WaitForProjectClosedAsync(client).ConfigureAwait(false);
 
-            foreach (var group in fixes.GroupBy(f => clipFiles[f.ClipId], StringComparer.OrdinalIgnoreCase))
+            foreach (var group in patchList.GroupBy(p => clipFiles[p.ClipId], StringComparer.OrdinalIgnoreCase))
             {
-                PatchPlayAtInWorkUnitFile(group.Key, group.ToList(), log);
+                PatchMusicClipPropertiesInWorkUnitFile(group.Key, group.ToList(), log);
             }
         }
         finally
         {
-            // 「Closing project in progress」ロックが残っていても解除までリトライする。
             log(UiStrings.LogPlayAtProjectReopen(Path.GetFileName(projectPath)));
             await CallWithLockRetryAsync(
                     client,
@@ -1517,38 +1704,86 @@ internal static class WaapiMusicImporter
                 .ConfigureAwait(false);
         }
 
-        // open はロード完了前に返る。ロード中の WAAPI アクセスは既定値（PlayAt=0）を
-        // 返したり Wwise を不安定にするため、ロード完了を待ってから検証する。
         await WaitForProjectLoadedAsync(client, projectPath).ConfigureAwait(false);
 
-        // 書き込み結果を WAAPI で読み戻して照合する。
-        // WWU フォーマットが将来変わってパッチが無効になった場合に、ここで確実に検出する。
-        // ロード直後は既定値 0 が見えることがあるため、期待値に一致するまでリトライする。
-        foreach (var fix in fixes)
+        foreach (var patch in patchList)
         {
-            double? actual = null;
-            var verifyDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-            while (true)
+            if (patch.PlayAtMs is { } playAtMs)
             {
-                actual = await QueryClipPlayAtAsync(client, fix.ClipId)
+                await VerifyClipReal64PropertyAsync(
+                        client,
+                        patch.ClipId,
+                        "@PlayAt",
+                        playAtMs,
+                        (expected, actual) =>
+                            UiStrings.ErrPlayAtVerifyFailed(patch.ClipId, expected, actual))
                     .ConfigureAwait(false);
-                if ((actual is not null && Math.Abs(actual.Value - fix.PlayAtMs) <= 0.01)
-                    || DateTime.UtcNow >= verifyDeadline)
-                {
-                    break;
-                }
-
-                await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
             }
 
-            if (actual is null || Math.Abs(actual.Value - fix.PlayAtMs) > 0.01)
+            if (patch.FadeInDurationMs is { } fadeInMs)
             {
-                throw new InvalidOperationException(
-                    UiStrings.ErrPlayAtVerifyFailed(fix.ClipId, fix.PlayAtMs, actual));
+                await VerifyClipReal64PropertyAsync(
+                        client,
+                        patch.ClipId,
+                        "@FadeInDuration",
+                        fadeInMs,
+                        (expected, actual) =>
+                            UiStrings.ErrMusicClipFadeVerifyFailed(
+                                patch.ClipId, "FadeInDuration", expected, actual))
+                    .ConfigureAwait(false);
+            }
+
+            if (patch.FadeOutDurationMs is { } fadeOutMs)
+            {
+                await VerifyClipReal64PropertyAsync(
+                        client,
+                        patch.ClipId,
+                        "@FadeOutDuration",
+                        fadeOutMs,
+                        (expected, actual) =>
+                            UiStrings.ErrMusicClipFadeVerifyFailed(
+                                patch.ClipId, "FadeOutDuration", expected, actual))
+                    .ConfigureAwait(false);
             }
         }
 
-        log(UiStrings.LogPlayAtPatchDone(fixes.Count));
+        log(UiStrings.LogMusicClipWorkUnitPatchDone(patchList.Count));
+    }
+
+    private sealed class MusicClipWorkUnitPatch(string clipId)
+    {
+        public string ClipId { get; } = clipId;
+        public double? PlayAtMs { get; set; }
+        public double? FadeInDurationMs { get; set; }
+        public double? FadeOutDurationMs { get; set; }
+    }
+
+    private static async Task VerifyClipReal64PropertyAsync(
+        WaapiHttpClient client,
+        string clipId,
+        string returnField,
+        double expected,
+        Func<double, double?, string> errorFactory)
+    {
+        double? actual = null;
+        var verifyDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (true)
+        {
+            actual = await QueryClipReal64Async(client, clipId, returnField)
+                .ConfigureAwait(false);
+            if ((actual is not null && Math.Abs(actual.Value - expected) <= 0.01)
+                || DateTime.UtcNow >= verifyDeadline)
+            {
+                break;
+            }
+
+            await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
+        }
+
+        if (actual is null || Math.Abs(actual.Value - expected) > 0.01)
+        {
+            throw new InvalidOperationException(errorFactory(expected, actual));
+        }
     }
 
     /// <summary>
@@ -1658,16 +1893,17 @@ internal static class WaapiMusicImporter
         }
     }
 
-    /// <summary>再オープン後の MusicClip から PlayAt 実値を読み戻す。</summary>
-    private static async Task<double?> QueryClipPlayAtAsync(
+    /// <summary>再オープン後の MusicClip から Real64 プロパティを読み戻す。</summary>
+    private static async Task<double?> QueryClipReal64Async(
         WaapiHttpClient client,
-        string clipId)
+        string clipId,
+        string returnField)
     {
         var result = await CallWithLockRetryAsync(
                 client,
                 "ak.wwise.core.object.get",
                 new Dictionary<string, object?> { ["waql"] = $"$ \"{clipId}\"" },
-                new Dictionary<string, object?> { ["return"] = new[] { "id", "@PlayAt" } })
+                new Dictionary<string, object?> { ["return"] = new[] { "id", returnField } })
             .ConfigureAwait(false);
         if (!result.TryGetProperty("return", out var arr)
             || arr.ValueKind != JsonValueKind.Array
@@ -1676,33 +1912,31 @@ internal static class WaapiMusicImporter
             return null;
         }
 
-        return arr[0].TryGetProperty("@PlayAt", out var el)
+        return arr[0].TryGetProperty(returnField, out var el)
                && el.ValueKind == JsonValueKind.Number
             ? el.GetDouble()
             : null;
     }
 
-    /// <summary>WWU（XML）内の MusicClip に PlayAt プロパティを直接書き込む。</summary>
-    private static void PatchPlayAtInWorkUnitFile(
+    /// <summary>WWU（XML）内の MusicClip に Real64 プロパティを直接書き込む。</summary>
+    private static void PatchMusicClipPropertiesInWorkUnitFile(
         string wwuPath,
-        IReadOnlyList<MusicClipPlayAtFix> fixes,
+        IReadOnlyList<MusicClipWorkUnitPatch> patches,
         Action<string> log)
     {
-        // Wwise のクローズ処理がファイルを掴んだまま残ることがあるため、
-        // 排他で開けるようになるまで待ってから書き換える。
         WaitForExclusiveFileAccess(wwuPath);
 
         var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
         doc.Load(wwuPath);
 
-        foreach (var fix in fixes)
+        foreach (var patch in patches)
         {
             var clipNode = doc.SelectSingleNode(
-                $"//MusicClip[@ID='{fix.ClipId}']") as System.Xml.XmlElement;
+                $"//MusicClip[@ID='{patch.ClipId}']") as System.Xml.XmlElement;
             if (clipNode is null)
             {
                 throw new InvalidOperationException(
-                    UiStrings.ErrPlayAtClipXmlMissing(fix.ClipId, wwuPath));
+                    UiStrings.ErrPlayAtClipXmlMissing(patch.ClipId, wwuPath));
             }
 
             var propertyList = clipNode.SelectSingleNode("PropertyList") as System.Xml.XmlElement;
@@ -1712,24 +1946,45 @@ internal static class WaapiMusicImporter
                 clipNode.PrependChild(propertyList);
             }
 
-            var value = fix.PlayAtMs.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
-            if (propertyList.SelectSingleNode("Property[@Name='PlayAt']")
-                is System.Xml.XmlElement existing)
+            if (patch.PlayAtMs is { } playAtMs)
             {
-                existing.SetAttribute("Value", value);
+                UpsertReal64Property(doc, propertyList, "PlayAt", playAtMs);
             }
-            else
+
+            if (patch.FadeInDurationMs is { } fadeInMs)
             {
-                var property = doc.CreateElement("Property");
-                property.SetAttribute("Name", "PlayAt");
-                property.SetAttribute("Type", "Real64");
-                property.SetAttribute("Value", value);
-                propertyList.AppendChild(property);
+                UpsertReal64Property(doc, propertyList, "FadeInDuration", fadeInMs);
+            }
+
+            if (patch.FadeOutDurationMs is { } fadeOutMs)
+            {
+                UpsertReal64Property(doc, propertyList, "FadeOutDuration", fadeOutMs);
             }
         }
 
         doc.Save(wwuPath);
-        log(UiStrings.LogPlayAtPatchFile(Path.GetFileName(wwuPath), fixes.Count));
+        log(UiStrings.LogPlayAtPatchFile(Path.GetFileName(wwuPath), patches.Count));
+    }
+
+    private static void UpsertReal64Property(
+        System.Xml.XmlDocument doc,
+        System.Xml.XmlElement propertyList,
+        string name,
+        double value)
+    {
+        var text = value.ToString("R", System.Globalization.CultureInfo.InvariantCulture);
+        if (propertyList.SelectSingleNode($"Property[@Name='{name}']")
+            is System.Xml.XmlElement existing)
+        {
+            existing.SetAttribute("Value", text);
+            return;
+        }
+
+        var property = doc.CreateElement("Property");
+        property.SetAttribute("Name", name);
+        property.SetAttribute("Type", "Real64");
+        property.SetAttribute("Value", text);
+        propertyList.AppendChild(property);
     }
 
     /// <summary>指定ファイルを排他モードで開けるまで待つ（最大 30 秒）。</summary>
@@ -1781,7 +2036,7 @@ internal static class WaapiMusicImporter
         WaapiHttpClient client,
         string clipId,
         string property,
-        double value,
+        object value,
         CancellationToken cancellationToken)
     {
         await client.CallAsync(

@@ -156,17 +156,12 @@ internal sealed class WaveformPreviewSession
     /// <summary>1 固まり分のフェードを更新する。長さ 0 なら一覧から外す。</summary>
     public void UpsertRegionEdgeFade(RegionEdgeFade fade)
     {
-        var normalized = fade.Normalized();
         var next = _regionEdgeFades
             .Where(existing =>
-                existing.InSample != normalized.InSample
-                || existing.OutSample != normalized.OutSample)
+                existing.InSample != fade.InSample
+                || existing.OutSample != fade.OutSample)
+            .Append(fade)
             .ToList();
-        if (normalized.HasAnyFade)
-        {
-            next.Add(normalized);
-        }
-
         _regionEdgeFades = RegionEdgeFade.RemapToRuns(next, EffectiveRegions);
     }
 
