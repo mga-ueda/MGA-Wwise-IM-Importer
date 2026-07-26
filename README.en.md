@@ -10,7 +10,7 @@ Take Interactive Music from “hand-built Authoring” to “listen, decide, and
 
 Building Music Playlist Containers, Music Switch Containers, Music Segments, Music Tracks, State Groups, transitions, cues, and fades one by one in Authoring takes time. Preview on the waveform, decide transitions and layers by ear, then push a consistent Wwise structure with a single EXPORT. **Far faster than hand-building the same graph.**
 
-**You do not need Nuendo / Cubase.** A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move marker sets itself—so **a dedicated waveform editor is often unnecessary**, which is another major benefit.
+**You do not need Nuendo / Cubase.** A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so **a dedicated waveform editor is often unnecessary**, which is another major benefit.
 
 **Those DAWs make it especially powerful.** Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.
 
