@@ -183,44 +183,6 @@ internal readonly record struct RegionEdgeFade(
     };
 
     /// <summary>
-    /// [startSample, endSample) がいずれかのフェード区間と重なるか。
-    /// </summary>
-    public static bool OverlapsRange(
-        long startSample,
-        long endSample,
-        IReadOnlyList<RegionEdgeFade> fades)
-    {
-        if (endSample <= startSample || fades.Count == 0)
-        {
-            return false;
-        }
-
-        foreach (var fade in fades)
-        {
-            if (!fade.HasAnyFade)
-            {
-                continue;
-            }
-
-            if (fade.HasFadeIn
-                && startSample < fade.EffectiveFadeInEnd
-                && endSample > fade.InSample)
-            {
-                return true;
-            }
-
-            if (fade.HasFadeOut
-                && startSample < fade.OutSample
-                && endSample > fade.EffectiveFadeOutStart)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
     /// カーブ形状に応じたゲイン。範囲外は 1。
     /// </summary>
     public float GainAt(long sample)

@@ -40,7 +40,6 @@ internal static class UiColors
     public static Color BeatLine { get; set; } = Color.FromArgb(45, 170, 170, 170);
     public static Color TempoChangeLine { get; set; } = Color.FromArgb(180, 180, 255, 180);
     public static Color WaveFill { get; set; } = Color.FromArgb(182, 182, 182);
-    public static Color WaveCenter { get; set; } = Color.FromArgb(55, 55, 55);
     /// <summary>波形 0dB（垂直中心）の薄い水平線。初期値は小節線と同じ。</summary>
     public static Color WaveZeroDbLine { get; set; } = Color.FromArgb(90, 204, 204, 204);
     public static Color WaveformSourceMeterTrack { get; set; } = Color.FromArgb(18, 18, 18);
@@ -242,7 +241,6 @@ internal static class UiColors
         new("BeatLine", () => BeatLine, c => BeatLine = c),
         new("TempoChangeLine", () => TempoChangeLine, c => TempoChangeLine = c),
         new("WaveFill", () => WaveFill, c => WaveFill = c),
-        new("WaveCenter", () => WaveCenter, c => WaveCenter = c),
         new("WaveZeroDbLine", () => WaveZeroDbLine, c => WaveZeroDbLine = c),
         new("WaveformSourceMeterTrack", () => WaveformSourceMeterTrack, c => WaveformSourceMeterTrack = c),
         new("WaveformSourceMeterMinimum", () => WaveformSourceMeterMinimum, c => WaveformSourceMeterMinimum = c),

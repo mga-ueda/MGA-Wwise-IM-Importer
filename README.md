@@ -98,7 +98,7 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 | Fade In | 左のラジオから `None / 1.0 / 3.0 / 6.0 / 9.0 Sec.`（既定 None）。見出し右のカーブアイコンで MusicFade カーブを選択（ツールチップに名前、クリックで選択メニュー）。Playlist を選んでから変更するとパート（グループ）単位で記憶。再生中の Playlist 遷移だけに適用。遷移先が `-A` なら先行再生開始からフェードイン。待機中の遷移には影響せず、次の予約から適用。EXPORT 時は遷移先ルールの Destination Fade-in Time／Curve へ書く（下記「フェードと Wwise トランジション」） |
 | Options | Fade In の下（列幅は Fade In と同じ）。**プレースホルダ**（現在は空。後日項目を追加） |
 | Fade Out | 通常 Fade In と同様の秒数候補（既定 None）と見出し右のカーブアイコン。待機中の遷移には影響せず、次の予約から適用。EXPORT 時は遷移先ルールの Source Fade-out Time／Offset／Curve へ書く |
-| Group Fade | Fade Out の通常候補の下、帯付き `Group` 見出し内の秒数ラジオ（`None / 1.0 / 3.0 / 6.0 / 9.0 Sec.`。既定 None）。**In／Out 共通の 1 系統**（UI・記憶・再生とも同一秒数）。**グループ化していても Playlist ごとに個別**（通常の Fade In／Out／Exit Source At とは異なり、同一グループ ID では同期しない）。ローカル再生では同一グループ内の上乗せ／停止・グループ内遷移にだけ使う。通常 Fade はグループ内では無効。グループ外からの遷移は通常の Fade In／Out。サイドカー `PartGroupFadeSeconds` へパート別にオートセーブ／復元（旧 `PartGroupFadeInSeconds`／`PartGroupFadeOutSeconds` は読み込み時に Max で移行）。EXPORT 時の Wwise 側への載せ方は下記「グループ化 Playlist と State Group」 |
+| Group Fade | Fade Out の通常候補の下、帯付き `Group` 見出し内の秒数ラジオ（`None / 1.0 / 3.0 / 6.0 / 9.0 Sec.`。既定 None）。**In／Out 共通の 1 系統**（UI・記憶・再生とも同一秒数）。**グループ化していても Playlist ごとに個別**（通常の Fade In／Out／Exit Source At とは異なり、同一グループ ID では同期しない）。ローカル再生では同一グループ内の上乗せ／停止・グループ内遷移にだけ使う。通常 Fade はグループ内では無効。グループ外からの遷移は通常の Fade In／Out。サイドカー `PartGroupFadeSeconds` へパート別にオートセーブ／復元。EXPORT 時の Wwise 側への載せ方は下記「グループ化 Playlist と State Group」 |
 | Exit Source At | Fade Out 右（既定 Immediate）。候補は `Immediate / Next Bar / Next Beat / Next Cue / Exit Cue`。Playlist ごとに Fade In／Fade Out／Group Fade／Exit Source At を記憶。通常の Fade In／Out／Exit Source At は同一グループ ID で共通同期。サイドカーへオートセーブ／復元。Wwise へは Exit Source At・通常 Fade In／Out を Switch トランジションへ、Group Fade はグループ State Group（全員同一なら Default のみ、異なれば Custom）へ渡す（詳細は下記）。**Wwise の全候補は載せず、アプリ内で再現しにくい項目（`Next Grid`／`Custom Cue` など）は割愛**（Change Occurs At も同様） |
 | Change Occurs At | Exit Source At の下（UI 見出しは **Chg Occ At**）。`Immediate / Next Bar / Next Beat / Next Cue / Exit Cue`（**既定 Immediate**）。**グループ内レイヤー切替のタイミング**（Alt 上乗せ／停止、および同一グループ内 `Same Time` 遷移）。Group Fade と同様 **Playlist ごとに個別**（グループ ID では同期しない）。グループ Playlist 再生中のみ有効。サイドカー `PartChangeOccursAtModes` へパート別にオートセーブ／復元。EXPORT 時はグループ各 Music Track の `StateGroupInfo/@MusicSyncType` へ渡す（States タブの Change Occurs At）。Wwise 側には他にも `Next Grid`／`Custom Cue`／`Never` などがあるが、**アプリ内プレビューでの再現が難しいため本アプリでは割愛**（Exit Source At も同様） |
 | 遷移先同期（自動） | 同一グループ内は `Same Time`、それ以外は `Entry Cue`。`Same Time` は実際の退出時点の相対時間を引き継ぐ。遷移先の長さ以上なら予約しない |
@@ -295,7 +295,7 @@ exe と同じフォルダに置きます（無ければ起動時に既定値で�
 
 #### `[Project.*]`
 
-サイドカー JSON（`MgaWwiseIMImporter.lastwave.<プロジェクト名>.json`）はプロジェクト単位で、グループ／無効化／追加マーカー／通常 Fade In／Out／**Group Fade**（`PartGroupFadeSeconds`）／Exit Source At を保持します。旧キー `PartGroupFadeInSeconds`／`PartGroupFadeOutSeconds` だけがある場合は、読み込み時に各パートの Max を `PartGroupFadeSeconds` へ移行します。INI のキーは UI に近い順です。
+サイドカー JSON（`MgaWwiseIMImporter.lastwave.<プロジェクト名>.json`）はプロジェクト単位で、グループ／無効化／追加マーカー／通常 Fade In／Out／**Group Fade**（`PartGroupFadeSeconds`）／Exit Source At を保持します。INI のキーは UI に近い順です。
 
 | キー | 意味 | 既定 |
 |------|------|------|
@@ -323,8 +323,8 @@ exe と同じフォルダに置きます（無ければ起動時に既定値で�
 | `CommentDigits` | マーカーコメント連番の桁数（0〜6。0 で連番なし） | `3` |
 | `CommentZeroPad` | 連番を桁数まで 0 埋めする（`1`/`0`） | `1` |
 | `CommentResetPerPart` | パートごとに連番をリセットする（`1`/`0`） | `1` |
-| `CommentPrefixEnabled` / `CommentPrefix` | 接頭語の有効と文字列 | `0`／（空） |
-| `CommentSuffixEnabled` / `CommentSuffix` | 接尾語の有効と文字列 | `0`／（空） |
-| `CommentJoinerEnabled` / `CommentJoiner` | Separator（区切り）の有効と文字列 | `0`／（空） |
+| `CommentPrefix` | マーカーコメントの接頭語（空＝なし） | （空） |
+| `CommentSuffix` | マーカーコメントの接尾語（空＝なし） | （空） |
+| `CommentJoiner` | Separator（区切り。空＝なし） | （空） |
 
 WAAPI の URL／タイムアウト／起動プローブ、および State Group 親パスはアプリ内固定です。

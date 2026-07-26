@@ -2734,22 +2734,6 @@ public partial class Form1 : Form, IMessageFilter
         UpdateGroupFadeRadioEnabled();
     }
 
-    private void ApplyWaveOnlyToChangeOccursAtRadios(bool waveOnly)
-    {
-        // Group 無効でラジオ自体が Disabled のときは触らない。
-        if (!changeOccursImmediateRadio.Enabled
-            && !changeOccursNextBarRadio.Enabled
-            && !changeOccursNextBeatRadio.Enabled)
-        {
-            return;
-        }
-
-        changeOccursNextBarRadio.Enabled = !waveOnly && changeOccursImmediateRadio.Enabled;
-        changeOccursNextBeatRadio.Enabled = !waveOnly && changeOccursImmediateRadio.Enabled;
-        RefreshFlatOptionControl(changeOccursNextBarRadio);
-        RefreshFlatOptionControl(changeOccursNextBeatRadio);
-    }
-
     private double ResolveFadeInSeconds(int partNumber)
     {
         if (_playlistFadeInSecondsByPart.TryGetValue(partNumber, out var seconds))

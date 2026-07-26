@@ -60,12 +60,6 @@ internal sealed class LastWaveSessionState
     /// <summary>パート番号 → 同一グループ内遷移用 Group Fade 秒数（In／Out 共通）。</summary>
     public Dictionary<string, double> PartGroupFadeSeconds { get; set; } = new(StringComparer.Ordinal);
 
-    /// <summary>旧形式（Group Fade In）。読み込み時のみ互換用。</summary>
-    public Dictionary<string, double>? PartGroupFadeInSeconds { get; set; }
-
-    /// <summary>旧形式（Group Fade Out）。読み込み時のみ互換用。</summary>
-    public Dictionary<string, double>? PartGroupFadeOutSeconds { get; set; }
-
     /// <summary>連続リージョン固まりのイン／アウト端フェード（プレビュー用）。</summary>
     public List<LastWaveRegionEdgeFadeState> RegionEdgeFades { get; set; } = [];
 
@@ -420,31 +414,7 @@ internal sealed class LastWaveSessionState
             return false;
         }
 
-        // 新形式を優先。無ければ旧 In／Out を Max で統合する。
-        if (!TryParseFadeMap(PartGroupFadeSeconds, partGroupFadeSeconds))
-        {
-            return false;
-        }
-
-        if (partGroupFadeSeconds.Count == 0)
-        {
-            var legacyIn = new Dictionary<int, double>();
-            var legacyOut = new Dictionary<int, double>();
-            if (!TryParseFadeMap(PartGroupFadeInSeconds, legacyIn)
-                || !TryParseFadeMap(PartGroupFadeOutSeconds, legacyOut))
-            {
-                return false;
-            }
-
-            foreach (var partNumber in legacyIn.Keys.Concat(legacyOut.Keys).Distinct())
-            {
-                legacyIn.TryGetValue(partNumber, out var fadeIn);
-                legacyOut.TryGetValue(partNumber, out var fadeOut);
-                partGroupFadeSeconds[partNumber] = Math.Max(fadeIn, fadeOut);
-            }
-        }
-
-        return true;
+        return TryParseFadeMap(PartGroupFadeSeconds, partGroupFadeSeconds);
     }
 
     public bool TryGetPartFadeCurves(

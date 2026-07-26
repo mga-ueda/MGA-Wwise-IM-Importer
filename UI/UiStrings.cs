@@ -2589,7 +2589,6 @@ internal static class UiStrings
         "BeatLine" => Get("拍線", "Beat Line"),
         "TempoChangeLine" => Get("テンポ変更線", "Tempo Change Line"),
         "WaveFill" => Get("波形", "Waveform Fill"),
-        "WaveCenter" => Get("波形センター線（旧）", "Waveform Center Line (Legacy)"),
         "WaveZeroDbLine" => Get("波形 0dB 線", "Waveform 0 dB Line"),
         "WaveformSourceMeterTrack" => Get("波形メーター・トラック", "Waveform Meter - Track"),
         "WaveformSourceMeterMinimum" => Get("波形メーター・最小", "Waveform Meter - Minimum"),

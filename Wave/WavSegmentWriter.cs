@@ -11,8 +11,6 @@ internal static class WavSegmentWriter
 {
     /// <summary>
     /// ソース WAV の指定サンプル範囲を切り出して書き出す。
-    /// <paramref name="regionEdgeFades"/> がある場合は絶対サンプル位置でゲインを乗算する
-    /// （互換用。現行 EXPORT はリージョン端フェードを MusicClip 非破壊フェードへ渡すため渡さない）。
     /// </summary>
     public static void WriteSegment(
         string sourcePath,
@@ -21,8 +19,7 @@ internal static class WavSegmentWriter
         long endSample,
         ushort blockAlign,
         float gain = 1f,
-        WavFileInfo? formatInfo = null,
-        IReadOnlyList<RegionEdgeFade>? regionEdgeFades = null)
+        WavFileInfo? formatInfo = null)
     {
         if (blockAlign == 0)
         {
@@ -113,28 +110,15 @@ internal static class WavSegmentWriter
         writer.Write(segmentByteLength);
         source.Position = dataStart + startByte;
 
-        var fades = regionEdgeFades is { Count: > 0 }
-            ? regionEdgeFades.Where(f => f.HasAnyFade).ToArray()
-            : [];
-        var bakeRegionFade = fades.Length > 0
-            && RegionEdgeFade.OverlapsRange(startSample, endSample, fades);
         var applyConstantGain = Math.Abs(gain - 1f) >= 0.000001f;
-
-        if (!bakeRegionFade && !applyConstantGain)
+        if (!applyConstantGain)
         {
             CopyExact(source, dest, segmentByteLength);
         }
         else
         {
             var info = formatInfo ?? WavFileInfo.Read(sourcePath);
-            CopyWithGainEnvelope(
-                source,
-                dest,
-                segmentByteLength,
-                info,
-                startSample,
-                gain,
-                bakeRegionFade ? fades : null);
+            CopyWithConstantGain(source, dest, segmentByteLength, info, gain);
         }
 
         if ((segmentByteLength & 1) == 1)
@@ -143,14 +127,12 @@ internal static class WavSegmentWriter
         }
     }
 
-    private static void CopyWithGainEnvelope(
+    private static void CopyWithConstantGain(
         Stream source,
         Stream destination,
         int byteCount,
         WavFileInfo info,
-        long startSample,
-        float linearGain,
-        IReadOnlyList<RegionEdgeFade>? regionEdgeFades)
+        float linearGain)
     {
         var format = LoudnessMeter.ResolvePcmFormat(info);
         var bytesPerSample = info.BitsPerSample / 8;
@@ -175,15 +157,9 @@ internal static class WavSegmentWriter
                 throw new EndOfStreamException(UiStrings.ErrDataChunkTruncated);
             }
 
-            var sampleGain = linearGain;
-            if (regionEdgeFades is not null)
-            {
-                sampleGain *= RegionEdgeFade.GainAt(startSample + i, regionEdgeFades);
-            }
-
             for (var c = 0; c < channels; c++)
             {
-                var sample = LoudnessMeter.DecodeSample(frame, c * bytesPerSample, format) * sampleGain;
+                var sample = LoudnessMeter.DecodeSample(frame, c * bytesPerSample, format) * linearGain;
                 LoudnessMeter.EncodeSample(sample, frame, c * bytesPerSample, format);
             }
 

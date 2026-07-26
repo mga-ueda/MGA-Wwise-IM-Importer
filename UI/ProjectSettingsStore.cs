@@ -559,11 +559,8 @@ internal sealed class ProjectSettingsStore
                     MarkerSettings.CommentDigitsMax)
                 .ToString(CultureInfo.InvariantCulture),
             ["CommentZeroPad"] = profile.CommentZeroPad ? "1" : "0",
-            ["CommentPrefixEnabled"] = profile.CommentPrefixEnabled ? "1" : "0",
             ["CommentPrefix"] = profile.CommentPrefix,
-            ["CommentSuffixEnabled"] = profile.CommentSuffixEnabled ? "1" : "0",
             ["CommentSuffix"] = profile.CommentSuffix,
-            ["CommentJoinerEnabled"] = profile.CommentJoinerEnabled ? "1" : "0",
             ["CommentJoiner"] = profile.CommentJoiner,
             ["CommentResetPerPart"] = profile.CommentResetPerPart ? "1" : "0",
             ["CompactFileNumbers"] = profile.CompactFileNumbers ? "1" : "0",
