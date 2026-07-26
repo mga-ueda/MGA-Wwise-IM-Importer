@@ -19,6 +19,8 @@
     nav.toc h1 { font-size: 0.95rem; margin: 0 0 0.75rem; font-weight: 600; }
     nav.toc ol { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
     nav.toc li { margin: 0.35rem 0; }
+    nav.toc ol ol { margin: 0.2rem 0 0.35rem; padding-left: 1rem; font-size: 0.82rem; }
+    nav.toc ol ol li { margin: 0.2rem 0; }
     nav.toc a { color: var(--muted); }
     nav.toc a:hover { color: var(--accent); }
     main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
@@ -54,13 +56,28 @@
       <h1>Contents</h1>
       <ol>
         <li><a href="#about">About this app</a></li>
-        <li><a href="#load">Loading patterns</a></li>
+        <li>
+          <a href="#load">Loading patterns</a>
+          <ol>
+            <li><a href="#load-single">Wave-only</a></li>
+            <li><a href="#load-multi">Multi-wave</a></li>
+            <li><a href="#load-xml">WAV + marker-track XML</a></li>
+          </ol>
+        </li>
         <li><a href="#wwise-prep">Wwise setup and EXPORT</a></li>
         <li><a href="#layout">UI overview</a></li>
         <li><a href="#project-bar">Project bar</a></li>
         <li><a href="#waveform">Waveform preview</a></li>
         <li><a href="#transport">TRANSPORT</a></li>
-        <li><a href="#transition">Log / transition panel</a></li>
+        <li>
+          <a href="#transition">Log / transition panel</a>
+          <ol>
+            <li><a href="#fade-options">Fade In / Fade Out / Options</a></li>
+            <li><a href="#group-exit">Group Fade / Exit Source At / Chg Occ At</a></li>
+            <li><a href="#playlist-list">Music Playlist list</a></li>
+            <li><a href="#more-options">More Options</a></li>
+          </ol>
+        </li>
         <li><a href="#action-bar">Action bar / WAAPI status</a></li>
         <li><a href="#export">What EXPORT creates in Wwise</a></li>
         <li><a href="#suffixes">Suffixes and cues</a></li>
@@ -79,7 +96,7 @@
       <div class="hero">
         <p><strong>Carry the music structure you designed in the DAW straight into Wwise Interactive Music.</strong></p>
         <p>Building Music Playlist Containers, Music Switch Containers, Music Segments, Music Tracks, State Groups, transitions, cues, and fades one by one in Authoring is accurate—but slow. Preview on the waveform, decide transitions and layers by ear, then push a consistent Wwise structure with a single <span class="ui">EXPORT</span>. <strong>Far faster than hand-building the same graph.</strong></p>
-        <p><strong>Export a tracklist XML from Nuendo / Cubase</strong> and you get the most out of tempo, bar, and time-signature data. Markers and cycles overlay the waveform like painted regions, so Entry / Exit / loop design stays visual.</p>
+        <p><strong>Export a marker-track XML from Nuendo / Cubase</strong> and you get the most out of tempo, bar, and time-signature data. Markers and cycles overlay the waveform like painted regions, so Entry / Exit / loop design stays visual.</p>
         <p><strong>You do not need those DAWs.</strong> A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move marker sets itself—so <strong>a dedicated waveform editor is often unnecessary</strong>, which is another major benefit.</p>
         <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
         <ul>
@@ -87,6 +104,7 @@
           <li>Vertical layers via grouping (Alt layering, Group Fade, Change Occurs At)</li>
           <li>Streaming (Prefetch Length / Look-ahead Time) and Keep Layer Balance (Make-Up Gain)</li>
           <li>Automatic Music hierarchy creation over WAAPI</li>
+          <li><strong>Drop multiple waves at once, or use marker-track XML, to implement any number of pieces together</strong></li>
         </ul>
       </div>
 
@@ -115,7 +133,7 @@
       <ol>
         <li>Drop <strong>two or more</strong> <code>.wav</code> files together (none may have a matching <code>.xml</code>)</li>
         <li>Confirm the log shows <code>=== Multi-wave mode (no XML) ===</code></li>
-        <li>Files are concatenated on a virtual timeline: <strong>one file = one Music Playlist</strong></li>
+        <li>Files are concatenated on a virtual timeline: <strong>one file = one Music Playlist</strong> (implement any number of pieces together)</li>
         <li>Optionally Shift-group them into vertical layers</li>
       </ol>
       <p><strong>Notes</strong></p>
@@ -126,10 +144,10 @@
         <li>If any file has a matching XML, this mode is not used—pair processing applies instead</li>
       </ul>
 
-      <h3 id="load-xml">2-3. WAV + matching XML (Nuendo / Cubase tracklist)</h3>
+      <h3 id="load-xml">2-3. WAV + matching XML (exported marker track)</h3>
       <p><strong>Steps</strong></p>
       <ol>
-        <li>Place a <code>.wav</code> and tracklist <code>.xml</code> with the <strong>same base name</strong> in the same folder (e.g. <code>Song.wav</code> + <code>Song.xml</code>)</li>
+        <li>In Nuendo / Cubase, <strong>export the marker track as XML</strong> and place it next to a <code>.wav</code> with the <strong>same base name</strong> (e.g. <code>Song.wav</code> + <code>Song.xml</code>)</li>
         <li>Drop either or both</li>
         <li>Confirm the log shows <code>=== Nuendo XML mode ===</code></li>
         <li>Bars, tempo, signature, markers, and cycles overlay the waveform</li>
@@ -137,6 +155,7 @@
       <p><strong>Notes</strong></p>
       <ul>
         <li>Makes the most of tempo, bar, and time-signature data. Markers/cycles overlay the waveform like painted regions for clearer structure work</li>
+        <li>Multiple parts / pieces on one master can be implemented into Wwise together</li>
         <li>XML single markers are also used as Wwise <strong>Custom Cues</strong></li>
         <li><kbd>Shift</kbd>+drag on the Marker lane adds session markers; <kbd>Ctrl</kbd>+drag removes only those additions (XML markers stay)</li>
         <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> are enabled</li>
@@ -204,7 +223,7 @@
       </ul>
 
       <h2 id="transition">8. Log / transition panel</h2>
-      <h3>Fade In / Fade Out / Options</h3>
+      <h3 id="fade-options">Fade In / Fade Out / Options</h3>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
         <tbody>
@@ -214,7 +233,7 @@
         </tbody>
       </table>
       <p>Normal Fade In / Fade Out / Exit Source At / Play -E are shared within the same group ID.</p>
-      <h3>Group Fade / Exit Source At / Chg Occ At</h3>
+      <h3 id="group-exit">Group Fade / Exit Source At / Chg Occ At</h3>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
         <tbody>
@@ -223,14 +242,14 @@
           <tr><td class="ui">Chg Occ At</td><td>Change Occurs At. Same candidates (default Immediate). In-group layer switch timing → Music Track States.</td></tr>
         </tbody>
       </table>
-      <h3>Music Playlist list</h3>
+      <h3 id="playlist-list">Music Playlist list</h3>
       <ul>
         <li>Click to transition. Same-group uses Same Time; otherwise Entry Cue</li>
         <li><kbd>Shift</kbd> group / <kbd>Ctrl</kbd> ungroup / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> exclude (<code>Excluded Region n</code>)</li>
         <li><kbd>Alt</kbd> layer on/off inside a group (max 8, Group Fade)</li>
         <li><span class="ui">Compact Num.</span> renumbers export IDs (default off)</li>
       </ul>
-      <h3>More Options</h3>
+      <h3 id="more-options">More Options</h3>
       <p>Top: <span class="ui">Stream</span> (left) | <span class="ui">Layer Music Option</span> (right). Bottom: <span class="ui">Marker Comment</span> (left) | <span class="ui">Marker Grid</span> (right).</p>
       <ul>
         <li><span class="ui">Stream</span> … Prefetch Length / Look-ahead Time (ms). First Music Segment Look-ahead is fixed at <strong>50 ms</strong>; later segments use the UI value (default 500)</li>

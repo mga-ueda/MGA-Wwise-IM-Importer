@@ -19,6 +19,8 @@
     nav.toc h1 { font-size: 0.95rem; margin: 0 0 0.75rem; font-weight: 600; }
     nav.toc ol { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
     nav.toc li { margin: 0.35rem 0; }
+    nav.toc ol ol { margin: 0.2rem 0 0.35rem; padding-left: 1rem; font-size: 0.82rem; }
+    nav.toc ol ol li { margin: 0.2rem 0; }
     nav.toc a { color: var(--muted); }
     nav.toc a:hover { color: var(--accent); }
     main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
@@ -54,13 +56,28 @@
       <h1>目次</h1>
       <ol>
         <li><a href="#about">このアプリについて</a></li>
-        <li><a href="#load">読み込みのパターン</a></li>
+        <li>
+          <a href="#load">読み込みのパターン</a>
+          <ol>
+            <li><a href="#load-single">Wave 単体</a></li>
+            <li><a href="#load-multi">複数波形</a></li>
+            <li><a href="#load-xml">WAV ＋ マーカートラック XML</a></li>
+          </ol>
+        </li>
         <li><a href="#wwise-prep">Wwise 側の準備と EXPORT</a></li>
         <li><a href="#layout">画面の見方</a></li>
         <li><a href="#project-bar">プロジェクトバー</a></li>
         <li><a href="#waveform">波形プレビュー</a></li>
         <li><a href="#transport">TRANSPORT</a></li>
-        <li><a href="#transition">ログ／遷移パネル</a></li>
+        <li>
+          <a href="#transition">ログ／遷移パネル</a>
+          <ol>
+            <li><a href="#fade-options">Fade In／Fade Out／Options</a></li>
+            <li><a href="#group-exit">Group Fade／Exit Source At／Chg Occ At</a></li>
+            <li><a href="#playlist-list">Music Playlist 一覧</a></li>
+            <li><a href="#more-options">More Options</a></li>
+          </ol>
+        </li>
         <li><a href="#action-bar">操作バー／WAAPI ステータスバー</a></li>
         <li><a href="#export">EXPORT と Wwise に作られるもの</a></li>
         <li><a href="#suffixes">接尾辞と Cue</a></li>
@@ -79,7 +96,7 @@
       <div class="hero">
         <p><strong>DAW で設計した音楽の構造を、そのまま Wwise の Interactive Music へ運ぶ</strong>ためのツールです。</p>
         <p>Authoring 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、正確でも時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を <span class="ui">EXPORT</span> 一発で Wwise へ揃えられます。<strong>手作業での実装より大幅に時短</strong>できます。</p>
-        <p><strong>Nuendo／Cubase から tracklist XML を出せば</strong>、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように重ねられ、Entry／Exit／ループ設計を視覚的に進められます。</p>
+        <p><strong>Nuendo／Cubase でマーカートラックをエクスポートした XML</strong> があれば、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように重ねられ、Entry／Exit／ループ設計を視覚的に進められます。</p>
         <p><strong>それらの DAW を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やセット移動があり、<strong>波形エディタすら必須ではありません</strong>——これも大きな魅力の一つです。</p>
         <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。</p>
         <ul>
@@ -87,6 +104,7 @@
           <li>グループ化による縦レイヤー（Alt 上乗せ、Group Fade、Change Occurs At）</li>
           <li>ストリーミング（Prefetch Length／Look-ahead Time）や Keep Layer Balance（Make-Up Gain）</li>
           <li>WAAPI 経由で Music 構造を自動生成</li>
+          <li><strong>複数波形の同時ドロップやマーカートラック XML の利用により、何曲でもまとめて実装可能</strong></li>
         </ul>
       </div>
 
@@ -115,7 +133,7 @@
       <ol>
         <li><strong>2 本以上</strong>の <code>.wav</code> を同時にドロップする（どれにも同名 <code>.xml</code> が無いこと）</li>
         <li>ログに <code>=== 複数波形モード（XML なし） ===</code> と出ることを確認する</li>
-        <li>仮想タイムラインへ連結され、<strong>1 ファイル＝1 Music Playlist</strong> として並ぶ</li>
+        <li>仮想タイムラインへ連結され、<strong>1 ファイル＝1 Music Playlist</strong> として並ぶ（何曲でもまとめて実装可能）</li>
         <li>必要なら Shift でグループ化（縦レイヤー）する</li>
       </ol>
       <p><strong>ポイント</strong></p>
@@ -126,10 +144,10 @@
         <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
       </ul>
 
-      <h3 id="load-xml">2-3. WAV ＋ 同名 XML（Nuendo／Cubase tracklist）</h3>
+      <h3 id="load-xml">2-3. WAV ＋ 同名 XML（マーカートラックのエクスポート）</h3>
       <p><strong>手順</strong></p>
       <ol>
-        <li>同じフォルダに、<strong>同じベース名</strong>の <code>.wav</code> と tracklist <code>.xml</code> を用意する（例: <code>Song.wav</code> と <code>Song.xml</code>）</li>
+        <li>Nuendo／Cubase で<strong>マーカートラックを XML エクスポート</strong>し、同じフォルダに<strong>同じベース名</strong>の <code>.wav</code> と並べる（例: <code>Song.wav</code> と <code>Song.xml</code>）</li>
         <li>どちらか一方、または両方をドロップする</li>
         <li>ログに <code>=== Nuendo XML モード ===</code> と出ることを確認する</li>
         <li>小節・テンポ・拍子・マーカー／サイクルが波形に重なる</li>
@@ -137,6 +155,7 @@
       <p><strong>ポイント</strong></p>
       <ul>
         <li>テンポ・小節・拍子を最大限に利用できます。マーカー／サイクルは波形上に塗り重ねるように表示され、構造設計がしやすくなります</li>
+        <li>1 本のマスター上に複数パート／複数曲相当の区間を置けば、まとめて Wwise へ実装できます</li>
         <li>XML 由来の単発マーカーは Wwise <strong>Custom Cue</strong> にも使われます</li>
         <li><kbd>Shift</kbd>＋Marker レーン左ドラッグで追加マーカー（Custom Cue 用）。<kbd>Ctrl</kbd>＋ドラッグで追加分だけ消去（XML 由来は消しません）</li>
         <li><span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> が有効です</li>
@@ -206,7 +225,7 @@
       </ul>
 
       <h2 id="transition">8. ログ／遷移パネル</h2>
-      <h3>Fade In／Fade Out／Options</h3>
+      <h3 id="fade-options">Fade In／Fade Out／Options</h3>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
         <tbody>
@@ -216,7 +235,7 @@
         </tbody>
       </table>
       <p>通常の Fade In／Fade Out／Exit Source At／Play -E は同一グループ ID で共有されます。</p>
-      <h3>Group Fade／Exit Source At／Chg Occ At</h3>
+      <h3 id="group-exit">Group Fade／Exit Source At／Chg Occ At</h3>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
         <tbody>
@@ -225,14 +244,14 @@
           <tr><td class="ui">Chg Occ At</td><td>Change Occurs At。同候補（既定 Immediate）。グループ内レイヤー切替。EXPORT 時は Music Track の States タブへ。</td></tr>
         </tbody>
       </table>
-      <h3>Music Playlist 一覧</h3>
+      <h3 id="playlist-list">Music Playlist 一覧</h3>
       <ul>
         <li>クリックで遷移。再生中は Exit Source At に従う。同一グループ内は Same Time、以外は Entry Cue</li>
         <li><kbd>Shift</kbd> … グループ化（縦レイヤー）／<kbd>Ctrl</kbd> … 解除／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> … 除外（<code>Excluded Region n</code>）</li>
         <li><kbd>Alt</kbd> … グループ内上乗せ／停止（最大 8、Group Fade）</li>
         <li><span class="ui">Compact Num.</span> … 書き出し番号を詰める（既定オフ）</li>
       </ul>
-      <h3>More Options</h3>
+      <h3 id="more-options">More Options</h3>
       <p>上段: <span class="ui">Stream</span>（左）｜<span class="ui">Layer Music Option</span>（右）。下段: <span class="ui">Marker Comment</span>（左）｜<span class="ui">Marker Grid</span>（右）。</p>
       <ul>
         <li><span class="ui">Stream</span> … Prefetch Length／Look-ahead Time（ms）。先頭 Music Segment の Look-ahead は固定 <strong>50 ms</strong>。2 番目以降は UI 値（既定 500）</li>

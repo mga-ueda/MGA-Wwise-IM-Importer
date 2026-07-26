@@ -2,11 +2,11 @@
 
 [日本語 README](README.ja.md)
 
-Windows tool (in development) that reads Nuendo/Cubase tracklist XML and Wave files, previews the waveform, writes split WAVs, and imports a Wwise Interactive Music hierarchy over WAAPI. Preview what you decide in the DAW, then deliver it to Wwise—typically much faster than hand-building the same structure in Authoring.
+Windows tool (in development) that reads Wave files and marker-track XML exported from Nuendo/Cubase, previews the waveform, writes split WAVs, and imports a Wwise Interactive Music hierarchy over WAAPI. Preview what you decide in the DAW, then deliver it to Wwise—typically much faster than hand-building the same structure in Authoring.
 
-Designed so **the Interactive Music data in Wwise is the master waveform**: build one-shot and loop structure nondestructively on one master instead of pre-separating files.
+Designed so **the Interactive Music data in Wwise is the master waveform**: build one-shot and loop structure nondestructively on one master instead of pre-separating files. Drop multiple waves at once, or use marker-track XML, to implement any number of pieces together.
 
-With Nuendo/Cubase XML you get the most from tempo and bar data, and markers overlay the wave like painted regions. Marker-bearing WAVs from Logic and similar DAWs also work well; in-app marker add / set-move often removes the need for a separate waveform editor.
+With Nuendo/Cubase marker-track XML you get the most from tempo and bar data, and markers overlay the wave like painted regions. Marker-bearing WAVs from Logic and similar DAWs also work well; in-app marker add / set-move often removes the need for a separate waveform editor.
 
 **Volume, fades, and markers are fully nondestructive.** Nothing is baked into source or split WAVs; EXPORT writes Wwise properties (MusicClip Fade, MusicFade, Make-Up Gain, Cue, and so on).
 
@@ -23,7 +23,7 @@ With Nuendo/Cubase XML you get the most from tempo and bar data, and markers ove
 3. Load with one of these patterns, then run **EXPORT**
    - **Wave-only** — drop one `.wav` with no matching XML
    - **Multi-wave** — drop two or more `.wav` files with no matching XML
-   - **WAV + matching XML** — drop a Nuendo/Cubase tracklist pair
+   - **WAV + matching XML** — drop a Nuendo/Cubase marker-track export pair
 
 See the manual section “Loading patterns” for details.
 
@@ -36,7 +36,7 @@ Project settings, extra markers, Keep Last Session data, and so on live next to 
 ## Trademarks & licenses
 
 - **Wwise®** / **Audiokinetic®** are trademarks of Audiokinetic Inc. This tool is unofficial and does not bundle Audiokinetic software. A valid Wwise license is required for WAAPI.
-- **Nuendo®** / **Cubase®** / **Steinberg®** are trademarks of Steinberg Media Technologies GmbH. This tool is unofficial and only reads tracklist XML.
+- **Nuendo®** / **Cubase®** / **Steinberg®** are trademarks of Steinberg Media Technologies GmbH. This tool is unofficial and only reads marker-track XML exports.
 - Bundled: [NAudio](https://github.com/naudio/NAudio) (Ms-PL), [UDEV Gothic](https://github.com/yuru7/udev-gothic) (SIL OFL 1.1; `Licenses/LICENSE-UDEV-GOTHIC.txt`)
 
 Footer text in the app:

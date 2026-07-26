@@ -2,9 +2,9 @@
 
 [English README](README.md)
 
-Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー・分割 WAV 書き出し・WAAPI 経由の Wwise Interactive Music インポートを行う Windows 向けツール（開発中）です。Authoring での手組みより大幅に時短でき、**Wwise 上の実装をマスター波形として扱う**非破壊ワークフローを想定しています（ワンショット／ループを事前に別ファイルへ分けなくても組み立て可能）。
+Nuendo／Cubase の**マーカートラックをエクスポートした XML** と Wave を読み、波形プレビュー・分割 WAV 書き出し・WAAPI 経由の Wwise Interactive Music インポートを行う Windows 向けツール（開発中）です。Authoring での手組みより大幅に時短でき、**Wwise 上の実装をマスター波形として扱う**非破壊ワークフローを想定しています（ワンショット／ループを事前に別ファイルへ分けなくても組み立て可能）。複数波形の同時ドロップやマーカートラック XML により、何曲でもまとめて実装できます。
 
-Nuendo／Cubase の XML があればテンポ・小節情報を最大限に活かし、マーカーを波形上に塗るように扱えます。Logic などマーカー付き WAV でも十分に使え、アプリ側のマーカー付与・セット移動により波形エディタが不要な場合も多いです。
+Nuendo／Cubase のマーカートラック XML があればテンポ・小節情報を最大限に活かし、マーカーを波形上に塗るように扱えます。Logic などマーカー付き WAV でも十分に使え、アプリ側のマーカー付与・セット移動により波形エディタが不要な場合も多いです。
 
 **音量・フェード・マーカー類は全面的に非破壊です。** ソース／分割 WAV へ焼き込まず、EXPORT 時は Wwise 側プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ設定します。
 
@@ -21,7 +21,7 @@ Nuendo／Cubase の XML があればテンポ・小節情報を最大限に活�
 3. 次のいずれかのパターンで読み込み、［EXPORT］を実行する
    - **Wave 単体** … 同名 XML 無しの `.wav` を 1 本ドロップ
    - **複数波形** … 同名 XML 無しの `.wav` を 2 本以上同時ドロップ
-   - **WAV ＋ 同名 XML** … Nuendo／Cubase tracklist のペアをドロップ
+   - **WAV ＋ 同名 XML** … Nuendo／Cubase でマーカートラックをエクスポートしたペアをドロップ
 
 詳細手順はマニュアルの「読み込みのパターン」を参照してください。
 
@@ -34,7 +34,7 @@ Windows x64 の自己完結パッケージは [Releases](https://github.com/mga-
 ## 商標・ライセンス
 
 - **Wwise®**／**Audiokinetic®** は Audiokinetic Inc. の商標です。本ツールは非公式で、Audiokinetic ソフトウェアを同梱しません。WAAPI 利用には有効な Wwise ライセンスが必要です。
-- **Nuendo®**／**Cubase®**／**Steinberg®** は Steinberg Media Technologies GmbH の商標です。本ツールは非公式で、tracklist XML を読み取るのみです。
+- **Nuendo®**／**Cubase®**／**Steinberg®** は Steinberg Media Technologies GmbH の商標です。本ツールは非公式で、マーカートラックをエクスポートした XML を読み取るのみです。
 - 同梱: [NAudio](https://github.com/naudio/NAudio)（Ms-PL）、[UDEV Gothic](https://github.com/yuru7/udev-gothic)（SIL OFL 1.1。`Licenses/LICENSE-UDEV-GOTHIC.txt`）
 
 アプリ下部表示:
