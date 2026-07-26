@@ -18,7 +18,6 @@ internal sealed class AudioSettingsForm : Form
     private readonly FadeCurveRow _playlistFadeOutRow;
     private readonly RoundedButton _okButton;
     private readonly RoundedButton _cancelButton;
-    private readonly ToolTip _toolTip = new();
     private ContextMenuStrip? _fadeCurveMenu;
     private bool _suppressDeviceReload;
 
@@ -195,6 +194,8 @@ internal sealed class AudioSettingsForm : Form
         AcceptButton = _okButton;
         CancelButton = _cancelButton;
 
+        DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+
         SelectApi(current.Api);
         ReloadDevices(preserveSelection: true, preferredDeviceId: current.DeviceId);
     }
@@ -243,11 +244,33 @@ internal sealed class AudioSettingsForm : Form
 
         var row = new FadeCurveRow(host, label, icon, curve, isFadeIn);
         RefreshFadeRowIcon(row);
+        WireFadeCurveIconHover(icon);
         icon.Click += (_, _) => ShowFadeCurvePicker(row);
-        label.Click += (_, _) => ShowFadeCurvePicker(row);
         host.Controls.Add(label);
         host.Controls.Add(icon);
         return row;
+    }
+
+    private static void WireFadeCurveIconHover(PictureBox icon)
+    {
+        var idle = UiColors.ForControlBack(UiColors.ProjectBarInputBack);
+        var hover = UiColors.ForControlBack(UiColors.TransportHoverBack);
+        var pressed = UiColors.ForControlBack(UiColors.TransportPressedBack);
+
+        icon.MouseEnter += (_, _) => icon.BackColor = hover;
+        icon.MouseLeave += (_, _) => icon.BackColor = idle;
+        icon.MouseDown += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                icon.BackColor = pressed;
+            }
+        };
+        icon.MouseUp += (_, _) =>
+        {
+            var local = icon.PointToClient(Control.MousePosition);
+            icon.BackColor = icon.ClientRectangle.Contains(local) ? hover : idle;
+        };
     }
 
     private void ShowFadeCurvePicker(FadeCurveRow row)
@@ -275,8 +298,8 @@ internal sealed class AudioSettingsForm : Form
             pixelSize: FadeCurveIcons.IconSize,
             leftMargin: 0);
         old?.Dispose();
-        _toolTip.SetToolTip(row.Icon, UiStrings.LabelRegionFadeCurve(row.Curve));
-        _toolTip.SetToolTip(row.Label, UiStrings.LabelRegionFadeCurve(row.Curve));
+        TipService.Set(row.Icon, UiStrings.LabelRegionFadeCurve(row.Curve));
+        TipService.Set(row.Label, UiStrings.LabelRegionFadeCurve(row.Curve));
     }
 
     private RoundedButton CreateDialogButton(string text, Point location, int width, int height)
@@ -341,7 +364,6 @@ internal sealed class AudioSettingsForm : Form
             image?.Dispose();
         }
 
-        _toolTip.Dispose();
         base.OnFormClosed(e);
     }
 

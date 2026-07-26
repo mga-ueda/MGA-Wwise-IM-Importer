@@ -16,13 +16,6 @@ internal sealed class MarkerOptionsPanel : UserControl
     private const int StreamMsDefault = 500;
 
     private readonly Panel _leftSeparator = new() { Dock = DockStyle.Left, Width = 1, TabStop = false };
-    private readonly DarkToolTip _toolTip = new()
-    {
-        AutoPopDelay = 12000,
-        InitialDelay = 350,
-        ReshowDelay = 100,
-        ShowAlways = true,
-    };
 
     private readonly SectionHeaderLabel _streamHeaderLabel;
     private readonly FlatOptionCheckBox _streamEnabledCheckBox;
@@ -372,7 +365,7 @@ internal sealed class MarkerOptionsPanel : UserControl
         Controls.Add(_leftSeparator);
 
         ApplyMoreOptionsVisibility();
-        ApplyToolTips();
+        ApplyTips();
         UiStrings.LanguageChanged += (_, _) =>
         {
             if (!IsDisposed)
@@ -410,7 +403,7 @@ internal sealed class MarkerOptionsPanel : UserControl
 
         _moreOptionsHeaderLabel.Text = FormatMoreOptionsHeader(_moreOptionsExpanded);
 
-        ApplyToolTips();
+        ApplyTips();
         UpdatePreview();
     }
 
@@ -592,10 +585,9 @@ internal sealed class MarkerOptionsPanel : UserControl
         var headerBack = UiColors.ForControlBack(UiColors.SectionHeaderBack);
         var headerFore = UiColors.PlaylistDefaultFore;
         var optionFore = UiColors.PlaylistOptionFore;
-        var separator = UiColors.ForControlBack(UiColors.PlaylistButtonBorder);
-
         BackColor = back;
-        _leftSeparator.BackColor = separator;
+        // セパレータは幅（レイアウト）だけ残し、線としては見せない。
+        _leftSeparator.BackColor = back;
         foreach (var header in new[]
         {
             _streamHeaderLabel,
@@ -1058,39 +1050,36 @@ internal sealed class MarkerOptionsPanel : UserControl
             && digits <= MarkerSettings.CommentDigitsMax;
     }
 
-    private void ApplyToolTips()
+    private void ApplyTips()
     {
-        _toolTip.ApplyTheme();
-        SetToolTip(_streamHeaderLabel, UiStrings.TipStreamHeader);
-        SetToolTip(_streamEnabledCheckBox, UiStrings.TipStreamEnabled);
-        SetToolTip(_lookAheadLabel, UiStrings.TipLookAheadLabel);
-        SetToolTip(_lookAheadTextBox, UiStrings.TipLookAheadBox);
-        SetToolTip(_lookAheadUnitLabel, UiStrings.TipLookAheadUnit);
-        SetToolTip(_prefetchLabel, UiStrings.TipPrefetchLabel);
-        SetToolTip(_prefetchTextBox, UiStrings.TipPrefetchBox);
-        SetToolTip(_prefetchUnitLabel, UiStrings.TipPrefetchUnit);
-        SetToolTip(_loudnessHeaderLabel, UiStrings.TipLoudnessHeader);
-        SetToolTip(_loudnessGroupBalanceCheckBox, UiStrings.TipLoudnessGroupBalance);
-        SetToolTip(_moreOptionsHeaderLabel, UiStrings.TipMoreOptionsHeader);
-        SetToolTip(_gridHeaderLabel, UiStrings.TipMarkerGridHeader);
-        SetToolTip(_gridDefaultRadio, UiStrings.TipMarkerGridTimeline);
-        SetToolTip(_gridBarRadio, UiStrings.TipMarkerGridBar);
-        SetToolTip(_gridBeatRadio, UiStrings.TipMarkerGridBeat);
-        SetToolTip(_commentHeaderLabel, UiStrings.TipMarkerCommentHeader);
-        SetToolTip(_digitsLabel, UiStrings.TipCommentDigits);
-        SetToolTip(_digitsTextBox, UiStrings.TipCommentDigitsBox);
-        SetToolTip(_zeroPadCheckBox, UiStrings.TipCommentZeroPad);
-        SetToolTip(_resetPerPartCheckBox, UiStrings.TipCommentResetPerPart);
-        SetToolTip(_prefixLabel, UiStrings.TipCommentPrefix);
-        SetToolTip(_prefixTextBox, UiStrings.TipCommentPrefixBox);
-        SetToolTip(_suffixLabel, UiStrings.TipCommentSuffix);
-        SetToolTip(_suffixTextBox, UiStrings.TipCommentSuffixBox);
-        SetToolTip(_joinerLabel, UiStrings.TipCommentSeparator);
-        SetToolTip(_joinerTextBox, UiStrings.TipCommentSeparatorBox);
-        SetToolTip(_previewLabel, UiStrings.TipCommentPreview);
+        TipService.Set(_streamHeaderLabel, UiStrings.TipStreamHeader);
+        TipService.Set(_streamEnabledCheckBox, UiStrings.TipStreamEnabled);
+        TipService.Set(_lookAheadLabel, UiStrings.TipLookAheadLabel);
+        TipService.Set(_lookAheadTextBox, UiStrings.TipLookAheadBox);
+        TipService.Set(_lookAheadUnitLabel, UiStrings.TipLookAheadUnit);
+        TipService.Set(_prefetchLabel, UiStrings.TipPrefetchLabel);
+        TipService.Set(_prefetchTextBox, UiStrings.TipPrefetchBox);
+        TipService.Set(_prefetchUnitLabel, UiStrings.TipPrefetchUnit);
+        TipService.Set(_loudnessHeaderLabel, UiStrings.TipLoudnessHeader);
+        TipService.Set(_loudnessGroupBalanceCheckBox, UiStrings.TipLoudnessGroupBalance);
+        TipService.Set(_moreOptionsHeaderLabel, UiStrings.TipMoreOptionsHeader);
+        TipService.Set(_gridHeaderLabel, UiStrings.TipMarkerGridHeader);
+        TipService.Set(_gridDefaultRadio, UiStrings.TipMarkerGridTimeline);
+        TipService.Set(_gridBarRadio, UiStrings.TipMarkerGridBar);
+        TipService.Set(_gridBeatRadio, UiStrings.TipMarkerGridBeat);
+        TipService.Set(_commentHeaderLabel, UiStrings.TipMarkerCommentHeader);
+        TipService.Set(_digitsLabel, UiStrings.TipCommentDigits);
+        TipService.Set(_digitsTextBox, UiStrings.TipCommentDigitsBox);
+        TipService.Set(_zeroPadCheckBox, UiStrings.TipCommentZeroPad);
+        TipService.Set(_resetPerPartCheckBox, UiStrings.TipCommentResetPerPart);
+        TipService.Set(_prefixLabel, UiStrings.TipCommentPrefix);
+        TipService.Set(_prefixTextBox, UiStrings.TipCommentPrefixBox);
+        TipService.Set(_suffixLabel, UiStrings.TipCommentSuffix);
+        TipService.Set(_suffixTextBox, UiStrings.TipCommentSuffixBox);
+        TipService.Set(_joinerLabel, UiStrings.TipCommentSeparator);
+        TipService.Set(_joinerTextBox, UiStrings.TipCommentSeparatorBox);
+        TipService.Set(_previewLabel, UiStrings.TipCommentPreview);
     }
-
-    private void SetToolTip(Control control, string text) => _toolTip.SetToolTip(control, text);
 
     private void UpdatePreview()
     {

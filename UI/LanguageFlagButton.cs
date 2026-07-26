@@ -33,7 +33,6 @@ internal sealed class LanguageFlagButton : Button
 
     public Color HoverBackColor { get; set; }
     public Color PressedBackColor { get; set; }
-    public Color BorderColor { get; set; }
 
     public void RefreshAppearance()
     {
@@ -49,7 +48,6 @@ internal sealed class LanguageFlagButton : Button
         ForeColor = UiColors.LogButtonFore;
         HoverBackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
         PressedBackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
-        BorderColor = UiColors.ForControlBack(UiColors.ChromeBorder);
         Invalidate();
     }
 

@@ -55,6 +55,7 @@ internal sealed class WaveAudioPlayer : IDisposable
 
     public bool IsPlaying => _isPlaying;
 
+
     public bool HasSource => !string.IsNullOrEmpty(_path);
 
     public TimeSpan Position => _reader?.CurrentTime ?? TimeSpan.Zero;
@@ -228,6 +229,22 @@ internal sealed class WaveAudioPlayer : IDisposable
     {
         start = 0;
         end = 0;
+        if (!TryGetActiveLoopSamples(out var startSample, out var endSample))
+        {
+            return false;
+        }
+
+        var frameCount = FrameCount;
+        start = startSample / (double)frameCount;
+        end = endSample / (double)frameCount;
+        return end > start;
+    }
+
+    /// <summary>有効中のループ区間（サンプル）。未アームなら false。</summary>
+    public bool TryGetActiveLoopSamples(out long startSample, out long endSample)
+    {
+        startSample = 0;
+        endSample = 0;
         // Provider が存在する場合、その null は「現在の Playlist に有効なループなし」を意味する。
         // ?? で _activePlan へ戻すと、Playlist 遷移前の古いループを UI が再利用してしまう。
         var plan = _provider is not null
@@ -238,15 +255,14 @@ internal sealed class WaveAudioPlayer : IDisposable
             return false;
         }
 
-        var frameCount = FrameCount;
-        if (frameCount <= 0 || activePlan.LoopEndSample <= activePlan.LoopStartSample)
+        if (FrameCount <= 0 || activePlan.LoopEndSample <= activePlan.LoopStartSample)
         {
             return false;
         }
 
-        start = activePlan.LoopStartSample / (double)frameCount;
-        end = activePlan.LoopEndSample / (double)frameCount;
-        return end > start;
+        startSample = activePlan.LoopStartSample;
+        endSample = activePlan.LoopEndSample;
+        return true;
     }
 
     /// <summary>
@@ -256,20 +272,37 @@ internal sealed class WaveAudioPlayer : IDisposable
     {
         start = 0;
         end = 0;
-        if (FindPlanAtProgress(progress) is not { } plan)
+        if (!TryGetLoopSamples(progress, out var startSample, out var endSample))
         {
             return false;
         }
 
         var frameCount = FrameCount;
-        if (frameCount <= 0)
+        start = startSample / (double)frameCount;
+        end = endSample / (double)frameCount;
+        return end > start;
+    }
+
+    /// <summary>
+    /// カタログ上、<paramref name="progress"/> が含まれるループ区間のサンプル範囲。
+    /// </summary>
+    public bool TryGetLoopSamples(double progress, out long startSample, out long endSample)
+    {
+        startSample = 0;
+        endSample = 0;
+        if (FindPlanAtProgress(progress) is not { } plan || FrameCount <= 0)
         {
             return false;
         }
 
-        start = plan.LoopStartSample / (double)frameCount;
-        end = plan.LoopEndSample / (double)frameCount;
-        return end > start;
+        if (plan.LoopEndSample <= plan.LoopStartSample)
+        {
+            return false;
+        }
+
+        startSample = plan.LoopStartSample;
+        endSample = plan.LoopEndSample;
+        return true;
     }
 
     /// <summary>

@@ -34,7 +34,6 @@ internal sealed class ManualHelpButton : Button
 
     public Color HoverBackColor { get; set; }
     public Color PressedBackColor { get; set; }
-    public Color BorderColor { get; set; }
 
     public void RefreshAppearance()
     {
@@ -48,7 +47,6 @@ internal sealed class ManualHelpButton : Button
         ForeColor = UiColors.LogButtonFore;
         HoverBackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
         PressedBackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
-        BorderColor = UiColors.ForControlBack(UiColors.ChromeBorder);
         Invalidate();
     }
 
@@ -120,11 +118,14 @@ internal sealed class ManualHelpButton : Button
     {
         var side = Math.Min(Width, Height);
         using var font = new Font("Segoe UI Semibold", Math.Max(9f, side * 0.52f), FontStyle.Bold, GraphicsUnit.Pixel);
-        var text = "?";
-        var size = g.MeasureString(text, font);
-        var x = (Width - size.Width) / 2f;
-        var y = (Height - size.Height) / 2f - side * 0.04f;
         using var brush = new SolidBrush(color);
-        g.DrawString(text, font, brush, x, y);
+        using var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center,
+            FormatFlags = StringFormatFlags.NoWrap | StringFormatFlags.NoClip,
+        };
+        // MeasureString の余白補正を入れず、描画矩形の幾何中心へ厳密に合わせる。
+        g.DrawString("?", font, brush, ClientRectangle, format);
     }
 }

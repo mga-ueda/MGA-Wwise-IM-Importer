@@ -101,6 +101,9 @@ public partial class Form1 : Form, IMessageFilter
     private bool _keepTarget;
     private string _keptTargetPath = string.Empty;
     private string _keptTargetProjectFilePath = string.Empty;
+    /// <summary>直近に WAAPI から得た .wproj パス（切断後の再起動用。Keep Target 未使用時も含む）。</summary>
+    private string _lastKnownWwiseProjectFilePath = string.Empty;
+    private string _lastKnownWwiseProjectName = string.Empty;
     private int _waapiPollFailCount;
     private bool _waapiPollBusy;
     private bool _wwiseProjectActivateBusy;
@@ -247,8 +250,7 @@ public partial class Form1 : Form, IMessageFilter
     private bool _playlistDisablePaintActive;
     private bool _playlistDisablePaintSetDisabled;
     private int? _playlistDisablePaintLastPartNumber;
-    /// <summary>Ctrl/Shift ドラッグ中は Playlist ツールチップを出さない。</summary>
-    private bool _playlistToolTipsSuspendedForPaint;
+    /// <summary>Ctrl/Shift ドラッグ直後の誤クリックを抑止する。</summary>
     private bool _suppressNextPlaylistClick;
     /// <summary>
     /// 戻る方向ジャンプ中に再生を一時停止したとき true。キーアップで再開する。
@@ -279,6 +281,7 @@ public partial class Form1 : Form, IMessageFilter
         UiColors.LoadFromIni();
         AppFonts.EnsureRegistered();
         InitializeComponent();
+        TipService.BindDisplay(tipsLabel, tipsPanel);
         fadeInHeaderPanel.Layout += (_, _) =>
             LayoutPlaylistFadeCurveIcon(fadeInHeaderLabel, fadeInCurveIcon);
         fadeOutHeaderPanel.Layout += (_, _) =>
@@ -381,6 +384,7 @@ public partial class Form1 : Form, IMessageFilter
         };
         waveformView.MarkerGridOverride = _markerSettings.GridOverride;
         ApplyPlaylistSelectorColors();
+        UpdateCompactFileNumbersEnabled();
         waapiStatusBar.ApplyColors();
         waapiStatusBar.KeepTargetChanged += WaapiStatusBar_KeepTargetChanged;
         waapiStatusBar.AutoActiveChanged += WaapiStatusBar_AutoActiveChanged;
@@ -799,6 +803,7 @@ public partial class Form1 : Form, IMessageFilter
         if (result.Ok)
         {
             _waapiPollFailCount = 0;
+            RememberLiveWwiseProject(result);
         }
 
         RefreshWaapiStatusDisplay();
@@ -817,6 +822,46 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         UpdateExportButtonState();
+    }
+
+    /// <summary>
+    /// 接続成功時のプロジェクト情報を記憶する。切断後もステータス表示と再起動に使う。
+    /// Keep Target 中に後からパスが取れた場合は固定記憶も更新する。
+    /// </summary>
+    private void RememberLiveWwiseProject(WaapiProbeResult result)
+    {
+        if (!result.Ok)
+        {
+            return;
+        }
+
+        var projectFile = result.ProjectFilePath.Trim();
+        if (projectFile.Length > 0)
+        {
+            _lastKnownWwiseProjectFilePath = projectFile;
+        }
+
+        var projectName = result.ProjectName.Trim();
+        if (projectName.Length > 0)
+        {
+            _lastKnownWwiseProjectName = projectName;
+        }
+        else if (_lastKnownWwiseProjectFilePath.Length > 0 && _lastKnownWwiseProjectName.Length == 0)
+        {
+            _lastKnownWwiseProjectName = Path.GetFileNameWithoutExtension(_lastKnownWwiseProjectFilePath);
+        }
+
+        if (!_keepTarget || projectFile.Length == 0)
+        {
+            return;
+        }
+
+        if (string.Equals(_keptTargetProjectFilePath, projectFile, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        PersistKeepTarget(true, _keptTargetPath, projectFile);
     }
 
     private void WaapiStatusBar_KeepTargetChanged(object? sender, EventArgs e)
@@ -840,6 +885,11 @@ public partial class Form1 : Form, IMessageFilter
             var projectFile = livePath.Length > 0
                 ? (_waapiLastResult?.ProjectFilePath ?? string.Empty)
                 : _keptTargetProjectFilePath;
+            if (projectFile.Trim().Length == 0)
+            {
+                projectFile = _lastKnownWwiseProjectFilePath;
+            }
+
             PersistKeepTarget(true, pathToKeep, projectFile);
             AppendReport(
                 UiStrings.LogKeepTargetOn(pathToKeep) + Environment.NewLine);
@@ -903,6 +953,11 @@ public partial class Form1 : Form, IMessageFilter
             var projectName = _keepTarget
                 ? GetKeptWwiseProjectDisplayName(fallback: result.ProjectName)
                 : result.ProjectName;
+            if (projectName.Length == 0)
+            {
+                projectName = _lastKnownWwiseProjectName;
+            }
+
             waapiStatusBar.UpdateSelection(
                 result.WwiseVersion,
                 projectName,
@@ -914,7 +969,7 @@ public partial class Form1 : Form, IMessageFilter
         // 切断中でも Keep Target ならロック中プロジェクト名を維持し、クリックで開けるようにする。
         if (_keepTarget)
         {
-            var projectName = GetKeptWwiseProjectDisplayName(fallback: string.Empty);
+            var projectName = GetKeptWwiseProjectDisplayName(fallback: _lastKnownWwiseProjectName);
             if (projectName.Length > 0 || _keptTargetPath.Length > 0)
             {
                 waapiStatusBar.UpdateDisconnectedKeepTarget(projectName, _keptTargetPath);
@@ -922,15 +977,29 @@ public partial class Form1 : Form, IMessageFilter
             }
         }
 
-        if (_waapiLastResult is { } failed)
+        // Keep Target オフでも、切断前に掴んだプロジェクトがあれば表示・クリック起動できる。
+        if (_lastKnownWwiseProjectFilePath.Length > 0 || _lastKnownWwiseProjectName.Length > 0)
         {
-            waapiStatusBar.SetResult(failed);
+            var projectName = GetKeptWwiseProjectDisplayName(fallback: _lastKnownWwiseProjectName);
+            var detail = _waapiLastResult is { Message: { Length: > 0 } } failed
+                ? failed.Message
+                : UiStrings.StatusDisconnected;
+            waapiStatusBar.UpdateDisconnectedLastProject(
+                projectName,
+                detail,
+                projectNameClickable: _lastKnownWwiseProjectFilePath.Length > 0);
+            return;
+        }
+
+        if (_waapiLastResult is { } failedResult)
+        {
+            waapiStatusBar.SetResult(failedResult);
         }
     }
 
     private string GetKeptWwiseProjectDisplayName(string fallback)
     {
-        var projectFile = _keptTargetProjectFilePath.Trim();
+        var projectFile = ResolveWwiseProjectFilePathForLaunch();
         if (projectFile.Length > 0)
         {
             var name = Path.GetFileNameWithoutExtension(projectFile);
@@ -940,23 +1009,42 @@ public partial class Form1 : Form, IMessageFilter
             }
         }
 
+        if (_lastKnownWwiseProjectName.Length > 0)
+        {
+            return _lastKnownWwiseProjectName;
+        }
+
         return fallback.Trim();
+    }
+
+    /// <summary>ステータスのプロジェクト名クリック／Keep Target 再起動用の .wproj パス。</summary>
+    private string ResolveWwiseProjectFilePathForLaunch()
+    {
+        if (_keepTarget)
+        {
+            var kept = _keptTargetProjectFilePath.Trim();
+            if (kept.Length > 0)
+            {
+                return kept;
+            }
+        }
+
+        if (_waapiLastResult is { Ok: true, ProjectFilePath: { Length: > 0 } } live)
+        {
+            return live.ProjectFilePath.Trim();
+        }
+
+        return _lastKnownWwiseProjectFilePath.Trim();
     }
 
     private async Task OpenOrFocusKeptWwiseProjectAsync()
     {
-        if (IsDisposed || _wwiseProjectActivateBusy || !_keepTarget)
+        if (IsDisposed || _wwiseProjectActivateBusy)
         {
             return;
         }
 
-        var projectFile = _keptTargetProjectFilePath.Trim();
-        if (projectFile.Length == 0
-            && _waapiLastResult is { Ok: true, ProjectFilePath: { Length: > 0 } } live)
-        {
-            projectFile = live.ProjectFilePath.Trim();
-        }
-
+        var projectFile = ResolveWwiseProjectFilePathForLaunch();
         if (projectFile.Length == 0)
         {
             AppendReport(UiStrings.LogWwiseProjectPathMissing + Environment.NewLine);
@@ -1150,48 +1238,59 @@ public partial class Form1 : Form, IMessageFilter
     {
         try
         {
-            var (path, type) = await WaapiStartupProbe.RefreshSelectionAsync(_waapiSettings)
-                .ConfigureAwait(true);
+            // 選択だけでなくプロジェクト情報も毎回取り直す。
+            // アプリ先行起動→後から Wwise／プロジェクトを開いたとき、初回接続で
+            // ProjectFilePath が空のまま固定されると EXPORT が永久に無効になるため。
+            var result = await WaapiStartupProbe.RunAsync(_waapiSettings).ConfigureAwait(true);
             if (IsDisposed || _waapiLastResult is not { Ok: true })
             {
                 return;
             }
 
-            _waapiPollFailCount = 0;
-
-            // ライブ選択は常に内部へ保持（Keep Target OFF 復帰用）。表示は Keep 中は固定。
-            var selectionChanged =
-                !string.Equals(path, _waapiLastResult.SelectedPath, StringComparison.Ordinal)
-                || !string.Equals(type, _waapiLastResult.SelectedType, StringComparison.Ordinal);
-
-            if (selectionChanged)
+            if (!result.Ok)
             {
-                _waapiLastResult = new WaapiProbeResult
-                {
-                    Ok = true,
-                    WwiseVersion = _waapiLastResult.WwiseVersion,
-                    Project = _waapiLastResult.Project,
-                    ProjectName = _waapiLastResult.ProjectName,
-                    ProjectFilePath = _waapiLastResult.ProjectFilePath,
-                    SelectedPath = path,
-                    SelectedType = type,
-                };
-            }
-
-            if (_keepTarget)
-            {
-                // Keep 中は Wwise 側の選択変更で表示・ログ・記憶を動かさない。
+                RegisterWaapiPollFailure();
                 return;
             }
 
-            if (!selectionChanged)
+            _waapiPollFailCount = 0;
+
+            var previous = _waapiLastResult;
+            var path = result.SelectedPath;
+            var type = result.SelectedType;
+            var selectionChanged =
+                !string.Equals(path, previous.SelectedPath, StringComparison.Ordinal)
+                || !string.Equals(type, previous.SelectedType, StringComparison.Ordinal);
+            var projectChanged =
+                !string.Equals(result.ProjectFilePath, previous.ProjectFilePath, StringComparison.Ordinal)
+                || !string.Equals(result.ProjectName, previous.ProjectName, StringComparison.Ordinal)
+                || !string.Equals(result.WwiseVersion, previous.WwiseVersion, StringComparison.Ordinal);
+
+            // ライブ状態は常に最新へ（Keep Target OFF 復帰用の選択含む）。
+            _waapiLastResult = result;
+            RememberLiveWwiseProject(result);
+
+            if (_keepTarget)
+            {
+                // Keep 中は選択表示・ログは動かさないが、プロジェクトパス更新時は EXPORT 判定をやり直す。
+                if (projectChanged)
+                {
+                    RefreshWaapiStatusDisplay();
+                    UpdateExportButtonState();
+                }
+
+                return;
+            }
+
+            if (!selectionChanged && !projectChanged)
             {
                 return;
             }
 
             RefreshWaapiStatusDisplay();
 
-            if (!string.Equals(path, _waapiLoggedSelectionPath, StringComparison.Ordinal))
+            if (selectionChanged
+                && !string.Equals(path, _waapiLoggedSelectionPath, StringComparison.Ordinal))
             {
                 _waapiLoggedSelectionPath = path;
                 AppendReport(
@@ -1204,21 +1303,26 @@ public partial class Form1 : Form, IMessageFilter
         }
         catch
         {
-            // 一時失敗は許容し、連続 N 回で切断扱いにする。
-            _waapiPollFailCount++;
-            if (_waapiPollFailCount < WaapiPollFailThreshold || IsDisposed)
-            {
-                return;
-            }
-
-            ApplyWaapiProbeResult(
-                new WaapiProbeResult
-                {
-                    Ok = false,
-                    Message = UiStrings.LogWaapiConnectFailed,
-                },
-                logReport: true);
+            RegisterWaapiPollFailure();
         }
+    }
+
+    /// <summary>接続中ポーリングの一時失敗を数え、連続 N 回で切断表示にする。</summary>
+    private void RegisterWaapiPollFailure()
+    {
+        _waapiPollFailCount++;
+        if (_waapiPollFailCount < WaapiPollFailThreshold || IsDisposed)
+        {
+            return;
+        }
+
+        ApplyWaapiProbeResult(
+            new WaapiProbeResult
+            {
+                Ok = false,
+                Message = UiStrings.LogWaapiConnectFailed,
+            },
+            logReport: true);
     }
 
     private async Task PollWaapiWhileDisconnectedAsync()
@@ -1464,7 +1568,7 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     private static bool IsBackwardSeekKey(Keys keyCode) =>
-        keyCode is Keys.Home or Keys.Left or Keys.PageUp;
+        keyCode is Keys.Home or Keys.Left or Keys.PageUp or Keys.L;
 
     /// <summary>波形ビュー操作用ショートカット。</summary>
     private bool TryProcessWaveformShortcut(Keys keyData, bool showUiFeedback = true)
@@ -1531,6 +1635,12 @@ public partial class Form1 : Form, IMessageFilter
         {
             // シーク位置はそのまま、表示だけ一瞬センターへ寄せる
             waveformView.CenterViewOnPlayhead();
+            return true;
+        }
+
+        if (keyData == Keys.L && !IsTextEntryFocusActive())
+        {
+            TrySeekNearActiveLoopEnd();
             return true;
         }
 
@@ -2022,6 +2132,15 @@ public partial class Form1 : Form, IMessageFilter
         editorTextBox.ForeColor = UiColors.LogDefault;
         logEditorPanel.BackColor = editorTextBox.BackColor;
         logButtonPanel.BackColor = editorTextBox.BackColor;
+        logHeaderLabel.BackColor = editorTextBox.BackColor;
+        logHeaderLabel.BarColor = UiColors.ForControlBack(UiColors.SectionHeaderBack);
+        logHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        tipsPanel.BackColor = editorTextBox.BackColor;
+        tipsLabel.BackColor = editorTextBox.BackColor;
+        tipsLabel.ForeColor = UiColors.LogDefault;
+        tipsHeaderLabel.BackColor = editorTextBox.BackColor;
+        tipsHeaderLabel.BarColor = UiColors.ForControlBack(UiColors.SectionHeaderBack);
+        tipsHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
         ApplyLogButtonColors();
         ApplyPlaylistSelectorColors();
         actionBar.BackColor = UiColors.ForControlBack(UiColors.ActionBarBack);
@@ -2196,7 +2315,7 @@ public partial class Form1 : Form, IMessageFilter
         topMostCheckBox.BackColor = barBack;
         RefreshFlatOptionControl(topMostCheckBox);
         languageFlagButton.ApplyColors();
-        toolTipToggleButton.ApplyColors();
+        tipsToggleButton.ApplyColors();
         manualHelpButton.ApplyColors();
         settingsGearButton.ApplyColors();
         projectSpectrumView.BackColor = barBack;
@@ -2221,7 +2340,6 @@ public partial class Form1 : Form, IMessageFilter
     private void WireProjectBarEvents()
     {
         projectSpectrumView.Player = _audioPlayer;
-        projectBar.Paint += ProjectBar_Paint;
         projectNameComboBox.SelectedIndexChanged += ProjectNameComboBox_SelectedIndexChanged;
         projectNameComboBox.SelectionChangeCommitted += ProjectNameComboBox_SelectionChangeCommitted;
         projectNameComboBox.DropDownClosed += ProjectNameComboBox_DropDownClosed;
@@ -2271,7 +2389,7 @@ public partial class Form1 : Form, IMessageFilter
         CenterProjectBarControl(projectFolderButton, contentHeight);
         CenterProjectBarControl(projectDeleteButton, contentHeight);
         CenterProjectBarControl(languageFlagButton, contentHeight);
-        CenterProjectBarControl(toolTipToggleButton, contentHeight);
+        CenterProjectBarControl(tipsToggleButton, contentHeight);
         CenterProjectBarControl(manualHelpButton, contentHeight);
         CenterProjectBarControl(settingsGearButton, contentHeight);
         CenterProjectBarControl(projectSpectrumView, contentHeight);
@@ -2350,12 +2468,6 @@ public partial class Form1 : Form, IMessageFilter
         _ = SendMessage(projectOutputPathTextBox.Handle, EmSetRect, IntPtr.Zero, ref rect);
     }
 
-    private void ProjectBar_Paint(object? sender, PaintEventArgs e)
-    {
-        using var pen = new Pen(UiColors.ProjectBarBorder);
-        e.Graphics.DrawLine(pen, 0, projectBar.Height - 1, projectBar.Width, projectBar.Height - 1);
-    }
-
     private void ProjectOutputPathTextBox_GotFocus(object? sender, EventArgs e)
     {
         HideProjectPathCaret();
@@ -2417,8 +2529,8 @@ public partial class Form1 : Form, IMessageFilter
             topMostCheckBox.Checked = _appSettings.AlwaysOnTop;
             topMostCheckBox.CheckedChanged += TopMostCheckBox_CheckedChanged;
             TopMost = _appSettings.AlwaysOnTop;
-            DarkToolTip.GlobalActive = _appSettings.ShowToolTips;
-            toolTipToggleButton.Checked = _appSettings.ShowToolTips;
+            TipService.Enabled = _appSettings.ShowTips;
+            tipsToggleButton.Checked = _appSettings.ShowTips;
             _audioPlayer.ApplyOutputSettings(_appSettings.ToAudioOutputSettings());
             ApplyWaveformFadeCurveDefaults();
             ApplyWaveformHeightScale(adjustFormHeight: false);
@@ -2551,6 +2663,7 @@ public partial class Form1 : Form, IMessageFilter
             compactFileNumbersCheckBox.CheckedChanged -= CompactFileNumbersCheckBox_CheckedChanged;
             compactFileNumbersCheckBox.Checked = profile.CompactFileNumbers;
             compactFileNumbersCheckBox.CheckedChanged += CompactFileNumbersCheckBox_CheckedChanged;
+            UpdateCompactFileNumbersEnabled();
 
             keepLastSessionCheckBox.CheckedChanged -= KeepLastSessionCheckBox_CheckedChanged;
             keepLastSessionCheckBox.Checked = profile.KeepLastSession;
@@ -2981,7 +3094,7 @@ public partial class Form1 : Form, IMessageFilter
             leftMargin: 0);
         oldOut?.Dispose();
 
-        UpdatePlaylistFadeCurveToolTips();
+        UpdatePlaylistFadeCurveTips();
     }
 
     /// <summary>
@@ -3071,7 +3184,7 @@ public partial class Form1 : Form, IMessageFilter
         };
     }
 
-    private void UpdatePlaylistFadeCurveToolTips()
+    private void UpdatePlaylistFadeCurveTips()
     {
         var partNumber = _transitionSettingsEditPartNumber;
         var fadeIn = partNumber is int inPart
@@ -3080,8 +3193,8 @@ public partial class Form1 : Form, IMessageFilter
         var fadeOut = partNumber is int outPart
             ? ResolveFadeOutCurve(outPart)
             : _playlistFadeOutCurve;
-        playlistToolTip.SetToolTip(fadeInCurveIcon, UiStrings.LabelRegionFadeCurve(fadeIn));
-        playlistToolTip.SetToolTip(fadeOutCurveIcon, UiStrings.LabelRegionFadeCurve(fadeOut));
+        TipService.Set(fadeInCurveIcon, UiStrings.LabelRegionFadeCurve(fadeIn));
+        TipService.Set(fadeOutCurveIcon, UiStrings.LabelRegionFadeCurve(fadeOut));
     }
 
     private void StoreGroupFadeSeconds(int partNumber, double seconds)
@@ -3751,6 +3864,17 @@ public partial class Form1 : Form, IMessageFilter
     {
         var back = UiColors.ForControlBack(UiColors.PlaylistBack);
         var headerBack = UiColors.ForControlBack(UiColors.SectionHeaderBack);
+        var logBack = UiColors.ForControlBack(UiColors.LogBack);
+        // Tips / Log 見出しは Fade In 等と同じ Muted 色（起動時もここを通る）。
+        tipsPanel.BackColor = logBack;
+        tipsLabel.BackColor = logBack;
+        tipsLabel.ForeColor = UiColors.LogDefault;
+        tipsHeaderLabel.BackColor = logBack;
+        tipsHeaderLabel.BarColor = headerBack;
+        tipsHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        logHeaderLabel.BackColor = logBack;
+        logHeaderLabel.BarColor = headerBack;
+        logHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
         playlistSelectorPanel.BackColor = back;
         playlistScrollPanel.BackColor = back;
         playlistListLayout.BackColor = back;
@@ -3760,7 +3884,8 @@ public partial class Form1 : Form, IMessageFilter
         compactFileNumbersCheckBox.ForeColor = UiColors.PlaylistOptionFore;
         compactFileNumbersCheckBox.BackColor = back;
         RefreshFlatOptionControl(compactFileNumbersCheckBox);
-        playlistSeparator.BackColor = UiColors.ForControlBack(UiColors.PlaylistButtonBorder);
+        // セパレータは幅（レイアウト）だけ残し、線としては見せない。
+        playlistSeparator.BackColor = back;
         rightSidePanel.BackColor = back;
         _rightSideContentHost.BackColor = back;
         markerOptionsPanel.ApplyColors();
@@ -3801,8 +3926,7 @@ public partial class Form1 : Form, IMessageFilter
         exitSourceAtHeaderLabel.BackColor = back;
         exitSourceAtHeaderLabel.BarColor = headerBack;
         exitSourceAtHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
-        transitionTimeSeparator.BackColor =
-            UiColors.ForControlBack(UiColors.PlaylistButtonBorder);
+        transitionTimeSeparator.BackColor = back;
         foreach (var radio in new[]
         {
             fadeInNoneRadio,
@@ -4023,7 +4147,7 @@ public partial class Form1 : Form, IMessageFilter
                 button.AccessibleName = name;
             }
 
-            playlistToolTip.SetToolTip(control, BuildPlaylistGroupToolTip(name));
+            TipService.Set(control, BuildPlaylistGroupTip(name));
         }
 
         if (updateWaveform)
@@ -4552,7 +4676,7 @@ public partial class Form1 : Form, IMessageFilter
                 button.MouseLeave += PlaylistButton_MouseLeave;
                 button.DragEnter += EditorTextBox_DragEnter;
                 button.DragDrop += EditorTextBox_DragDrop;
-                playlistToolTip.SetToolTip(button, BuildPlaylistGroupToolTip(name));
+                TipService.Set(button, BuildPlaylistGroupTip(name));
 
                 var swatch = new PlaylistGroupSwatch
                 {
@@ -4573,7 +4697,7 @@ public partial class Form1 : Form, IMessageFilter
                 swatch.DragEnter += EditorTextBox_DragEnter;
                 swatch.DragDrop += EditorTextBox_DragDrop;
                 swatch.GroupColor = TryGetPlaylistGroupColor(part.Number);
-                playlistToolTip.SetToolTip(swatch, BuildPlaylistGroupToolTip(name));
+                TipService.Set(swatch, BuildPlaylistGroupTip(name));
 
                 playlistListLayout.Controls.Add(swatch);
                 playlistListLayout.Controls.Add(button);
@@ -4660,6 +4784,8 @@ public partial class Form1 : Form, IMessageFilter
         {
             session.SetDisabledPartNumbers(null);
         }
+
+        UpdateCompactFileNumbersEnabled();
     }
 
     private void EndPlaylistGroupPaint()
@@ -4668,7 +4794,7 @@ public partial class Form1 : Form, IMessageFilter
         _playlistGroupPaintErase = false;
         _playlistGroupPaintGroupId = null;
         _playlistGroupPaintLastPartNumber = null;
-        ResumePlaylistToolTipsAfterPaint();
+        TipService.Resume();
         // Sticky ID は Shift 押し続け中に残し、隙間を跨いだ再ドラッグでも同 ID を使う。
         if (_loadedPreview is { } preview)
         {
@@ -4685,34 +4811,7 @@ public partial class Form1 : Form, IMessageFilter
     {
         _playlistDisablePaintActive = false;
         _playlistDisablePaintLastPartNumber = null;
-        ResumePlaylistToolTipsAfterPaint();
-    }
-
-    /// <summary>グループ／無効ペイント中はホバーでツールチップが出ないよう一時停止する。</summary>
-    private void SuspendPlaylistToolTipsForPaint()
-    {
-        if (_playlistToolTipsSuspendedForPaint)
-        {
-            return;
-        }
-
-        _playlistToolTipsSuspendedForPaint = true;
-        playlistToolTip.Active = false;
-        foreach (Control control in playlistListLayout.Controls)
-        {
-            playlistToolTip.Hide(control);
-        }
-    }
-
-    private void ResumePlaylistToolTipsAfterPaint()
-    {
-        if (!_playlistToolTipsSuspendedForPaint)
-        {
-            return;
-        }
-
-        _playlistToolTipsSuspendedForPaint = false;
-        playlistToolTip.Active = DarkToolTip.GlobalActive;
+        TipService.Resume();
     }
 
     private void ClearPlaylistPlaybackSelection()
@@ -4830,7 +4929,7 @@ public partial class Form1 : Form, IMessageFilter
         if (ctrl && shift)
         {
             _suppressNextPlaylistClick = sender is Button;
-            SuspendPlaylistToolTipsForPaint();
+            TipService.Suspend();
             _playlistDisablePaintActive = true;
             _playlistDisablePaintSetDisabled =
                 !_disabledPlaylistPartNumbers.Contains(part.Number);
@@ -4858,7 +4957,7 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         _suppressNextPlaylistClick = sender is Button;
-        SuspendPlaylistToolTipsForPaint();
+        TipService.Suspend();
         _playlistGroupPaintActive = true;
         _playlistGroupPaintErase = erase;
         _playlistGroupPaintLastPartNumber = null;
@@ -4939,7 +5038,7 @@ public partial class Form1 : Form, IMessageFilter
         }
     }
 
-    private static string BuildPlaylistGroupToolTip(string playlistName) =>
+    private static string BuildPlaylistGroupTip(string playlistName) =>
         UiStrings.TipPlaylistItem(playlistName);
 
     private WaveformOutputPart? HitTestPlaylistPartAtCursor()
@@ -5087,6 +5186,22 @@ public partial class Form1 : Form, IMessageFilter
         ApplyPlaylistSelectorColors();
         UpdateExportButtonState();
         UpdateLayerMusicOptionEnabled();
+        UpdateCompactFileNumbersEnabled();
+    }
+
+    /// <summary>
+    /// Compact Num. は出力対象外（無効）Playlist があるときだけ操作できる。
+    /// </summary>
+    private void UpdateCompactFileNumbersEnabled()
+    {
+        var enabled = _disabledPlaylistPartNumbers.Count > 0;
+        if (compactFileNumbersCheckBox.Enabled == enabled)
+        {
+            return;
+        }
+
+        compactFileNumbersCheckBox.Enabled = enabled;
+        RefreshFlatOptionControl(compactFileNumbersCheckBox);
     }
 
     /// <summary>
@@ -6755,22 +6870,18 @@ public partial class Form1 : Form, IMessageFilter
     {
         Text = UiStrings.FormTitle;
         languageFlagButton.RefreshAppearance();
-        toolTipToggleButton.RefreshAppearance();
+        tipsToggleButton.RefreshAppearance();
         manualHelpButton.RefreshAppearance();
         settingsGearButton.RefreshAppearance();
         ApplyLocalizedControlLabels();
-        if (playlistToolTip is DarkToolTip darkTip)
-        {
-            darkTip.ApplyTheme();
-        }
 
-        ApplyActionBarToolTips();
-        ApplyProjectBarToolTips();
-        ApplyTransitionToolTips();
-        ApplyLogAreaToolTips();
-        ApplyPlaylistItemToolTips();
-        transportBar.ApplyLocalizedToolTips();
-        waveformView.RefreshLocalizedToolTips();
+        ApplyActionBarTips();
+        ApplyProjectBarTips();
+        ApplyTransitionTips();
+        ApplyLogAreaTips();
+        ApplyPlaylistItemTips();
+        transportBar.ApplyLocalizedTips();
+        waveformView.RefreshLocalizedTips();
         markerOptionsPanel.ApplyLocalizedLabels();
         if (_loadedPreview is { } preview)
         {
@@ -6810,6 +6921,8 @@ public partial class Form1 : Form, IMessageFilter
         changeOccursAtHeaderLabel.Text = UiStrings.LabelChangeOccursAt;
         exitSourceAtHeaderLabel.Text = UiStrings.LabelExitSourceAt;
         playlistHeaderLabel.Text = UiStrings.LabelMusicPlaylist;
+        tipsHeaderLabel.Text = UiStrings.LabelTips;
+        logHeaderLabel.Text = UiStrings.LabelLog;
         playMinusECheckBox.Text = UiStrings.LabelPlayMinusE;
 
         FlatOptionRadioButton[] fadeRadios =
@@ -6860,7 +6973,7 @@ public partial class Form1 : Form, IMessageFilter
         }
     }
 
-    private void ApplyPlaylistItemToolTips()
+    private void ApplyPlaylistItemTips()
     {
         foreach (Control control in playlistListLayout.Controls)
         {
@@ -6869,12 +6982,12 @@ public partial class Form1 : Form, IMessageFilter
                 continue;
             }
 
-            var name = ResolvePlaylistTooltipName(part);
-            playlistToolTip.SetToolTip(control, BuildPlaylistGroupToolTip(name));
+            var name = ResolvePlaylistTipName(part);
+            TipService.Set(control, BuildPlaylistGroupTip(name));
         }
     }
 
-    private string ResolvePlaylistTooltipName(WaveformOutputPart part)
+    private string ResolvePlaylistTipName(WaveformOutputPart part)
     {
         foreach (Control control in playlistListLayout.Controls)
         {
@@ -6899,12 +7012,12 @@ public partial class Form1 : Form, IMessageFilter
         ReleaseFocusToWaveform();
     }
 
-    private void ToolTipToggleButton_Click(object? sender, EventArgs e)
+    private void TipsToggleButton_Click(object? sender, EventArgs e)
     {
-        var enabled = !_appSettings.ShowToolTips;
-        _appSettings.SaveShowToolTips(enabled);
-        DarkToolTip.GlobalActive = enabled;
-        toolTipToggleButton.Checked = enabled;
+        var enabled = !_appSettings.ShowTips;
+        _appSettings.SaveShowTips(enabled);
+        TipService.Enabled = enabled;
+        tipsToggleButton.Checked = enabled;
         ReleaseFocusToWaveform();
     }
 
@@ -6974,50 +7087,50 @@ public partial class Form1 : Form, IMessageFilter
         ReleaseFocusToWaveform();
     }
 
-    private void ApplyActionBarToolTips()
+    private void ApplyActionBarTips()
     {
-        playlistToolTip.SetToolTip(detailedLogCheckBox, UiStrings.TipDebugLog);
-        playlistToolTip.SetToolTip(languageFlagButton, UiStrings.IsJapanese
+        TipService.Set(detailedLogCheckBox, UiStrings.TipDebugLog);
+        TipService.Set(languageFlagButton, UiStrings.IsJapanese
             ? UiStrings.TipLanguageJapanese
             : UiStrings.TipLanguageEnglish);
-        playlistToolTip.SetToolTip(settingsGearButton, UiStrings.TipAudioSettings);
-        playlistToolTip.SetToolTip(manualHelpButton, UiStrings.TipManualHelp);
-        playlistToolTip.SetToolTip(compactFileNumbersCheckBox, UiStrings.TipCompactFileNumbers);
-        playlistToolTip.SetToolTip(keepLastSessionCheckBox, UiStrings.TipKeepLastSession);
-        playlistToolTip.SetToolTip(topMostCheckBox, UiStrings.TipAlwaysOnTop);
-        playlistToolTip.SetToolTip(clearButton, UiStrings.TipClear);
-        playlistToolTip.SetToolTip(reloadButton, UiStrings.TipReload);
-        playlistToolTip.SetToolTip(exportButton, UiStrings.TipExport);
-        playlistToolTip.SetToolTip(copyrightLinkLabel, UiStrings.TipCopyright);
+        TipService.Set(settingsGearButton, UiStrings.TipAudioSettings);
+        TipService.Set(manualHelpButton, UiStrings.TipManualHelp);
+        TipService.Set(compactFileNumbersCheckBox, UiStrings.TipCompactFileNumbers);
+        TipService.Set(keepLastSessionCheckBox, UiStrings.TipKeepLastSession);
+        TipService.Set(topMostCheckBox, UiStrings.TipAlwaysOnTop);
+        TipService.Set(clearButton, UiStrings.TipClear);
+        TipService.Set(reloadButton, UiStrings.TipReload);
+        TipService.Set(exportButton, UiStrings.TipExport);
+        TipService.Set(copyrightLinkLabel, UiStrings.TipCopyright);
     }
 
-    private void ApplyProjectBarToolTips()
+    private void ApplyProjectBarTips()
     {
-        playlistToolTip.SetToolTip(projectNameComboBox, UiStrings.TipProjectName);
-        playlistToolTip.SetToolTip(projectOutputPathTextBox, UiStrings.TipProjectOutputPath);
-        playlistToolTip.SetToolTip(projectFolderButton, UiStrings.TipProjectFolder);
-        playlistToolTip.SetToolTip(projectDeleteButton, UiStrings.TipProjectDelete);
-        playlistToolTip.SetToolTip(projectSpectrumView, UiStrings.TipSpectrum);
+        TipService.Set(projectNameComboBox, UiStrings.TipProjectName);
+        TipService.Set(projectOutputPathTextBox, UiStrings.TipProjectOutputPath);
+        TipService.Set(projectFolderButton, UiStrings.TipProjectFolder);
+        TipService.Set(projectDeleteButton, UiStrings.TipProjectDelete);
+        TipService.Set(projectSpectrumView, UiStrings.TipSpectrum);
     }
 
-    private void ApplyLogAreaToolTips()
+    private void ApplyLogAreaTips()
     {
-        playlistToolTip.SetToolTip(editorTextBox, UiStrings.TipLogEditor);
-        playlistToolTip.SetToolTip(logClearButton, UiStrings.TipLogClear);
-        playlistToolTip.SetToolTip(logCopyButton, UiStrings.TipLogCopy);
-        playlistToolTip.SetToolTip(logDownloadButton, UiStrings.TipLogDownload);
-        playlistToolTip.SetToolTip(playlistHeaderLabel, UiStrings.TipPlaylistHeader);
+        TipService.Set(editorTextBox, UiStrings.TipLogEditor);
+        TipService.Set(logClearButton, UiStrings.TipLogClear);
+        TipService.Set(logCopyButton, UiStrings.TipLogCopy);
+        TipService.Set(logDownloadButton, UiStrings.TipLogDownload);
+        TipService.Set(playlistHeaderLabel, UiStrings.TipPlaylistHeader);
     }
 
-    private void ApplyTransitionToolTips()
+    private void ApplyTransitionTips()
     {
-        playlistToolTip.SetToolTip(fadeInHeaderLabel, UiStrings.TipFadeInHeader);
-        playlistToolTip.SetToolTip(transitionTimeHeaderLabel, UiStrings.TipFadeOutHeader);
-        playlistToolTip.SetToolTip(exitSourceAtHeaderLabel, UiStrings.TipExitSourceHeader);
-        playlistToolTip.SetToolTip(fadeInGroupDividerLabel, UiStrings.TipGroupFadeHeader);
-        playlistToolTip.SetToolTip(optionsHeaderLabel, UiStrings.TipOptionsHeader);
-        playlistToolTip.SetToolTip(playMinusECheckBox, UiStrings.TipPlayMinusE);
-        playlistToolTip.SetToolTip(changeOccursAtHeaderLabel, UiStrings.TipChangeOccursAtHeader);
+        TipService.Set(fadeInHeaderLabel, UiStrings.TipFadeInHeader);
+        TipService.Set(transitionTimeHeaderLabel, UiStrings.TipFadeOutHeader);
+        TipService.Set(exitSourceAtHeaderLabel, UiStrings.TipExitSourceHeader);
+        TipService.Set(fadeInGroupDividerLabel, UiStrings.TipGroupFadeHeader);
+        TipService.Set(optionsHeaderLabel, UiStrings.TipOptionsHeader);
+        TipService.Set(playMinusECheckBox, UiStrings.TipPlayMinusE);
+        TipService.Set(changeOccursAtHeaderLabel, UiStrings.TipChangeOccursAtHeader);
         UpdatePlaylistFadeCurveIcons();
 
         FlatOptionRadioButton[] fadeRadios =
@@ -7044,16 +7157,16 @@ public partial class Form1 : Form, IMessageFilter
             ApplyFadeRadioTip(radio);
         }
 
-        playlistToolTip.SetToolTip(exitSourceImmediateRadio, UiStrings.TipExitImmediate);
-        playlistToolTip.SetToolTip(exitSourceNextBarRadio, UiStrings.TipExitNextBar);
-        playlistToolTip.SetToolTip(exitSourceNextBeatRadio, UiStrings.TipExitNextBeat);
-        playlistToolTip.SetToolTip(exitSourceNextCueRadio, UiStrings.TipExitNextCue);
-        playlistToolTip.SetToolTip(exitSourceExitCueRadio, UiStrings.TipExitExitCue);
-        playlistToolTip.SetToolTip(changeOccursImmediateRadio, UiStrings.TipExitImmediate);
-        playlistToolTip.SetToolTip(changeOccursNextBarRadio, UiStrings.TipExitNextBar);
-        playlistToolTip.SetToolTip(changeOccursNextBeatRadio, UiStrings.TipExitNextBeat);
-        playlistToolTip.SetToolTip(changeOccursNextCueRadio, UiStrings.TipExitNextCue);
-        playlistToolTip.SetToolTip(changeOccursExitCueRadio, UiStrings.TipExitExitCue);
+        TipService.Set(exitSourceImmediateRadio, UiStrings.TipExitImmediate);
+        TipService.Set(exitSourceNextBarRadio, UiStrings.TipExitNextBar);
+        TipService.Set(exitSourceNextBeatRadio, UiStrings.TipExitNextBeat);
+        TipService.Set(exitSourceNextCueRadio, UiStrings.TipExitNextCue);
+        TipService.Set(exitSourceExitCueRadio, UiStrings.TipExitExitCue);
+        TipService.Set(changeOccursImmediateRadio, UiStrings.TipExitImmediate);
+        TipService.Set(changeOccursNextBarRadio, UiStrings.TipExitNextBar);
+        TipService.Set(changeOccursNextBeatRadio, UiStrings.TipExitNextBeat);
+        TipService.Set(changeOccursNextCueRadio, UiStrings.TipExitNextCue);
+        TipService.Set(changeOccursExitCueRadio, UiStrings.TipExitExitCue);
     }
 
     private void ApplyFadeRadioTip(RadioButton radio)
@@ -7062,7 +7175,7 @@ public partial class Form1 : Form, IMessageFilter
         var tip = seconds <= 0
             ? UiStrings.TipFadeNone
             : UiStrings.TipFadeSeconds(seconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture));
-        playlistToolTip.SetToolTip(radio, tip);
+        TipService.Set(radio, tip);
     }
 
     /// <summary>
@@ -7312,13 +7425,19 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        if (name.EndsWith(' ')
-            || name.EndsWith('.')
-            || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        if (!WwiseObjectNames.TryValidateBaseName(name, out var rejectReason))
         {
+            var body = rejectReason switch
+            {
+                WwiseBaseNameRejectReason.StartsWithDigit =>
+                    UiStrings.DialogRenameStartsWithDigitBody,
+                WwiseBaseNameRejectReason.ReservedWindowsName =>
+                    UiStrings.DialogRenameReservedNameBody,
+                _ => UiStrings.DialogRenameFailedBody,
+            };
             OwnerCenteredMessageBox.Show(
                 this,
-                UiStrings.DialogRenameFailedBody,
+                body,
                 UiStrings.DialogRenameFailedTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
@@ -9144,6 +9263,192 @@ public partial class Form1 : Form, IMessageFilter
 
         var start = Math.Max(0d, _smoothProgress - (prerollSeconds / durationSec));
         StartPlaybackAt(start);
+    }
+
+    /// <summary>
+    /// ループ終点の直前へシークする。
+    /// 順序: (1) 小節管理あり → ループエンドの 1 小節前
+    /// (2) それ以外 → ループエンドの 3 秒前。いずれもループ開始より前には出ない。
+    /// </summary>
+    private bool TrySeekNearActiveLoopEnd()
+    {
+        if (!_audioPlayer.HasSource
+            || _loadedPreview is not { } preview
+            || preview.WavInfo.FrameCount <= 0)
+        {
+            return false;
+        }
+
+        if (!TryResolveLoopEndSamples(out var loopStartSample, out var loopEndSample)
+            || loopEndSample <= loopStartSample)
+        {
+            return false;
+        }
+
+        var frameCount = preview.WavInfo.FrameCount;
+        var sampleRate = preview.WavInfo.SampleRate;
+
+        // (1) 小節管理あり → ループエンドの 1 小節前
+        // (2) 小節管理なし／小節頭が取れない → ループエンドの 3 秒前
+        long? oneBarBefore = HasTransportBarNavigation()
+            ? FindSampleOneBarBefore(preview.Bars, loopEndSample, sampleRate)
+            : null;
+        long targetSample;
+        if (oneBarBefore is long barSample)
+        {
+            targetSample = barSample;
+        }
+        else
+        {
+            if (sampleRate <= 0)
+            {
+                return false;
+            }
+
+            targetSample = loopEndSample - (3L * sampleRate);
+        }
+
+        targetSample = Math.Clamp(
+            targetSample,
+            loopStartSample,
+            Math.Max(loopStartSample, loopEndSample - 1));
+        var targetProgress = Math.Clamp(targetSample / (double)frameCount, 0d, 1d);
+        if (targetProgress < _smoothProgress)
+        {
+            PauseForBackwardSeekHold();
+        }
+
+        SeekPlayback(targetProgress, ensureVisible: true);
+        return true;
+    }
+
+    /// <summary>
+    /// ジャンプ先のループ範囲（-L の折り返し）を解決する。
+    /// Playlist 終端（-E 含む）ではなく、実際にループする -L 終端を使う。
+    /// </summary>
+    private bool TryResolveLoopEndSamples(out long loopStartSample, out long loopEndSample)
+    {
+        loopStartSample = 0;
+        loopEndSample = 0;
+
+        // アーム中／再生ヘッド位置の -L
+        if (_audioPlayer.TryGetActiveLoopSamples(out loopStartSample, out loopEndSample)
+            || _audioPlayer.TryGetLoopSamples(_smoothProgress, out loopStartSample, out loopEndSample))
+        {
+            return true;
+        }
+
+        // Playlist 内にいるが -A／-E 側などで未アームのとき: その Playlist に含まれる -L を使う
+        if (ResolveClockPlaylistPart() is { } part
+            && TryFindLoopSamplesInRange(
+                part.StartSampleOffset,
+                part.EndSampleOffset,
+                out loopStartSample,
+                out loopEndSample))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// <paramref name="rangeStart"/>〜<paramref name="rangeEnd"/> に含まれる -L 区間を探す。
+    /// 複数あるときは再生ヘッドに最も近い（同点なら終端が後の）ものを採用する。
+    /// </summary>
+    private bool TryFindLoopSamplesInRange(
+        long rangeStart,
+        long rangeEnd,
+        out long loopStartSample,
+        out long loopEndSample)
+    {
+        loopStartSample = 0;
+        loopEndSample = 0;
+        if (rangeEnd <= rangeStart || _loadedPreview is not { } preview)
+        {
+            return false;
+        }
+
+        var plans = WaveAudioPlayer.BuildLoopPlans(GetEffectiveRegions());
+        if (plans.Length == 0)
+        {
+            return false;
+        }
+
+        var frameCount = preview.WavInfo.FrameCount;
+        var playheadSample = frameCount > 0
+            ? (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount)
+            : rangeStart;
+
+        LoopPlaybackPlan? best = null;
+        var bestDistance = long.MaxValue;
+        foreach (var plan in plans)
+        {
+            // Playlist に含まれる -L（終端が範囲内）だけを対象にする
+            if (plan.LoopEndSample <= plan.LoopStartSample
+                || plan.LoopStartSample < rangeStart
+                || plan.LoopEndSample > rangeEnd)
+            {
+                continue;
+            }
+
+            var distance = playheadSample < plan.LoopStartSample
+                ? plan.LoopStartSample - playheadSample
+                : playheadSample >= plan.LoopEndSample
+                    ? playheadSample - plan.LoopEndSample
+                    : 0L;
+            if (best is null
+                || distance < bestDistance
+                || (distance == bestDistance && plan.LoopEndSample > best.Value.LoopEndSample))
+            {
+                best = plan;
+                bestDistance = distance;
+            }
+        }
+
+        if (best is not { } chosen)
+        {
+            return false;
+        }
+
+        loopStartSample = chosen.LoopStartSample;
+        loopEndSample = chosen.LoopEndSample;
+        return true;
+    }
+
+    /// <summary>
+    /// <paramref name="loopEndSample"/> の 1 小節前の小節頭。取れなければ null（呼び出し側で 3 秒前へ）。
+    /// 終端小節線の丸め誤差（数 ms）は終端側とみなし、その 1 つ前だけを返す。
+    /// </summary>
+    private static long? FindSampleOneBarBefore(
+        IReadOnlyList<WaveformBarMark> bars,
+        long loopEndSample,
+        uint sampleRate)
+    {
+        // PPQ→サンプル丸めで終端小節線が数サンプル手前に付くことがある。
+        var endTolerance = sampleRate > 0
+            ? Math.Max(2L, sampleRate / 100L)
+            : 2L;
+        var endThreshold = loopEndSample - endTolerance;
+
+        long? previous = null;
+        foreach (var mark in bars)
+        {
+            if (mark.IsTempoChangeOnly)
+            {
+                continue;
+            }
+
+            // 終端近傍（およびそれ以降）の小節線はループエンド側。1 小節前には使わない。
+            if (mark.SampleOffset >= endThreshold)
+            {
+                break;
+            }
+
+            previous = mark.SampleOffset;
+        }
+
+        return previous;
     }
 
     /// <summary>指定進捗へシークして再生開始（または再生中ならその位置から続行）。</summary>

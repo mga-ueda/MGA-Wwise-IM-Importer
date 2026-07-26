@@ -2,13 +2,17 @@
 
 partial class Form1
 {
-    private System.ComponentModel.IContainer components = null;
     private Panel waveformHostPanel;
     private WaveformView waveformView;
     private ThinHorizontalScrollBar waveformHorizontalScrollBar;
     private TransportBar transportBar;
     private Panel logAreaPanel;
+    private Panel logColumnPanel;
+    private Panel tipsPanel;
+    private SectionHeaderLabel tipsHeaderLabel;
+    private Label tipsLabel;
     private Panel logEditorPanel;
+    private SectionHeaderLabel logHeaderLabel;
     private ShortcutForwardingRichTextBox editorTextBox;
     private FlowLayoutPanel logButtonPanel;
     private TransportIconButton logClearButton;
@@ -69,7 +73,6 @@ partial class Form1
     private SectionHeaderLabel playlistHeaderLabel;
     private Panel playlistScrollPanel;
     private TableLayoutPanel playlistListLayout;
-    private ToolTip playlistToolTip;
     private Panel actionBar;
     private PictureBox brandLogoPictureBox;
     private SmoothLinkLabel copyrightLinkLabel;
@@ -78,7 +81,7 @@ partial class Form1
     private LanguageFlagButton languageFlagButton;
     private SettingsGearButton settingsGearButton;
     private ManualHelpButton manualHelpButton;
-    private ToolTipToggleButton toolTipToggleButton;
+    private TipsToggleButton tipsToggleButton;
     private FlatOptionCheckBox compactFileNumbersCheckBox;
     private FlatOptionCheckBox keepLastSessionCheckBox;
     private FlatOptionCheckBox topMostCheckBox;
@@ -102,10 +105,6 @@ partial class Form1
             brandLogoPictureBox?.Image?.Dispose();
         }
 
-        if (disposing && (components != null))
-        {
-            components.Dispose();
-        }
         base.Dispose(disposing);
     }
 
@@ -113,13 +112,17 @@ partial class Form1
 
     private void InitializeComponent()
     {
-        components = new System.ComponentModel.Container();
         waveformHostPanel = new Panel();
         waveformView = new WaveformView();
         waveformHorizontalScrollBar = new ThinHorizontalScrollBar();
         transportBar = new TransportBar();
         logAreaPanel = new Panel();
+        logColumnPanel = new Panel();
+        tipsPanel = new Panel();
+        tipsHeaderLabel = new SectionHeaderLabel();
+        tipsLabel = new Label();
         logEditorPanel = new Panel();
+        logHeaderLabel = new SectionHeaderLabel();
         editorTextBox = new ShortcutForwardingRichTextBox();
         logButtonPanel = new FlowLayoutPanel();
         logClearButton = new TransportIconButton(TransportIcon.Clear);
@@ -180,7 +183,6 @@ partial class Form1
         playlistHeaderLabel = new SectionHeaderLabel();
         playlistScrollPanel = new Panel();
         playlistListLayout = new TableLayoutPanel();
-        playlistToolTip = new DarkToolTip(components);
         actionBar = new Panel();
         brandLogoPictureBox = new PictureBox();
         copyrightLinkLabel = new SmoothLinkLabel();
@@ -189,7 +191,7 @@ partial class Form1
         languageFlagButton = new LanguageFlagButton();
         settingsGearButton = new SettingsGearButton();
         manualHelpButton = new ManualHelpButton();
-        toolTipToggleButton = new ToolTipToggleButton();
+        tipsToggleButton = new TipsToggleButton();
         compactFileNumbersCheckBox = new FlatOptionCheckBox();
         keepLastSessionCheckBox = new FlatOptionCheckBox();
         topMostCheckBox = new FlatOptionCheckBox();
@@ -208,6 +210,8 @@ partial class Form1
         SuspendLayout();
         waveformHostPanel.SuspendLayout();
         logAreaPanel.SuspendLayout();
+        logColumnPanel.SuspendLayout();
+        tipsPanel.SuspendLayout();
         logEditorPanel.SuspendLayout();
         logButtonPanel.SuspendLayout();
         transitionTimePanel.SuspendLayout();
@@ -278,7 +282,7 @@ partial class Form1
         projectActionPanel.Controls.Add(keepLastSessionCheckBox);
         projectActionPanel.Controls.Add(topMostCheckBox);
         projectActionPanel.Controls.Add(languageFlagButton);
-        projectActionPanel.Controls.Add(toolTipToggleButton);
+        projectActionPanel.Controls.Add(tipsToggleButton);
         projectActionPanel.Controls.Add(manualHelpButton);
         projectActionPanel.Controls.Add(settingsGearButton);
         projectActionPanel.Controls.Add(projectSpectrumView);
@@ -332,12 +336,12 @@ partial class Form1
         languageFlagButton.TabIndex = 4;
         languageFlagButton.Click += LanguageFlagButton_Click;
         //
-        // toolTipToggleButton
+        // tipsToggleButton
         //
-        toolTipToggleButton.Margin = new Padding(0, 0, 4, 0);
-        toolTipToggleButton.Name = "toolTipToggleButton";
-        toolTipToggleButton.TabIndex = 5;
-        toolTipToggleButton.Click += ToolTipToggleButton_Click;
+        tipsToggleButton.Margin = new Padding(0, 0, 4, 0);
+        tipsToggleButton.Name = "tipsToggleButton";
+        tipsToggleButton.TabIndex = 5;
+        tipsToggleButton.Click += TipsToggleButton_Click;
         //
         // manualHelpButton
         //
@@ -457,23 +461,78 @@ partial class Form1
         logDownloadButton.TabIndex = 2;
         logDownloadButton.Click += LogDownloadButton_Click;
         //
+        // tipsLabel
+        //
+        tipsLabel.Dock = DockStyle.Fill;
+        tipsLabel.Font = new Font("Yu Gothic UI", 8.5F);
+        tipsLabel.ForeColor = UiColors.LogDefault;
+        tipsLabel.Name = "tipsLabel";
+        tipsLabel.Padding = new Padding(6, 3, 6, 3);
+        tipsLabel.TextAlign = ContentAlignment.TopLeft;
+        tipsLabel.UseMnemonic = false;
+        //
+        // tipsHeaderLabel（他セクション見出しと同じ帯）
+        //
+        tipsHeaderLabel.BarMarginBottom = 2;
+        tipsHeaderLabel.BarMarginTop = 2;
+        tipsHeaderLabel.Dock = DockStyle.Top;
+        tipsHeaderLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
+        tipsHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        tipsHeaderLabel.Height = 22;
+        tipsHeaderLabel.Name = "tipsHeaderLabel";
+        tipsHeaderLabel.Padding = new Padding(10, 0, 2, 0);
+        tipsHeaderLabel.Text = "Tips";
+        tipsHeaderLabel.TextAlign = ContentAlignment.MiddleLeft;
+        //
+        // tipsPanel（ログの上。高さは TipService が文言に合わせて可変）
+        //
+        tipsPanel.BackColor = UiColors.LogBack;
+        tipsPanel.Controls.Add(tipsLabel);
+        tipsPanel.Controls.Add(tipsHeaderLabel);
+        tipsPanel.Dock = DockStyle.Top;
+        tipsPanel.Height = 0;
+        tipsPanel.Name = "tipsPanel";
+        tipsPanel.TabIndex = 0;
+        //
+        // logHeaderLabel（Tips 帯と同じ見出し）
+        //
+        logHeaderLabel.BarMarginBottom = 2;
+        logHeaderLabel.BarMarginTop = 2;
+        logHeaderLabel.Dock = DockStyle.Top;
+        logHeaderLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
+        logHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        logHeaderLabel.Height = 22;
+        logHeaderLabel.Name = "logHeaderLabel";
+        logHeaderLabel.Padding = new Padding(10, 0, 2, 0);
+        logHeaderLabel.Text = "Log";
+        logHeaderLabel.TextAlign = ContentAlignment.MiddleLeft;
+        //
         // logEditorPanel
         //
         logEditorPanel.Dock = DockStyle.Fill;
         logEditorPanel.Name = "logEditorPanel";
-        logEditorPanel.TabIndex = 0;
+        logEditorPanel.TabIndex = 1;
         logEditorPanel.Controls.Add(editorTextBox);
         logEditorPanel.Controls.Add(logButtonPanel);
+        logEditorPanel.Controls.Add(logHeaderLabel);
+        //
+        // logColumnPanel
+        //
+        logColumnPanel.Controls.Add(logEditorPanel);
+        logColumnPanel.Controls.Add(tipsPanel);
+        logColumnPanel.Dock = DockStyle.Fill;
+        logColumnPanel.Name = "logColumnPanel";
+        logColumnPanel.TabIndex = 0;
         //
         // logAreaPanel
         //
         logAreaPanel.Dock = DockStyle.Fill;
         logAreaPanel.Name = "logAreaPanel";
         logAreaPanel.TabIndex = 0;
-        logAreaPanel.Controls.Add(logEditorPanel);
+        logAreaPanel.Controls.Add(logColumnPanel);
         logAreaPanel.Controls.Add(rightSidePanel);
         //
-        // rightSidePaneliE[jBPlaylist^JÚÝèÈÇðcÉÏÞB
+        // rightSidePanel（右端）。Playlist／遷移設定などを縦に積む。
         //
         rightSidePanel.Dock = DockStyle.Right;
         rightSidePanel.Name = "rightSidePanel";
@@ -1226,7 +1285,8 @@ partial class Form1
         //
         compactFileNumbersCheckBox.AutoSize = false;
         compactFileNumbersCheckBox.Checked = false;
-        compactFileNumbersCheckBox.CheckState = CheckState.Checked;
+        compactFileNumbersCheckBox.CheckState = CheckState.Unchecked;
+        compactFileNumbersCheckBox.Enabled = false;
         // Music Playlist êiXN[ÌæjÌOAplº[ÌÅèGAÉzuB
         // ¶ Padding Í AlignCompactFileNumbersCheckBox ªO[vgÆµ¤æ¤ÄvZ·éB
         compactFileNumbersCheckBox.Dock = DockStyle.Bottom;
@@ -1307,7 +1367,7 @@ partial class Form1
         MinimumSize = new Size(480, 320);
         Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
-        Text = "MGA Wwise IMImporter - Version 1.0.7-beta";
+        Text = "MGA Wwise IMImporter - Version 1.0.8-beta";
         ((System.ComponentModel.ISupportInitialize)brandLogoPictureBox).EndInit();
         projectActionPanel.ResumeLayout(false);
         projectActionPanel.PerformLayout();
@@ -1341,6 +1401,8 @@ partial class Form1
         transitionSettingsPanel.PerformLayout();
         transitionTimePanel.ResumeLayout(false);
         logEditorPanel.ResumeLayout(false);
+        tipsPanel.ResumeLayout(false);
+        logColumnPanel.ResumeLayout(false);
         playlistScrollPanel.ResumeLayout(false);
         playlistScrollPanel.PerformLayout();
         playlistSelectorPanel.ResumeLayout(false);

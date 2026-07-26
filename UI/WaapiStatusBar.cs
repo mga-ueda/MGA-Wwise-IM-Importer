@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// エディタ下の WAAPI / Wwise 接続ステータス表示。
@@ -14,7 +14,6 @@ internal sealed class WaapiStatusBar : Panel
     private readonly TransportIconButton _keepLockButton;
     private readonly Label _keepStateLabel;
     private readonly FlatOptionCheckBox _autoActiveCheckBox;
-    private readonly DarkToolTip _toolTip = new();
     private readonly Font _badgeFont = new("Yu Gothic UI", 9F, FontStyle.Bold);
 
     private string _badgeText = "—";
@@ -107,7 +106,7 @@ internal sealed class WaapiStatusBar : Panel
         Resize += (_, _) => LayoutLabels();
         Paint += OnPaint;
         ApplyColors();
-        ApplyToolTips();
+        ApplyTips();
         SetPending();
         UiStrings.LanguageChanged += (_, _) =>
         {
@@ -119,7 +118,7 @@ internal sealed class WaapiStatusBar : Panel
             UpdateKeepLockAppearance();
             _titleLabel.Text = UiStrings.WaapiTitle;
             _autoActiveCheckBox.Text = UiStrings.LabelAutoActive;
-            ApplyToolTips();
+            ApplyTips();
             LayoutLabels();
         };
     }
@@ -182,7 +181,6 @@ internal sealed class WaapiStatusBar : Panel
         if (disposing)
         {
             _badgeFont.Dispose();
-            _toolTip.Dispose();
         }
 
         base.Dispose(disposing);
@@ -251,7 +249,7 @@ internal sealed class WaapiStatusBar : Panel
             ? UiStrings.KeepTargetOnLabel
             : UiStrings.KeepTargetOffLabel;
         ApplyKeepLockColors();
-        ApplyToolTips();
+        ApplyTips();
     }
 
     private void ApplyKeepLockColors()
@@ -280,16 +278,15 @@ internal sealed class WaapiStatusBar : Panel
         _keepLockButton.Invalidate();
     }
 
-    private void ApplyToolTips()
+    private void ApplyTips()
     {
-        _toolTip.ApplyTheme();
-        _toolTip.SetToolTip(
+        TipService.Set(
             _keepLockButton,
             _keepTargetChecked ? UiStrings.TipKeepTargetLock : UiStrings.TipKeepTargetUnlock);
-        _toolTip.SetToolTip(
+        TipService.Set(
             _projectNameLabel,
             _projectNameClickable ? UiStrings.TipWwiseProjectNameOpen : string.Empty);
-        _toolTip.SetToolTip(_autoActiveCheckBox, UiStrings.TipAutoActive);
+        TipService.Set(_autoActiveCheckBox, UiStrings.TipAutoActive);
     }
 
     private void AutoActiveCheckBox_CheckedChanged(object? sender, EventArgs e)
@@ -484,16 +481,40 @@ internal sealed class WaapiStatusBar : Panel
     /// <summary>
     /// WAAPI 切断中でも Keep Target がオンなら、ロック中プロジェクト名と固定パスを維持表示する。
     /// </summary>
-    public void UpdateDisconnectedKeepTarget(string projectName, string keptPath)
+    public void UpdateDisconnectedKeepTarget(string projectName, string keptPath) =>
+        UpdateDisconnectedStatus(
+            projectName,
+            string.IsNullOrEmpty(keptPath) ? UiStrings.StatusNoneSelected : keptPath,
+            keepTargetChecked: true,
+            projectNameClickable: projectName.Length > 0);
+
+    /// <summary>
+    /// Keep Target オフの切断時でも、直近プロジェクト名を残しクリックで再起動できるようにする。
+    /// </summary>
+    public void UpdateDisconnectedLastProject(
+        string projectName,
+        string detailText,
+        bool projectNameClickable) =>
+        UpdateDisconnectedStatus(
+            projectName,
+            string.IsNullOrEmpty(detailText) ? UiStrings.StatusDisconnected : detailText,
+            keepTargetChecked: false,
+            projectNameClickable: projectNameClickable && projectName.Length > 0);
+
+    private void UpdateDisconnectedStatus(
+        string projectName,
+        string detailText,
+        bool keepTargetChecked,
+        bool projectNameClickable)
     {
         _keepLockEnabled = true;
-        if (!_keepTargetChecked)
+        if (keepTargetChecked != _keepTargetChecked)
         {
-            _keepTargetChecked = true;
+            _keepTargetChecked = keepTargetChecked;
             UpdateKeepLockAppearance();
         }
 
-        _selectionMissing = keptPath.Length == 0;
+        _selectionMissing = keepTargetChecked && detailText == UiStrings.StatusNoneSelected;
         _showKeepLock = true;
         SetBadgeDisconnected();
         // バッジで切断を示す。固定パス自体はエラー表示にしない。
@@ -504,8 +525,8 @@ internal sealed class WaapiStatusBar : Panel
         SetStructuredDetail(
             wwiseVersion: string.Empty,
             projectName,
-            string.IsNullOrEmpty(keptPath) ? UiStrings.StatusNoneSelected : keptPath,
-            projectNameClickable: projectName.Length > 0);
+            detailText,
+            projectNameClickable: projectNameClickable);
     }
 
     private void SetPlainDetail(string text, Color foreColor)
@@ -563,7 +584,7 @@ internal sealed class WaapiStatusBar : Panel
         }
 
         ApplyProjectNameColors();
-        ApplyToolTips();
+        ApplyTips();
     }
 
     /// <summary>表示用に <c>Wwise v2024.1.6</c> 形式へ揃える。</summary>

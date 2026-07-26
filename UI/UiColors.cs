@@ -71,7 +71,6 @@ internal static class UiColors
 
     // --- トランスポート ---
     public static Color TransportBack => ChromeBack;
-    public static Color TransportBorder => ChromeBorder;
     public static Color TransportFore => PrimaryFore;
     public static Color TransportDisabledFore => ChromeDim;
     public static Color TransportSectionFore => MutedFore;
@@ -88,11 +87,6 @@ internal static class UiColors
     public static Color LogMuted => MutedFore;
     public static Color LogButtonBack => SurfaceBack;
     public static Color LogButtonFore => PrimaryFore;
-
-    // --- ツールチップ（共通トークンの別名） ---
-    public static Color ToolTipBack => ChromeBack;
-    public static Color ToolTipFore => PrimaryFore;
-    public static Color ToolTipBorder => ChromeBorder;
 
     // --- 共通オプションコントロール ---
     public static Color OptionGlyphBorder => MutedFore;

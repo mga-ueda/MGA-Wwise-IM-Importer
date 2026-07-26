@@ -153,14 +153,7 @@ internal sealed class WaveformView : Control
     private int? _playlistHoverHighlightPartNumber;
     private int? _exportHighlightPartNumber;
     private readonly System.Windows.Forms.Timer _exportGlowTimer;
-    private readonly DarkToolTip _timelineToolTip = new()
-    {
-        InitialDelay = 450,
-        ReshowDelay = 100,
-        AutoPopDelay = 4000,
-        ShowAlways = true,
-    };
-    private string? _timelineToolTipText;
+    private string? _timelineTipText;
 
     // 時間軸ズーム（1=全体表示。既定より縮小しない）
     private const double TimeZoomMin = 1.0;
@@ -491,7 +484,7 @@ internal sealed class WaveformView : Control
         _playlistPartGroupIds = new Dictionary<int, int>();
         _playlistGroupColors = new Dictionary<int, Color>();
         _disabledPlaylistPartNumbers = [];
-        UpdateTimelineToolTip(null);
+        UpdateTimelineTip(null);
         SetHoveredPlaylistPart(null);
         SetPlaylistHoverHighlight(null);
         _segmentNames = [];
@@ -2078,7 +2071,6 @@ internal sealed class WaveformView : Control
         {
             _exportGlowTimer.Stop();
             _exportGlowTimer.Dispose();
-            _timelineToolTip.Dispose();
             _fadeCurveMenu?.Dispose();
             DisposeStaticLayer();
         }
@@ -2203,7 +2195,7 @@ internal sealed class WaveformView : Control
         {
             TransportFeedbackRequested?.Invoke(this, TransportCommand.TimeZoomOut);
         }
-        UpdateTimelineToolTip(e.Location);
+        UpdateTimelineTip(e.Location);
     }
 
     protected override bool IsInputKey(Keys keyData)
@@ -2948,7 +2940,7 @@ internal sealed class WaveformView : Control
 
         UpdateMouseGuide(e.X);
         SetSourceNameHovered(_sourceNameEditable && IsSourceNamePoint(e.Location));
-        UpdateTimelineToolTip(e.Location);
+        UpdateTimelineTip(e.Location);
 
         if (_markerEditMode is not null)
         {
@@ -3130,7 +3122,7 @@ internal sealed class WaveformView : Control
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
-        UpdateTimelineToolTip(null);
+        UpdateTimelineTip(null);
         SetSourceNameHovered(false);
         SetHoveredPlaylistPart(null);
         if (_isDraggingSeek || _isDraggingMarker || _isDraggingFadeHandle || _markerEditMode is not null)
@@ -3445,7 +3437,7 @@ internal sealed class WaveformView : Control
         return false;
     }
 
-    private void UpdateTimelineToolTip(Point? mouseLocation)
+    private void UpdateTimelineTip(Point? mouseLocation)
     {
         string? text = null;
         if (mouseLocation is { } sourceLocation
@@ -3500,22 +3492,28 @@ internal sealed class WaveformView : Control
             }
         }
 
-        if (string.Equals(_timelineToolTipText, text, StringComparison.Ordinal))
+        if (string.Equals(_timelineTipText, text, StringComparison.Ordinal))
         {
             return;
         }
 
-        _timelineToolTipText = text;
-        _timelineToolTip.SetToolTip(this, text);
+        _timelineTipText = text;
+        if (string.IsNullOrEmpty(text))
+        {
+            TipService.Clear(this);
+        }
+        else
+        {
+            TipService.Show(text, this);
+        }
     }
 
-    /// <summary>表示言語切替後にツールチップ文言を付け直す。</summary>
-    public void RefreshLocalizedToolTips()
+    /// <summary>表示言語切替後に Tips 文言を付け直す。</summary>
+    public void RefreshLocalizedTips()
     {
-        _timelineToolTip.ApplyTheme();
-        _timelineToolTipText = null;
+        _timelineTipText = null;
         var client = PointToClient(Cursor.Position);
-        UpdateTimelineToolTip(ClientRectangle.Contains(client) ? client : null);
+        UpdateTimelineTip(ClientRectangle.Contains(client) ? client : null);
     }
 
     private void UpdateHoveredPlaylistPart(int mouseX)

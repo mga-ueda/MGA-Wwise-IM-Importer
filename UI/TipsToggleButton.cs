@@ -1,20 +1,19 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// ツールチップ表示のオン／オフ切替（歯車の左）。吹き出しを描画し、オフ時はグレーアウトする。
+/// Tips 枠表示のオン／オフ切替（歯車の左）。吹き出しを描画し、オフ時はグレーアウトする。
 /// 見た目は <see cref="SettingsGearButton"/> と揃えた薄い枠付きの正方形。
-/// 自身のツールチップは全体オフ時も常に表示する。
+/// 自身の Tips は全体オフ時も常に表示する。
 /// </summary>
-internal sealed class ToolTipToggleButton : Button
+internal sealed class TipsToggleButton : Button
 {
-    private readonly DarkToolTip _ownToolTip = new() { RespectsGlobalActive = false };
     private bool _hovered;
     private bool _pressed;
     private bool _checked = true;
 
-    public ToolTipToggleButton()
+    public TipsToggleButton()
     {
         AccessibleRole = AccessibleRole.PushButton;
         FlatStyle = FlatStyle.Flat;
@@ -38,9 +37,8 @@ internal sealed class ToolTipToggleButton : Button
 
     public Color HoverBackColor { get; set; }
     public Color PressedBackColor { get; set; }
-    public Color BorderColor { get; set; }
 
-    /// <summary>ツールチップ表示が有効なら true。</summary>
+    /// <summary>Tips 枠表示が有効なら true。</summary>
     public bool Checked
     {
         get => _checked;
@@ -58,9 +56,8 @@ internal sealed class ToolTipToggleButton : Button
 
     public void RefreshAppearance()
     {
-        AccessibleName = UiStrings.AccessibleToolTipToggleButton;
-        _ownToolTip.ApplyTheme();
-        _ownToolTip.SetToolTip(this, UiStrings.TipToolTipToggle);
+        AccessibleName = UiStrings.AccessibleTipsToggleButton;
+        TipService.Set(this, UiStrings.TipTipsToggle, respectsEnabled: false);
         Invalidate();
     }
 
@@ -70,7 +67,6 @@ internal sealed class ToolTipToggleButton : Button
         ForeColor = UiColors.LogButtonFore;
         HoverBackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
         PressedBackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
-        BorderColor = UiColors.ForControlBack(UiColors.ChromeBorder);
         Invalidate();
     }
 

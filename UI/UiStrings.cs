@@ -1,7 +1,7 @@
 ﻿namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// ユーザーに見えるすべての表示テキスト（ツールチップ・ダイアログ・ログ・ラベル・ボタン・
+/// ユーザーに見えるすべての表示テキスト（Tips・ダイアログ・ログ・ラベル・ボタン・
 /// アクセシビリティ名・開発者パネルなど）を一箇所に集約する。画面の固定ラベルも例外ではない。
 /// 新しい表示テキストを追加するときは、必ずこのファイルへプロパティ／メソッドを追加してから参照する。
 /// </summary>
@@ -95,13 +95,21 @@ internal static class UiStrings
         "プレイリスト遷移フェードアウト",
         "Playlist Transition Fade Out");
 
-    public static string TipToolTipToggle => Get(
-        "ツールチップの表示をオン／オフします。",
-        "Turn tooltips on or off.");
+    public static string LabelTips => Get(
+        "Tips",
+        "Tips");
 
-    public static string AccessibleToolTipToggleButton => Get(
-        "ツールチップ表示切替",
-        "Toggle tooltips");
+    public static string LabelLog => Get(
+        "Log",
+        "Log");
+
+    public static string TipTipsToggle => Get(
+        "Tips 枠の表示をオン／オフします。",
+        "Turn the Tips panel on or off.");
+
+    public static string AccessibleTipsToggleButton => Get(
+        "Tips 表示切替",
+        "Toggle Tips");
 
     public static string TipManualHelp => Get(
         "ユーザーマニュアル（GitHub Pages）をブラウザで開きます（表示言語に合わせて日本語／英語）。",
@@ -141,7 +149,7 @@ internal static class UiStrings
         "Failed to apply audio output settings.\n{0}",
         detail);
 
-    // --- Action bar tooltips ---
+    // --- Action bar Tips ---
     public static string TipDebugLog => Get(
         "重ね再生／シークバーのアクションログ（AI 解析用 JSON）を出します。",
         "Emit layered-playback / seekbar action logs (AI-oriented JSON).");
@@ -245,8 +253,8 @@ internal static class UiStrings
         Environment.NewLine);
 
     public static string TipWaveformEditSourceName => Get(
-        "ダブルクリックでファイル名を編集",
-        "Double-click to edit the file name");
+        "ダブルクリックで書き出しファイル名・Playlist名・Switch名を編集",
+        "Double-click to edit the export file name, Playlist name, or Switch name");
 
     public static string TipWaveformMarkerLane => Get(
         "Shift + クリック／ドラッグ: マーカーを連続付与"
@@ -372,16 +380,20 @@ internal static class UiStrings
         _ => kind.ToString(),
     };
 
-    /// <summary>全モード共通の波形シーク系ショートカット（タイムラインツールチップ用）。</summary>
+    /// <summary>全モード共通の波形シーク系ショートカット（タイムライン Tips 用）。</summary>
     public static string TipWaveformCommonKeys => Get(
         "数字キー／テンキー 0〜9: 表示中画面内の 0%〜90% へジャンプ"
         + Environment.NewLine
         + "C / .: シーク位置を変えずに表示を中央寄せ"
         + Environment.NewLine
+        + "L: ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）"
+        + Environment.NewLine
         + "Z: 波形表示エリアの高さを 1倍 → 2倍 → 3倍 → 1倍",
         "Number keys 0–9: jump to 0%–90% within the current view"
         + Environment.NewLine
         + "C / .: center the view on the seek position (seek unchanged)"
+        + Environment.NewLine
+        + "L: jump to 1 bar before loop end (or 3 seconds before without bar data)"
         + Environment.NewLine
         + "Z: cycle waveform height 1× → 2× → 3× → 1×");
 
@@ -393,7 +405,7 @@ internal static class UiStrings
         "ダブルクリックで Music Playlist を拡大表示",
         "Double-click to zoom the Music Playlist");
 
-    // --- Fade / Exit Source tooltips ---
+    // --- Fade / Exit Source Tips ---
     public static string TipFadeInHeader => Get(
         "いま再生しているソース側のフェードイン時間です（次ソースの Destination Fade-in ではありません）。",
         "Fade-in time for the currently playing source (not Wwise Destination Fade-in).");
@@ -798,8 +810,35 @@ internal static class UiStrings
         "Cannot rename");
 
     public static string DialogRenameFailedBody => Get(
-        "ファイル名として使用できる、拡張子なしの名前を入力してください。",
-        "Enter a valid file name without extension.");
+        "ファイル名として使用できる、拡張子なしの名前を入力してください。"
+        + Environment.NewLine
+        + "（ \\ / : * ? \" < > | や制御文字、末尾の . ／空白、CON／COM1 などの予約名は不可）",
+        "Enter a valid file name without extension."
+        + Environment.NewLine
+        + "(Cannot use \\ / : * ? \" < > |, control chars, trailing . / spaces, or reserved names such as CON / COM1.)");
+
+    public static string DialogRenameStartsWithDigitBody => Get(
+        "Wwise では先頭が数字の名前を付けられません。元の名前に戻します。",
+        "Wwise does not allow names that start with a digit. Reverting to the previous name.");
+
+    public static string DialogRenameReservedNameBody => Get(
+        "CON／PRN／COM1 など Windows の予約名は使えません。元の名前に戻します。",
+        "Windows reserved names such as CON / PRN / COM1 cannot be used. Reverting to the previous name.");
+
+    public static string LogDropNameStartsWithDigit(string baseName) => Format(
+        "Message : Wwise では先頭が数字の名前を使えません（拒否）: {0}",
+        "Message : Wwise does not allow names that start with a digit (rejected): {0}",
+        baseName);
+
+    public static string LogDropNameInvalidFileName(string baseName) => Format(
+        "Message : ファイル名として不適切な文字を含むため拒否: {0}",
+        "Message : Rejected because the name contains characters invalid for a file name: {0}",
+        baseName);
+
+    public static string LogDropNameReservedWindows(string baseName) => Format(
+        "Message : Windows 予約名のため拒否: {0}",
+        "Message : Rejected because the name is a Windows reserved name: {0}",
+        baseName);
 
     public static string DialogClearProjectFailedTitle => Get(
         "プロジェクトのクリアに失敗",

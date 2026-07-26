@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -39,7 +39,6 @@ internal readonly record struct TransportPositionInfo(
 internal sealed class TransportBar : UserControl
 {
     private readonly FlowLayoutPanel _groups = new();
-    private readonly DarkToolTip _toolTip = new();
     private readonly TransportPositionDisplay _positionDisplay = new();
     private readonly Dictionary<TransportCommand, TransportIconButton> _commandButtons = [];
     private readonly System.Windows.Forms.Timer _commandRepeatTimer = new();
@@ -119,7 +118,7 @@ internal sealed class TransportBar : UserControl
 
         _commandRepeatTimer.Tick += (_, _) => RepeatHeldCommand();
         ApplyColors();
-        UiStrings.LanguageChanged += (_, _) => ApplyLocalizedToolTips();
+        UiStrings.LanguageChanged += (_, _) => ApplyLocalizedTips();
         TightenVerticalLayout();
     }
 
@@ -175,7 +174,7 @@ internal sealed class TransportBar : UserControl
 
         _waveOnlyViewStepTips = waveOnlyViewStepTips;
         _waveOnlyMarkerTips = waveOnlyMarkerTips;
-        ApplyLocalizedToolTips();
+        ApplyLocalizedTips();
     }
 
     /// <summary>波形高さ倍率（1〜3）をアイコン表示へ反映する。</summary>
@@ -198,10 +197,9 @@ internal sealed class TransportBar : UserControl
         }
     }
 
-    /// <summary>表示言語に合わせてツールチップ・グループ見出し・アクセシビリティ名を付け直す。</summary>
-    public void ApplyLocalizedToolTips()
+    /// <summary>表示言語に合わせて Tips・グループ見出し・アクセシビリティ名を付け直す。</summary>
+    public void ApplyLocalizedTips()
     {
-        _toolTip.ApplyTheme();
         foreach (var (command, button) in _commandButtons)
         {
             var tip = UiStrings.TipForTransportCommand(
@@ -209,7 +207,7 @@ internal sealed class TransportBar : UserControl
                 _waveOnlyViewStepTips,
                 _waveOnlyMarkerTips);
             button.AccessibleName = tip;
-            _toolTip.SetToolTip(button, tip);
+            TipService.Set(button, tip);
         }
 
         foreach (var (label, titleProvider) in _groupLabels)
@@ -394,9 +392,6 @@ internal sealed class TransportBar : UserControl
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         e.Graphics.Clear(BackColor);
-        using var border = new Pen(UiColors.ForControlBack(UiColors.TransportBorder));
-        e.Graphics.DrawLine(border, 0, 0, ClientSize.Width, 0);
-        e.Graphics.DrawLine(border, 0, ClientSize.Height - 1, ClientSize.Width, ClientSize.Height - 1);
     }
 
     private TransportIconButton AddGroup(
@@ -490,7 +485,7 @@ internal sealed class TransportBar : UserControl
                 button.Click += (_, _) => CommandInvoked?.Invoke(this, definition.Command);
             }
 
-            _toolTip.SetToolTip(button, tip);
+            TipService.Set(button, tip);
             buttons.Controls.Add(button);
             _commandButtons[definition.Command] = button;
             first ??= button;
@@ -556,7 +551,6 @@ internal sealed class TransportBar : UserControl
         if (disposing)
         {
             _commandRepeatTimer.Dispose();
-            _toolTip.Dispose();
         }
 
         base.Dispose(disposing);

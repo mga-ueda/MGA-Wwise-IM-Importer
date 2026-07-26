@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using MgaWwiseIMImporter.UI;
 using MgaWwiseIMImporter.Wave;
+using MgaWwiseIMImporter.Wwise;
 
 namespace MgaWwiseIMImporter.Processing;
 
@@ -51,6 +52,23 @@ internal static class DroppedFilesProcessor
 
             var directory = Path.GetDirectoryName(path) ?? string.Empty;
             var baseName = Path.GetFileNameWithoutExtension(path);
+            if (!WwiseObjectNames.TryValidateBaseName(baseName, out var rejectReason))
+            {
+                sb.AppendLine(UiStrings.LogErrorHeader);
+                sb.AppendLine($"{UiStrings.KeyPath} {path}");
+                sb.AppendLine(rejectReason switch
+                {
+                    WwiseBaseNameRejectReason.StartsWithDigit =>
+                        UiStrings.LogDropNameStartsWithDigit(baseName),
+                    WwiseBaseNameRejectReason.ReservedWindowsName =>
+                        UiStrings.LogDropNameReservedWindows(baseName),
+                    _ => UiStrings.LogDropNameInvalidFileName(
+                        string.IsNullOrEmpty(baseName) ? "(empty)" : baseName),
+                });
+                sb.AppendLine();
+                continue;
+            }
+
             var pairKey = Path.Combine(directory, baseName);
             if (!pairKeys.Add(pairKey))
             {

@@ -21,8 +21,8 @@ internal sealed class AppSettings
     /// </summary>
     public string SkippedUpdateVersion { get; set; } = string.Empty;
 
-    /// <summary>ツールチップ表示（既定オン）。</summary>
-    public bool ShowToolTips { get; set; } = true;
+    /// <summary>Tips 枠の表示（既定オン）。</summary>
+    public bool ShowTips { get; set; } = true;
 
     /// <summary>再生出力 API（既定 WaveOut）。</summary>
     public AudioOutputApi AudioApi { get; set; } = AudioOutputApi.WaveOut;
@@ -90,9 +90,9 @@ internal sealed class AppSettings
         Save();
     }
 
-    public void SaveShowToolTips(bool enabled)
+    public void SaveShowTips(bool enabled)
     {
-        ShowToolTips = enabled;
+        ShowTips = enabled;
         Save();
     }
 
@@ -120,7 +120,7 @@ internal sealed class AppSettings
         ["AlwaysOnTop"] = AlwaysOnTop ? "1" : "0",
         ["UiLanguage"] = UiStrings.ToIniValue(UiLanguage),
         ["SkippedUpdateVersion"] = SkippedUpdateVersion ?? string.Empty,
-        ["ShowToolTips"] = ShowToolTips ? "1" : "0",
+        ["ShowTips"] = ShowTips ? "1" : "0",
         ["AudioApi"] = AudioOutputSettings.ToIniValue(AudioApi),
         ["AudioDeviceId"] = AudioDeviceId ?? string.Empty,
         ["WaveformHeightScale"] = WaveformHeightScale.ToString(CultureInfo.InvariantCulture),
@@ -139,7 +139,7 @@ internal sealed class AppSettings
             ["SkippedUpdateVersion"] = values.TryGetValue("SkippedUpdateVersion", out var skipped)
                 ? skipped
                 : string.Empty,
-            ["ShowToolTips"] = values.TryGetValue("ShowToolTips", out var showToolTips) ? showToolTips : "1",
+            ["ShowTips"] = values.TryGetValue("ShowTips", out var showTips) ? showTips : "1",
             ["AudioApi"] = values.TryGetValue("AudioApi", out var audioApi) ? audioApi : "WaveOut",
             ["AudioDeviceId"] = values.TryGetValue("AudioDeviceId", out var deviceId) ? deviceId : string.Empty,
             ["WaveformHeightScale"] = values.TryGetValue("WaveformHeightScale", out var scale)
@@ -169,7 +169,7 @@ internal sealed class AppSettings
         SkippedUpdateVersion = values.TryGetValue("SkippedUpdateVersion", out var skipped)
             ? AppVersion.NormalizeTag(skipped)
             : string.Empty,
-        ShowToolTips = ReadBool(values, "ShowToolTips", defaultValue: true),
+        ShowTips = ReadBool(values, "ShowTips", defaultValue: true),
         AudioApi = values.TryGetValue("AudioApi", out var audioApiText)
             ? AudioOutputSettings.ParseApi(audioApiText)
             : AudioOutputApi.WaveOut,
@@ -201,7 +201,7 @@ internal sealed class AppSettings
         values.ContainsKey("AlwaysOnTop")
         || values.ContainsKey("UiLanguage")
         || values.ContainsKey("SkippedUpdateVersion")
-        || values.ContainsKey("ShowToolTips")
+        || values.ContainsKey("ShowTips")
         || values.ContainsKey("AudioApi")
         || values.ContainsKey("AudioDeviceId")
         || values.ContainsKey("WaveformHeightScale")
