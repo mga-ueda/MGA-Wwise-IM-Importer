@@ -64,12 +64,36 @@ internal static class UiStrings
         "Current: English. Click to switch to Japanese.");
 
     public static string TipAudioSettings => Get(
-        "再生の出力 API とデバイスを設定します。",
-        "Configure playback output API and device.");
+        "音声出力とフェードカーブの既定値を設定します。",
+        "Configure audio output and default fade curves.");
 
     public static string AccessibleAudioSettingsButton => Get(
-        "音声出力設定",
-        "Audio output settings");
+        "設定",
+        "Settings");
+
+    public static string DialogSettingsTitle => Get(
+        "設定",
+        "Settings");
+
+    public static string LabelFadeCurveDefaults => Get(
+        "フェードカーブ既定",
+        "Default Fade Curves");
+
+    public static string LabelDefaultWaveformFadeIn => Get(
+        "波形フェードイン",
+        "Waveform Fade In");
+
+    public static string LabelDefaultWaveformFadeOut => Get(
+        "波形フェードアウト",
+        "Waveform Fade Out");
+
+    public static string LabelDefaultPlaylistFadeIn => Get(
+        "プレイリスト遷移フェードイン",
+        "Playlist Transition Fade In");
+
+    public static string LabelDefaultPlaylistFadeOut => Get(
+        "プレイリスト遷移フェードアウト",
+        "Playlist Transition Fade Out");
 
     public static string TipToolTipToggle => Get(
         "ツールチップの表示をオン／オフします。",
@@ -937,11 +961,23 @@ internal static class UiStrings
 
     public static string LogTransitionAnyToPlaylist(
         string name,
-        string exitSourceAt) => Format(
-        "Transition : Any → {0} / Exit Source at={1} / Destination Sync To=Entry Cue / Fade-out ON",
-        "Transition : Any → {0} / Exit Source at={1} / Destination Sync To=Entry Cue / Fade-out ON",
+        string exitSourceAt,
+        double fadeInSeconds,
+        double fadeOutSeconds) => Format(
+        "Transition : Any → {0} / Exit Source at={1} / Destination Sync To=Entry Cue / Fade-in={2} / Fade-out={3}",
+        "Transition : Any → {0} / Exit Source at={1} / Destination Sync To=Entry Cue / Fade-in={2} / Fade-out={3}",
         name,
-        exitSourceAt);
+        exitSourceAt,
+        FormatFadeSecondsLog(fadeInSeconds),
+        FormatFadeSecondsLog(fadeOutSeconds));
+
+    private static string FormatFadeSecondsLog(double seconds) =>
+        seconds > 0
+            ? string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "{0:0.#}s",
+                seconds)
+            : "None";
 
     public static string LogTransitionDestinationSet(string name) => Format(
         "Transition : Any → {0} の Destination を設定",
@@ -2019,10 +2055,72 @@ internal static class UiStrings
         playAtCount,
         fadeCount);
 
+    public static string LogWorkUnitPatchStart(
+        int playAtCount,
+        int clipFadeCount,
+        int transitionFadeCount) => Format(
+        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Clip Fade 超過={1} 件 / Playlist 遷移 Fade={2} 件）。保存→クローズ→パッチ→再オープンを行います。",
+        "Message : Starting WWU patch (PlayAt={0}, Clip Fade over limit={1}, Playlist transition Fade={2}). save → close → patch → reopen.",
+        playAtCount,
+        clipFadeCount,
+        transitionFadeCount);
+
     public static string LogMusicClipWorkUnitPatchDone(int count) => Format(
         "Message : MusicClip WWU パッチ完了（{0} クリップ）。",
         "Message : MusicClip WWU patch done ({0} clip(s)).",
         count);
+
+    public static string LogMusicTransitionFadePatchFile(string fileName, int count) => Format(
+        "Message : WWU の MusicTransition Fade を直接更新しました → {0}（ルール {1} 件）",
+        "Message : Patched MusicTransition fades in work unit → {0} ({1} rule(s))",
+        fileName,
+        count);
+
+    public static string LogMusicTransitionFadePatchDone(int count) => Format(
+        "Message : Playlist 遷移 MusicFade WWU パッチ完了（{0} ルール）。",
+        "Message : Playlist transition MusicFade WWU patch done ({0} rule(s)).",
+        count);
+
+    public static string ErrMusicTransitionNotFound(string name, string containerPath) => Format(
+        "MusicTransition が見つかりませんでした（name={0} / under={1}）",
+        "MusicTransition not found (name={0} / under={1})",
+        name,
+        containerPath);
+
+    public static string ErrMusicTransitionWorkUnitNotFound(string name) => Format(
+        "MusicTransition の所属 WWU ファイルを特定できませんでした（{0}）",
+        "Could not resolve the work unit file for MusicTransition ({0})",
+        name);
+
+    public static string ErrMusicTransitionXmlMissing(string name, string wwuPath) => Format(
+        "WWU 内に MusicTransition {0} が見つかりません（{1}）。プロジェクトの保存に失敗している可能性があります。",
+        "MusicTransition {0} was not found in {1}. The project may not have been saved.",
+        name,
+        wwuPath);
+
+    public static string ErrMusicTransitionFadeVerifyFailed(
+        string transitionName,
+        string property,
+        bool expected,
+        bool? actual) => Format(
+        "{0} の検証に失敗しました（transition={1} 期待値={2} 実値={3}）。WWU フォーマットが変更された可能性があります。",
+        "{0} verification failed (transition={1} expected={2} actual={3}). The WWU format may have changed.",
+        property,
+        transitionName,
+        expected,
+        actual is null ? "(なし)" : actual.Value.ToString());
+
+    public static string ErrMusicTransitionFadeTimeVerifyFailed(
+        string transitionName,
+        string fadeName,
+        double expected,
+        double? actual) => Format(
+        "MusicFade Time の検証に失敗しました（transition={0} fade={1} 期待値={2:0.###}s 実値={3}）。WWU フォーマットが変更された可能性があります。",
+        "MusicFade Time verification failed (transition={0} fade={1} expected={2:0.###}s actual={3}). The WWU format may have changed.",
+        transitionName,
+        fadeName,
+        expected,
+        actual is null ? "(なし)" : actual.Value.ToString("0.###") + "s");
 
     public static string ErrMusicClipFadeVerifyFailed(
         string clipId,

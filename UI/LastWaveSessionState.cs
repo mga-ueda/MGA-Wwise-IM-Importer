@@ -48,6 +48,12 @@ internal sealed class LastWaveSessionState
     /// <summary>パート番号 → Fade Out 秒数。</summary>
     public Dictionary<string, double> PartFadeOutSeconds { get; set; } = new(StringComparer.Ordinal);
 
+    /// <summary>パート番号 → Fade In カーブ（列挙名）。</summary>
+    public Dictionary<string, string> PartFadeInCurves { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>パート番号 → Fade Out カーブ（列挙名）。</summary>
+    public Dictionary<string, string> PartFadeOutCurves { get; set; } = new(StringComparer.Ordinal);
+
     /// <summary>パート番号 → 同一グループ内遷移用 Fade In 秒数。</summary>
     public Dictionary<string, double> PartGroupFadeInSeconds { get; set; } = new(StringComparer.Ordinal);
 
@@ -104,6 +110,8 @@ internal sealed class LastWaveSessionState
         IReadOnlyDictionary<int, PlaylistExitSourceMode> partExitSourceModes,
         IReadOnlyDictionary<int, double> partFadeInSeconds,
         IReadOnlyDictionary<int, double> partFadeOutSeconds,
+        IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeInCurves,
+        IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeOutCurves,
         IReadOnlyDictionary<int, double> partGroupFadeInSeconds,
         IReadOnlyDictionary<int, double> partGroupFadeOutSeconds,
         IReadOnlyList<WaveformMarkerMark>? waveOnlySessionMarkers = null,
@@ -157,6 +165,14 @@ internal sealed class LastWaveSessionState
             PartFadeOutSeconds = partFadeOutSeconds.ToDictionary(
                 pair => pair.Key.ToString(),
                 pair => pair.Value,
+                StringComparer.Ordinal),
+            PartFadeInCurves = partFadeInCurves.ToDictionary(
+                pair => pair.Key.ToString(),
+                pair => pair.Value.ToString(),
+                StringComparer.Ordinal),
+            PartFadeOutCurves = partFadeOutCurves.ToDictionary(
+                pair => pair.Key.ToString(),
+                pair => pair.Value.ToString(),
                 StringComparer.Ordinal),
             PartGroupFadeInSeconds = partGroupFadeInSeconds.ToDictionary(
                 pair => pair.Key.ToString(),
@@ -378,6 +394,39 @@ internal sealed class LastWaveSessionState
             || !TryParseFadeMap(PartGroupFadeOutSeconds, partGroupFadeOutSeconds))
         {
             return false;
+        }
+
+        return true;
+    }
+
+    public bool TryGetPartFadeCurves(
+        out Dictionary<int, RegionFadeCurveKind> partFadeInCurves,
+        out Dictionary<int, RegionFadeCurveKind> partFadeOutCurves)
+    {
+        partFadeInCurves = new Dictionary<int, RegionFadeCurveKind>();
+        partFadeOutCurves = new Dictionary<int, RegionFadeCurveKind>();
+        return TryParseFadeCurveMap(PartFadeInCurves, partFadeInCurves)
+            && TryParseFadeCurveMap(PartFadeOutCurves, partFadeOutCurves);
+    }
+
+    private static bool TryParseFadeCurveMap(
+        Dictionary<string, string>? source,
+        Dictionary<int, RegionFadeCurveKind> destination)
+    {
+        if (source is null || source.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var pair in source)
+        {
+            if (!int.TryParse(pair.Key, out var partNumber)
+                || !Enum.TryParse<RegionFadeCurveKind>(pair.Value, ignoreCase: true, out var curve))
+            {
+                return false;
+            }
+
+            destination[partNumber] = curve;
         }
 
         return true;

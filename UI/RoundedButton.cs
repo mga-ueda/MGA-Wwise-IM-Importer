@@ -117,20 +117,23 @@ internal sealed class RoundedButton : Button
             g.DrawPath(pen, borderPath);
         }
 
+        // Yu Gothic UI は下寄りに見えやすいため、中央から 1px 上へオフセットする。
         TextRenderer.DrawText(
             g,
             Text,
             Font,
             new Rectangle(
                 Padding.Left,
-                Padding.Top,
+                -1,
                 Math.Max(0, Width - Padding.Horizontal),
-                Math.Max(0, Height - Padding.Vertical)),
+                Height),
             textColor,
             TextFormatFlags.HorizontalCenter
             | TextFormatFlags.VerticalCenter
             | TextFormatFlags.EndEllipsis
-            | TextFormatFlags.NoPrefix);
+            | TextFormatFlags.NoPrefix
+            | TextFormatFlags.NoPadding
+            | TextFormatFlags.SingleLine);
     }
 
     private Color ResolveFillColor()

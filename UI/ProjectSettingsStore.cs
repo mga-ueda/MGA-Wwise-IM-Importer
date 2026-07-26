@@ -14,6 +14,10 @@ internal sealed class ProjectProfile
 
     public double FadeOutSeconds { get; set; }
 
+    public string FadeInCurve { get; set; } = nameof(RegionFadeCurveKind.SCurve);
+
+    public string FadeOutCurve { get; set; } = nameof(RegionFadeCurveKind.SCurve);
+
     public PlaylistExitSourceMode ExitSourceAt { get; set; } = PlaylistExitSourceMode.Immediate;
 
     public MarkerGridOverrideMode GridOverride { get; set; } = MarkerGridOverrideMode.Bar;
@@ -92,6 +96,8 @@ internal sealed class ProjectProfile
         Name = Name,
         FadeInSeconds = FadeInSeconds,
         FadeOutSeconds = FadeOutSeconds,
+        FadeInCurve = FadeInCurve,
+        FadeOutCurve = FadeOutCurve,
         ExitSourceAt = ExitSourceAt,
         GridOverride = GridOverride,
         CommentDigits = CommentDigits,
@@ -176,6 +182,8 @@ internal sealed class ProjectSettingsStore
         Name = name,
         FadeInSeconds = 0d,
         FadeOutSeconds = 0d,
+        FadeInCurve = RegionEdgeFade.BuiltinPlaylistFadeInCurve.ToString(),
+        FadeOutCurve = RegionEdgeFade.BuiltinPlaylistFadeOutCurve.ToString(),
         ExitSourceAt = PlaylistExitSourceMode.Immediate,
         GridOverride = MarkerGridOverrideMode.Bar,
         CommentDigits = 3,
@@ -536,6 +544,8 @@ internal sealed class ProjectSettingsStore
             ["Name"] = profile.Name,
             ["FadeInSeconds"] = profile.FadeInSeconds.ToString(CultureInfo.InvariantCulture),
             ["FadeOutSeconds"] = profile.FadeOutSeconds.ToString(CultureInfo.InvariantCulture),
+            ["FadeInCurve"] = profile.FadeInCurve,
+            ["FadeOutCurve"] = profile.FadeOutCurve,
             ["ExitSourceAt"] = profile.ExitSourceAt.ToString(),
             ["GridOverride"] = profile.GridOverride.ToString(),
             ["CommentDigits"] = Math.Clamp(
@@ -593,6 +603,18 @@ internal sealed class ProjectSettingsStore
             && double.TryParse(fadeOutText, NumberStyles.Float, CultureInfo.InvariantCulture, out var fadeOut))
         {
             profile.FadeOutSeconds = fadeOut;
+        }
+
+        if (values.TryGetValue("FadeInCurve", out var fadeInCurve)
+            && !string.IsNullOrWhiteSpace(fadeInCurve))
+        {
+            profile.FadeInCurve = fadeInCurve.Trim();
+        }
+
+        if (values.TryGetValue("FadeOutCurve", out var fadeOutCurve)
+            && !string.IsNullOrWhiteSpace(fadeOutCurve))
+        {
+            profile.FadeOutCurve = fadeOutCurve.Trim();
         }
 
         if (values.TryGetValue("ExitSourceAt", out var exitText)

@@ -138,6 +138,8 @@ public partial class Form1 : Form, IMessageFilter
     private bool _automaticPlaylistPlayback;
     private double _playlistFadeInSeconds;
     private double _playlistFadeSeconds;
+    private RegionFadeCurveKind _playlistFadeInCurve = RegionEdgeFade.BuiltinPlaylistFadeInCurve;
+    private RegionFadeCurveKind _playlistFadeOutCurve = RegionEdgeFade.BuiltinPlaylistFadeOutCurve;
     /// <summary>プロジェクト既定の Exit Source At（パート未設定時のフォールバック。編集では書き換えない）。</summary>
     private PlaylistExitSourceMode _playlistExitSourceMode = PlaylistExitSourceMode.Immediate;
 
@@ -149,6 +151,12 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>パート番号 → Fade Out 秒数。</summary>
     private readonly Dictionary<int, double> _playlistFadeOutSecondsByPart = new();
+
+    /// <summary>パート番号 → Fade In カーブ。</summary>
+    private readonly Dictionary<int, RegionFadeCurveKind> _playlistFadeInCurveByPart = new();
+
+    /// <summary>パート番号 → Fade Out カーブ。</summary>
+    private readonly Dictionary<int, RegionFadeCurveKind> _playlistFadeOutCurveByPart = new();
 
     /// <summary>パート番号 → 同一グループ内遷移用 Fade In 秒数。</summary>
     private readonly Dictionary<int, double> _playlistGroupFadeInSecondsByPart = new();
@@ -163,6 +171,7 @@ public partial class Form1 : Form, IMessageFilter
     private double _playlistGroupFadeOutSeconds;
     /// <summary>トランジション設定ラジオの編集対象パート（直近クリックした Playlist）。</summary>
     private int? _transitionSettingsEditPartNumber;
+    private ContextMenuStrip? _playlistFadeCurveMenu;
     private int? _activeAutomaticPlaylistPartNumber;
     private int? _requestedPlaylistPartNumber;
     private int? _manualPlaylistPartNumber;
@@ -258,6 +267,12 @@ public partial class Form1 : Form, IMessageFilter
         UiColors.LoadFromIni();
         AppFonts.EnsureRegistered();
         InitializeComponent();
+        fadeInHeaderPanel.Layout += (_, _) =>
+            LayoutPlaylistFadeCurveIcon(fadeInHeaderLabel, fadeInCurveIcon);
+        fadeOutHeaderPanel.Layout += (_, _) =>
+            LayoutPlaylistFadeCurveIcon(transitionTimeHeaderLabel, fadeOutCurveIcon);
+        WirePlaylistFadeCurveIconHover(fadeInCurveIcon);
+        WirePlaylistFadeCurveIconHover(fadeOutCurveIcon);
         _waveformHostBaseHeight = Math.Max(1, waveformHostPanel.Height);
         WireRightSideContentHost();
         transportBar.CommandHoldEnded += TransportBar_CommandHoldEnded;
@@ -284,6 +299,7 @@ public partial class Form1 : Form, IMessageFilter
             AlignProjectBarInputs();
             UpdateMinimumWindowSize();
             LayoutActionBarCopyright();
+            UpdatePlaylistFadeCurveIcons();
         };
         actionBar.SizeChanged += (_, _) => LayoutActionBarCopyright();
         ApplyWindowIcon();
@@ -2368,12 +2384,19 @@ public partial class Form1 : Form, IMessageFilter
             DarkToolTip.GlobalActive = _appSettings.ShowToolTips;
             toolTipToggleButton.Checked = _appSettings.ShowToolTips;
             _audioPlayer.ApplyOutputSettings(_appSettings.ToAudioOutputSettings());
+            ApplyWaveformFadeCurveDefaults();
             ApplyWaveformHeightScale(adjustFormHeight: false);
         }
         finally
         {
             _suppressProjectUiEvents = false;
         }
+    }
+
+    private void ApplyWaveformFadeCurveDefaults()
+    {
+        waveformView.DefaultFadeInCurve = _appSettings.DefaultWaveformFadeInCurve;
+        waveformView.DefaultFadeOutCurve = _appSettings.DefaultWaveformFadeOutCurve;
     }
 
     /// <summary>
@@ -2482,6 +2505,12 @@ public partial class Form1 : Form, IMessageFilter
 
             _playlistFadeInSeconds = profile.FadeInSeconds;
             _playlistFadeSeconds = profile.FadeOutSeconds;
+            _playlistFadeInCurve = ParseFadeCurve(
+                profile.FadeInCurve,
+                _appSettings.DefaultPlaylistFadeInCurve);
+            _playlistFadeOutCurve = ParseFadeCurve(
+                profile.FadeOutCurve,
+                _appSettings.DefaultPlaylistFadeOutCurve);
             _playlistExitSourceMode = profile.ExitSourceAt;
             _playlistGroupFadeInSeconds = 0d;
             _playlistGroupFadeOutSeconds = 0d;
@@ -2664,6 +2693,26 @@ public partial class Form1 : Form, IMessageFilter
         return _playlistFadeSeconds;
     }
 
+    private RegionFadeCurveKind ResolveFadeInCurve(int partNumber)
+    {
+        if (_playlistFadeInCurveByPart.TryGetValue(partNumber, out var curve))
+        {
+            return curve;
+        }
+
+        return _playlistFadeInCurve;
+    }
+
+    private RegionFadeCurveKind ResolveFadeOutCurve(int partNumber)
+    {
+        if (_playlistFadeOutCurveByPart.TryGetValue(partNumber, out var curve))
+        {
+            return curve;
+        }
+
+        return _playlistFadeOutCurve;
+    }
+
     private double ResolveGroupFadeInSeconds(int partNumber)
     {
         if (_playlistGroupFadeInSecondsByPart.TryGetValue(partNumber, out var seconds))
@@ -2752,6 +2801,208 @@ public partial class Form1 : Form, IMessageFilter
         }
     }
 
+    private void StoreFadeInCurve(int partNumber, RegionFadeCurveKind curve)
+    {
+        foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
+        {
+            _playlistFadeInCurveByPart[scoped] = curve;
+        }
+    }
+
+    private void StoreFadeOutCurve(int partNumber, RegionFadeCurveKind curve)
+    {
+        foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
+        {
+            _playlistFadeOutCurveByPart[scoped] = curve;
+        }
+    }
+
+    private void FadeInCurveIcon_Click(object? sender, EventArgs e) =>
+        ShowPlaylistFadeCurvePicker(isFadeIn: true);
+
+    private void FadeOutCurveIcon_Click(object? sender, EventArgs e) =>
+        ShowPlaylistFadeCurvePicker(isFadeIn: false);
+
+    private void ShowPlaylistFadeCurvePicker(bool isFadeIn)
+    {
+        var partNumber = _transitionSettingsEditPartNumber;
+        var current = partNumber is int part
+            ? (isFadeIn ? ResolveFadeInCurve(part) : ResolveFadeOutCurve(part))
+            : (isFadeIn ? _playlistFadeInCurve : _playlistFadeOutCurve);
+        var icon = isFadeIn ? fadeInCurveIcon : fadeOutCurveIcon;
+        var location = new Point(0, icon.Height);
+        FadeCurveIcons.ShowPicker(
+            icon,
+            location,
+            current,
+            isFadeIn,
+            kind =>
+            {
+                if (_transitionSettingsEditPartNumber is int editPart)
+                {
+                    if (isFadeIn)
+                    {
+                        StoreFadeInCurve(editPart, kind);
+                    }
+                    else
+                    {
+                        StoreFadeOutCurve(editPart, kind);
+                    }
+                }
+                else if (isFadeIn)
+                {
+                    _playlistFadeInCurve = kind;
+                }
+                else
+                {
+                    _playlistFadeOutCurve = kind;
+                }
+
+                UpdatePlaylistFadeCurveIcons();
+                PersistLastWaveSessionIfPossible();
+                if (_transitionSettingsEditPartNumber is null)
+                {
+                    AutosaveCurrentProject();
+                }
+            },
+            ref _playlistFadeCurveMenu);
+    }
+
+    private void UpdatePlaylistFadeCurveIcons()
+    {
+        var partNumber = _transitionSettingsEditPartNumber;
+        var fadeIn = partNumber is int inPart
+            ? ResolveFadeInCurve(inPart)
+            : _playlistFadeInCurve;
+        var fadeOut = partNumber is int outPart
+            ? ResolveFadeOutCurve(outPart)
+            : _playlistFadeOutCurve;
+
+        LayoutPlaylistFadeCurveIcon(fadeInHeaderLabel, fadeInCurveIcon);
+        LayoutPlaylistFadeCurveIcon(transitionTimeHeaderLabel, fadeOutCurveIcon);
+
+        var iconSize = Math.Max(8, fadeInCurveIcon.Height);
+        var oldIn = fadeInCurveIcon.Image;
+        fadeInCurveIcon.Image = FadeCurveIcons.Create(
+            fadeIn,
+            isFadeIn: true,
+            selected: false,
+            pixelSize: iconSize,
+            leftMargin: 0);
+        oldIn?.Dispose();
+
+        var oldOut = fadeOutCurveIcon.Image;
+        fadeOutCurveIcon.Image = FadeCurveIcons.Create(
+            fadeOut,
+            isFadeIn: false,
+            selected: false,
+            pixelSize: Math.Max(8, fadeOutCurveIcon.Height),
+            leftMargin: 0);
+        oldOut?.Dispose();
+
+        UpdatePlaylistFadeCurveToolTips();
+    }
+
+    /// <summary>
+    /// カーブアイコンを帯内で右寄せ（右余白付き）し、帯高の 75% で中央揃えする。
+    /// Fade In/Out の帯はセクション幅を 1 文字分狭くして実現し、帯同士の隙間は他と同じく保つ。
+    /// </summary>
+    private void LayoutPlaylistFadeCurveIcon(SectionHeaderLabel header, PictureBox icon)
+    {
+        if (!header.IsHandleCreated || header.Height <= 0)
+        {
+            return;
+        }
+
+        ApplyFadeInOutSectionNarrowWidth();
+        header.BarRightInsetExtra = 0;
+
+        var bar = header.GetBarBounds();
+        var size = Math.Max(8, (int)Math.Round(bar.Height * 0.75));
+        // 右余白（以前の 2 倍）。
+        var rightInset = Math.Max(4, (int)Math.Round(6 * header.DeviceDpi / 96f));
+        icon.Size = new Size(size, size);
+        icon.Location = new Point(
+            Math.Max(bar.Left, bar.Right - rightInset - size),
+            bar.Top + Math.Max(0, (bar.Height - size) / 2));
+        icon.BringToFront();
+    }
+
+    /// <summary>
+    /// Fade In/Out 列だけ Exit Source At より 1 文字分狭くする。
+    /// 帯は列いっぱい（右インセット無し）なので、帯と帯の隙間は他見出しと同じ。
+    /// 減った幅は <see cref="UpdatePlaylistSelectorWidth"/> 経由で Music Playlist 側が吸収する。
+    /// </summary>
+    private void ApplyFadeInOutSectionNarrowWidth()
+    {
+        var charWidth = TextRenderer.MeasureText(
+            "M",
+            fadeInHeaderLabel.Font,
+            new Size(int.MaxValue, int.MaxValue),
+            TextFormatFlags.NoPadding
+            | TextFormatFlags.SingleLine
+            | TextFormatFlags.NoPrefix).Width;
+        var fullWidth = exitSourceAtSectionPanel.Width;
+        if (fullWidth <= 0)
+        {
+            return;
+        }
+
+        var narrow = Math.Max(40, fullWidth - Math.Max(1, charWidth));
+        var changed = false;
+        if (fadeInSectionPanel.Width != narrow)
+        {
+            fadeInSectionPanel.Width = narrow;
+            changed = true;
+        }
+
+        if (fadeOutSectionPanel.Width != narrow)
+        {
+            fadeOutSectionPanel.Width = narrow;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            QueuePlaylistSelectorWidthUpdate();
+        }
+    }
+
+    private static void WirePlaylistFadeCurveIconHover(PictureBox icon)
+    {
+        icon.MouseEnter += (_, _) =>
+            icon.BackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
+        icon.MouseLeave += (_, _) =>
+            icon.BackColor = UiColors.ForControlBack(UiColors.SectionHeaderBack);
+        icon.MouseDown += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                icon.BackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
+            }
+        };
+        icon.MouseUp += (_, _) =>
+        {
+            var local = icon.PointToClient(Control.MousePosition);
+            icon.BackColor = icon.ClientRectangle.Contains(local)
+                ? UiColors.ForControlBack(UiColors.TransportHoverBack)
+                : UiColors.ForControlBack(UiColors.SectionHeaderBack);
+        };
+    }
+
+    private void UpdatePlaylistFadeCurveToolTips()
+    {
+        var partNumber = _transitionSettingsEditPartNumber;
+        var fadeIn = partNumber is int inPart
+            ? ResolveFadeInCurve(inPart)
+            : _playlistFadeInCurve;
+        var fadeOut = partNumber is int outPart
+            ? ResolveFadeOutCurve(outPart)
+            : _playlistFadeOutCurve;
+        playlistToolTip.SetToolTip(fadeInCurveIcon, UiStrings.LabelRegionFadeCurve(fadeIn));
+        playlistToolTip.SetToolTip(fadeOutCurveIcon, UiStrings.LabelRegionFadeCurve(fadeOut));
+    }
+
     private void StoreGroupFadeInSeconds(int partNumber, double seconds)
     {
         foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
@@ -2794,6 +3045,7 @@ public partial class Form1 : Form, IMessageFilter
             ResolveGroupFadeOutSeconds(partNumber),
             FadeOutGroupTimeRadio_CheckedChanged);
         SelectExitSourceRadio(ResolveExitSourceMode(partNumber));
+        UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
     }
 
@@ -2802,6 +3054,8 @@ public partial class Form1 : Form, IMessageFilter
         _playlistExitSourceModes.Clear();
         _playlistFadeInSecondsByPart.Clear();
         _playlistFadeOutSecondsByPart.Clear();
+        _playlistFadeInCurveByPart.Clear();
+        _playlistFadeOutCurveByPart.Clear();
         _playlistGroupFadeInSecondsByPart.Clear();
         _playlistGroupFadeOutSecondsByPart.Clear();
         _transitionSettingsEditPartNumber = null;
@@ -2816,6 +3070,7 @@ public partial class Form1 : Form, IMessageFilter
             _playlistGroupFadeOutSeconds,
             FadeOutGroupTimeRadio_CheckedChanged);
         SelectExitSourceRadio(_playlistExitSourceMode);
+        UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
         UpdateGroupFadeRadioEnabled();
     }
@@ -2866,6 +3121,8 @@ public partial class Form1 : Form, IMessageFilter
         var profile = ProjectSettingsStore.CreateAppDefaults(name);
         profile.FadeInSeconds = _playlistFadeInSeconds;
         profile.FadeOutSeconds = _playlistFadeSeconds;
+        profile.FadeInCurve = _playlistFadeInCurve.ToString();
+        profile.FadeOutCurve = _playlistFadeOutCurve.ToString();
         profile.ExitSourceAt = _playlistExitSourceMode;
         profile.CopyMarkerFrom(_markerSettings);
         profile.CompactFileNumbers = compactFileNumbersCheckBox.Checked;
@@ -3399,15 +3656,20 @@ public partial class Form1 : Form, IMessageFilter
         transitionTimePanel.BackColor = back;
         transitionSettingsPanel.BackColor = back;
         fadeInSectionPanel.BackColor = back;
+        fadeInHeaderPanel.BackColor = back;
         fadeInChoicesPanel.BackColor = back;
         fadeInHeaderLabel.BackColor = back;
         fadeInHeaderLabel.BarColor = headerBack;
         fadeInHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        fadeInCurveIcon.BackColor = headerBack;
         fadeOutSectionPanel.BackColor = back;
+        fadeOutHeaderPanel.BackColor = back;
         transitionTimeChoicesPanel.BackColor = back;
         transitionTimeHeaderLabel.BackColor = back;
         transitionTimeHeaderLabel.BarColor = headerBack;
         transitionTimeHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        fadeOutCurveIcon.BackColor = headerBack;
+        UpdatePlaylistFadeCurveIcons();
         fadeInGroupChoicesPanel.BackColor = back;
         fadeInGroupDividerLabel.BackColor = back;
         fadeInGroupDividerLabel.ForeColor = UiColors.PlaylistDefaultFore;
@@ -4723,6 +4985,8 @@ public partial class Form1 : Form, IMessageFilter
         var exit = ResolveExitSourceMode(leader);
         var fadeIn = ResolveFadeInSeconds(leader);
         var fadeOut = ResolveFadeOutSeconds(leader);
+        var fadeInCurve = ResolveFadeInCurve(leader);
+        var fadeOutCurve = ResolveFadeOutCurve(leader);
         var groupFadeIn = ResolveGroupFadeInSeconds(leader);
         var groupFadeOut = ResolveGroupFadeOutSeconds(leader);
         foreach (var member in members)
@@ -4730,6 +4994,8 @@ public partial class Form1 : Form, IMessageFilter
             _playlistExitSourceModes[member] = exit;
             _playlistFadeInSecondsByPart[member] = fadeIn;
             _playlistFadeOutSecondsByPart[member] = fadeOut;
+            _playlistFadeInCurveByPart[member] = fadeInCurve;
+            _playlistFadeOutCurveByPart[member] = fadeOutCurve;
             _playlistGroupFadeInSecondsByPart[member] = groupFadeIn;
             _playlistGroupFadeOutSecondsByPart[member] = groupFadeOut;
         }
@@ -6289,7 +6555,17 @@ public partial class Form1 : Form, IMessageFilter
 
     private void SettingsGearButton_Click(object? sender, EventArgs e)
     {
-        using var dialog = new AudioSettingsForm(_appSettings.ToAudioOutputSettings())
+        OpenAppSettingsDialog();
+    }
+
+    private void OpenAppSettingsDialog()
+    {
+        using var dialog = new AudioSettingsForm(
+            _appSettings.ToAudioOutputSettings(),
+            _appSettings.DefaultWaveformFadeInCurve,
+            _appSettings.DefaultWaveformFadeOutCurve,
+            _appSettings.DefaultPlaylistFadeInCurve,
+            _appSettings.DefaultPlaylistFadeOutCurve)
         {
             // メインが最前面でもダイアログが背面に回らないようにする
             TopMost = TopMost,
@@ -6311,9 +6587,27 @@ public partial class Form1 : Form, IMessageFilter
             OwnerCenteredMessageBox.Show(
                 this,
                 UiStrings.ErrAudioOutputApplyFailed(ex.Message),
-                UiStrings.DialogAudioSettingsTitle,
+                UiStrings.DialogSettingsTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
+        }
+
+        _appSettings.SaveDefaultFadeCurves(
+            dialog.WaveformFadeInCurve,
+            dialog.WaveformFadeOutCurve,
+            dialog.PlaylistFadeInCurve,
+            dialog.PlaylistFadeOutCurve);
+        ApplyWaveformFadeCurveDefaults();
+
+        var playlistCurvesChanged =
+            _playlistFadeInCurve != dialog.PlaylistFadeInCurve
+            || _playlistFadeOutCurve != dialog.PlaylistFadeOutCurve;
+        _playlistFadeInCurve = dialog.PlaylistFadeInCurve;
+        _playlistFadeOutCurve = dialog.PlaylistFadeOutCurve;
+        UpdatePlaylistFadeCurveIcons();
+        if (playlistCurvesChanged)
+        {
+            AutosaveCurrentProject();
         }
 
         ReleaseFocusToWaveform();
@@ -6360,6 +6654,7 @@ public partial class Form1 : Form, IMessageFilter
         playlistToolTip.SetToolTip(exitSourceAtHeaderLabel, UiStrings.TipExitSourceHeader);
         playlistToolTip.SetToolTip(fadeInGroupDividerLabel, UiStrings.TipGroupFadeHeader);
         playlistToolTip.SetToolTip(fadeOutGroupDividerLabel, UiStrings.TipGroupFadeHeader);
+        UpdatePlaylistFadeCurveIcons();
 
         FlatOptionRadioButton[] fadeRadios =
         [
@@ -6719,7 +7014,11 @@ public partial class Form1 : Form, IMessageFilter
             groups,
             filteredMarkers,
             BuildPlaylistNameOverrides(parts),
-            BuildExportExitSourceModes(enabledNumbers));
+            BuildExportExitSourceModes(enabledNumbers),
+            BuildExportFadeSeconds(enabledNumbers, ResolveFadeInSeconds),
+            BuildExportFadeSeconds(enabledNumbers, ResolveFadeOutSeconds),
+            BuildExportFadeCurves(enabledNumbers, ResolveFadeInCurve),
+            BuildExportFadeCurves(enabledNumbers, ResolveFadeOutCurve));
     }
 
     private IReadOnlyDictionary<int, PlaylistExitSourceMode> BuildExportExitSourceModes(
@@ -6734,12 +7033,42 @@ public partial class Form1 : Form, IMessageFilter
         return result;
     }
 
+    private IReadOnlyDictionary<int, double> BuildExportFadeSeconds(
+        IReadOnlySet<int> enabledNumbers,
+        Func<int, double> resolver)
+    {
+        var result = new Dictionary<int, double>();
+        foreach (var partNumber in enabledNumbers)
+        {
+            result[partNumber] = resolver(partNumber);
+        }
+
+        return result;
+    }
+
+    private IReadOnlyDictionary<int, RegionFadeCurveKind> BuildExportFadeCurves(
+        IReadOnlySet<int> enabledNumbers,
+        Func<int, RegionFadeCurveKind> resolver)
+    {
+        var result = new Dictionary<int, RegionFadeCurveKind>();
+        foreach (var partNumber in enabledNumbers)
+        {
+            result[partNumber] = resolver(partNumber);
+        }
+
+        return result;
+    }
+
     private readonly record struct PlaylistExportSnapshot(
         IReadOnlyList<WaveformOutputPart> Parts,
         IReadOnlyDictionary<int, int> PartGroupIds,
         IReadOnlyList<WaveformMarkerMark> Markers,
         IReadOnlyDictionary<int, string> PlaylistNameOverrides,
-        IReadOnlyDictionary<int, PlaylistExitSourceMode> PartExitSourceModes);
+        IReadOnlyDictionary<int, PlaylistExitSourceMode> PartExitSourceModes,
+        IReadOnlyDictionary<int, double> PartFadeInSeconds,
+        IReadOnlyDictionary<int, double> PartFadeOutSeconds,
+        IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeInCurves,
+        IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeOutCurves);
 
     private void CopyrightLinkLabel_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
     {
@@ -7422,7 +7751,8 @@ public partial class Form1 : Form, IMessageFilter
                 out var savedFadeIns,
                 out var savedFadeOuts,
                 out var savedGroupFadeIns,
-                out var savedGroupFadeOuts))
+                out var savedGroupFadeOuts)
+            || !state.TryGetPartFadeCurves(out var savedFadeInCurves, out var savedFadeOutCurves))
         {
             AppendReport(
                 $"{UiStrings.LogSessionHeader}{Environment.NewLine}"
@@ -7441,6 +7771,8 @@ public partial class Form1 : Form, IMessageFilter
             || savedExitSources.Count > 0
             || savedFadeIns.Count > 0
             || savedFadeOuts.Count > 0
+            || savedFadeInCurves.Count > 0
+            || savedFadeOutCurves.Count > 0
             || savedGroupFadeIns.Count > 0
             || savedGroupFadeOuts.Count > 0
             || state.RegionEdgeFades.Count > 0;
@@ -7722,6 +8054,42 @@ public partial class Form1 : Form, IMessageFilter
             fadeOutApplied++;
         }
 
+        var fadeInCurveApplied = 0;
+        foreach (var (savedPartNumber, curve) in savedFadeInCurves)
+        {
+            var partNumber = MapPartNumber(savedPartNumber);
+            if (!loadedByNumber.ContainsKey(partNumber))
+            {
+                continue;
+            }
+
+            if (state.Parts.Count > 0 && !matchingNumbers.Contains(partNumber))
+            {
+                continue;
+            }
+
+            _playlistFadeInCurveByPart[partNumber] = curve;
+            fadeInCurveApplied++;
+        }
+
+        var fadeOutCurveApplied = 0;
+        foreach (var (savedPartNumber, curve) in savedFadeOutCurves)
+        {
+            var partNumber = MapPartNumber(savedPartNumber);
+            if (!loadedByNumber.ContainsKey(partNumber))
+            {
+                continue;
+            }
+
+            if (state.Parts.Count > 0 && !matchingNumbers.Contains(partNumber))
+            {
+                continue;
+            }
+
+            _playlistFadeOutCurveByPart[partNumber] = curve;
+            fadeOutCurveApplied++;
+        }
+
         var groupFadeInApplied = 0;
         foreach (var (savedPartNumber, seconds) in savedGroupFadeIns)
         {
@@ -7757,6 +8125,8 @@ public partial class Form1 : Form, IMessageFilter
             _playlistGroupFadeOutSecondsByPart[partNumber] = seconds;
             groupFadeOutApplied++;
         }
+
+        UpdatePlaylistFadeCurveIcons();
 
         var settingsPart = _playlistExitSourceModes.Keys
             .Concat(_playlistFadeInSecondsByPart.Keys)
@@ -7831,6 +8201,8 @@ public partial class Form1 : Form, IMessageFilter
             _playlistExitSourceModes,
             _playlistFadeInSecondsByPart,
             _playlistFadeOutSecondsByPart,
+            _playlistFadeInCurveByPart,
+            _playlistFadeOutCurveByPart,
             _playlistGroupFadeInSecondsByPart,
             _playlistGroupFadeOutSecondsByPart,
             session.GetWaveOnlySessionMarkers(),
@@ -7855,8 +8227,8 @@ public partial class Form1 : Form, IMessageFilter
                 saved.OutSample,
                 saved.FadeInEndSample,
                 saved.FadeOutStartSample,
-                ParseFadeCurve(saved.FadeInCurve, RegionFadeCurveKind.SCurve),
-                ParseFadeCurve(saved.FadeOutCurve, RegionFadeCurveKind.SCurve)))
+                ParseFadeCurve(saved.FadeInCurve, _appSettings.DefaultWaveformFadeInCurve),
+                ParseFadeCurve(saved.FadeOutCurve, _appSettings.DefaultWaveformFadeOutCurve)))
             .ToArray();
         _previewSession.SetRegionEdgeFades(fades);
     }
@@ -8068,6 +8440,14 @@ public partial class Form1 : Form, IMessageFilter
                 outputDirectory,
                 snapshot.PartExitSourceModes,
                 _playlistExitSourceMode,
+                snapshot.PartFadeInSeconds,
+                snapshot.PartFadeOutSeconds,
+                _playlistFadeInSeconds,
+                _playlistFadeSeconds,
+                snapshot.PartFadeInCurves,
+                snapshot.PartFadeOutCurves,
+                _playlistFadeInCurve,
+                _playlistFadeOutCurve,
                 containerNameOverride);
             ReportProgress(UiStrings.LogPlanReady(plan.Playlists.Count));
             AppendReport(WaapiMusicImporter.FormatPlanSummary(plan) + Environment.NewLine);

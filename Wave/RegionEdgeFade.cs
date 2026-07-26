@@ -59,6 +59,18 @@ internal readonly record struct RegionEdgeFade(
         RegionFadeCurveKind.LogarithmicBase3,
     ];
 
+    /// <summary>波形リージョン端フェードのアプリ既定（In／Out とも S-Curve）。</summary>
+    public static RegionFadeCurveKind BuiltinWaveformFadeInCurve => RegionFadeCurveKind.SCurve;
+
+    /// <summary>波形リージョン端フェードのアプリ既定（In／Out とも S-Curve）。</summary>
+    public static RegionFadeCurveKind BuiltinWaveformFadeOutCurve => RegionFadeCurveKind.SCurve;
+
+    /// <summary>Playlist 遷移フェードのアプリ既定（In／Out とも S-Curve）。</summary>
+    public static RegionFadeCurveKind BuiltinPlaylistFadeInCurve => RegionFadeCurveKind.SCurve;
+
+    /// <summary>Playlist 遷移フェードのアプリ既定（In／Out とも S-Curve）。</summary>
+    public static RegionFadeCurveKind BuiltinPlaylistFadeOutCurve => RegionFadeCurveKind.SCurve;
+
     public long EffectiveFadeInEnd =>
         FadeInEndSample is { } end && end > InSample ? end : InSample;
 
@@ -153,6 +165,21 @@ internal readonly record struct RegionEdgeFade(
         RegionFadeCurveKind.SineConstantPowerFadeOut => 8,
         RegionFadeCurveKind.ExponentialBase3 => 9,
         _ => 6,
+    };
+
+    /// <summary>Wwise MusicFade.FadeCurve の列挙値（Transition Fade Editor）。</summary>
+    public static int ToMusicFadeCurve(RegionFadeCurveKind kind) => kind switch
+    {
+        RegionFadeCurveKind.LogarithmicBase3 => 0,
+        RegionFadeCurveKind.SineConstantPowerFadeIn => 1,
+        RegionFadeCurveKind.LogarithmicBase141 => 2,
+        RegionFadeCurveKind.InvertedSCurve => 3,
+        RegionFadeCurveKind.Linear => 4,
+        RegionFadeCurveKind.SCurve => 5,
+        RegionFadeCurveKind.ExponentialBase141 => 6,
+        RegionFadeCurveKind.SineConstantPowerFadeOut => 7,
+        RegionFadeCurveKind.ExponentialBase3 => 8,
+        _ => 4,
     };
 
     /// <summary>

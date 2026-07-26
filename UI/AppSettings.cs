@@ -33,6 +33,22 @@ internal sealed class AppSettings
     /// <summary>波形表示エリア高さの倍率（1 / 2 / 3。既定 1）。</summary>
     public int WaveformHeightScale { get; set; } = 1;
 
+    /// <summary>波形リージョン端 Fade In の既定カーブ。</summary>
+    public RegionFadeCurveKind DefaultWaveformFadeInCurve { get; set; } =
+        RegionEdgeFade.BuiltinWaveformFadeInCurve;
+
+    /// <summary>波形リージョン端 Fade Out の既定カーブ。</summary>
+    public RegionFadeCurveKind DefaultWaveformFadeOutCurve { get; set; } =
+        RegionEdgeFade.BuiltinWaveformFadeOutCurve;
+
+    /// <summary>Playlist 遷移 Fade In の既定カーブ。</summary>
+    public RegionFadeCurveKind DefaultPlaylistFadeInCurve { get; set; } =
+        RegionEdgeFade.BuiltinPlaylistFadeInCurve;
+
+    /// <summary>Playlist 遷移 Fade Out の既定カーブ。</summary>
+    public RegionFadeCurveKind DefaultPlaylistFadeOutCurve { get; set; } =
+        RegionEdgeFade.BuiltinPlaylistFadeOutCurve;
+
     public AudioOutputSettings ToAudioOutputSettings() => new(AudioApi, AudioDeviceId ?? string.Empty);
 
     public static AppSettings Load()
@@ -86,6 +102,19 @@ internal sealed class AppSettings
         Save();
     }
 
+    public void SaveDefaultFadeCurves(
+        RegionFadeCurveKind waveformFadeIn,
+        RegionFadeCurveKind waveformFadeOut,
+        RegionFadeCurveKind playlistFadeIn,
+        RegionFadeCurveKind playlistFadeOut)
+    {
+        DefaultWaveformFadeInCurve = waveformFadeIn;
+        DefaultWaveformFadeOutCurve = waveformFadeOut;
+        DefaultPlaylistFadeInCurve = playlistFadeIn;
+        DefaultPlaylistFadeOutCurve = playlistFadeOut;
+        Save();
+    }
+
     private Dictionary<string, string> ToDictionary() => new(StringComparer.OrdinalIgnoreCase)
     {
         ["AlwaysOnTop"] = AlwaysOnTop ? "1" : "0",
@@ -95,6 +124,10 @@ internal sealed class AppSettings
         ["AudioApi"] = AudioOutputSettings.ToIniValue(AudioApi),
         ["AudioDeviceId"] = AudioDeviceId ?? string.Empty,
         ["WaveformHeightScale"] = WaveformHeightScale.ToString(CultureInfo.InvariantCulture),
+        ["DefaultWaveformFadeInCurve"] = DefaultWaveformFadeInCurve.ToString(),
+        ["DefaultWaveformFadeOutCurve"] = DefaultWaveformFadeOutCurve.ToString(),
+        ["DefaultPlaylistFadeInCurve"] = DefaultPlaylistFadeInCurve.ToString(),
+        ["DefaultPlaylistFadeOutCurve"] = DefaultPlaylistFadeOutCurve.ToString(),
     };
 
     private static void WriteValues(Dictionary<string, string> values)
@@ -112,6 +145,18 @@ internal sealed class AppSettings
             ["WaveformHeightScale"] = values.TryGetValue("WaveformHeightScale", out var scale)
                 ? NormalizeWaveformHeightScale(scale).ToString(CultureInfo.InvariantCulture)
                 : "1",
+            ["DefaultWaveformFadeInCurve"] = values.TryGetValue("DefaultWaveformFadeInCurve", out var wIn)
+                ? wIn
+                : RegionEdgeFade.BuiltinWaveformFadeInCurve.ToString(),
+            ["DefaultWaveformFadeOutCurve"] = values.TryGetValue("DefaultWaveformFadeOutCurve", out var wOut)
+                ? wOut
+                : RegionEdgeFade.BuiltinWaveformFadeOutCurve.ToString(),
+            ["DefaultPlaylistFadeInCurve"] = values.TryGetValue("DefaultPlaylistFadeInCurve", out var pIn)
+                ? pIn
+                : RegionEdgeFade.BuiltinPlaylistFadeInCurve.ToString(),
+            ["DefaultPlaylistFadeOutCurve"] = values.TryGetValue("DefaultPlaylistFadeOutCurve", out var pOut)
+                ? pOut
+                : RegionEdgeFade.BuiltinPlaylistFadeOutCurve.ToString(),
         });
     }
 
@@ -134,6 +179,22 @@ internal sealed class AppSettings
         WaveformHeightScale = values.TryGetValue("WaveformHeightScale", out var scaleText)
             ? NormalizeWaveformHeightScale(scaleText)
             : 1,
+        DefaultWaveformFadeInCurve = ParseFadeCurve(
+            values,
+            "DefaultWaveformFadeInCurve",
+            RegionEdgeFade.BuiltinWaveformFadeInCurve),
+        DefaultWaveformFadeOutCurve = ParseFadeCurve(
+            values,
+            "DefaultWaveformFadeOutCurve",
+            RegionEdgeFade.BuiltinWaveformFadeOutCurve),
+        DefaultPlaylistFadeInCurve = ParseFadeCurve(
+            values,
+            "DefaultPlaylistFadeInCurve",
+            RegionEdgeFade.BuiltinPlaylistFadeInCurve),
+        DefaultPlaylistFadeOutCurve = ParseFadeCurve(
+            values,
+            "DefaultPlaylistFadeOutCurve",
+            RegionEdgeFade.BuiltinPlaylistFadeOutCurve),
     };
 
     private static bool HasKnownKeys(Dictionary<string, string> values) =>
@@ -143,7 +204,20 @@ internal sealed class AppSettings
         || values.ContainsKey("ShowToolTips")
         || values.ContainsKey("AudioApi")
         || values.ContainsKey("AudioDeviceId")
-        || values.ContainsKey("WaveformHeightScale");
+        || values.ContainsKey("WaveformHeightScale")
+        || values.ContainsKey("DefaultWaveformFadeInCurve")
+        || values.ContainsKey("DefaultWaveformFadeOutCurve")
+        || values.ContainsKey("DefaultPlaylistFadeInCurve")
+        || values.ContainsKey("DefaultPlaylistFadeOutCurve");
+
+    private static RegionFadeCurveKind ParseFadeCurve(
+        Dictionary<string, string> values,
+        string key,
+        RegionFadeCurveKind fallback) =>
+        values.TryGetValue(key, out var text)
+        && Enum.TryParse<RegionFadeCurveKind>(text, ignoreCase: true, out var kind)
+            ? kind
+            : fallback;
 
     /// <summary>波形高さ倍率を 1〜3 に正規化する。</summary>
     public static int NormalizeWaveformHeightScale(int scale) =>

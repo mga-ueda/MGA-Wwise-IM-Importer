@@ -18,7 +18,9 @@ partial class Form1
     private FlowLayoutPanel transitionSettingsPanel;
     private Panel transitionTimeSeparator;
     private Panel fadeInSectionPanel;
+    private Panel fadeInHeaderPanel;
     private SectionHeaderLabel fadeInHeaderLabel;
+    private PictureBox fadeInCurveIcon;
     private FlowLayoutPanel fadeInChoicesPanel;
     private FlatOptionRadioButton fadeInNoneRadio;
     private FlatOptionRadioButton fadeInOneSecondRadio;
@@ -33,7 +35,9 @@ partial class Form1
     private FlatOptionRadioButton fadeInGroupSixSecondsRadio;
     private FlatOptionRadioButton fadeInGroupNineSecondsRadio;
     private Panel fadeOutSectionPanel;
+    private Panel fadeOutHeaderPanel;
     private SectionHeaderLabel transitionTimeHeaderLabel;
+    private PictureBox fadeOutCurveIcon;
     private FlowLayoutPanel transitionTimeChoicesPanel;
     private FlatOptionRadioButton transitionTimeHalfSecondRadio;
     private FlatOptionRadioButton transitionTimeOneSecondRadio;
@@ -121,7 +125,9 @@ partial class Form1
         transitionSettingsPanel = new FlowLayoutPanel();
         transitionTimeSeparator = new Panel();
         fadeInSectionPanel = new Panel();
+        fadeInHeaderPanel = new Panel();
         fadeInHeaderLabel = new SectionHeaderLabel();
+        fadeInCurveIcon = new PictureBox();
         fadeInChoicesPanel = new FlowLayoutPanel();
         fadeInNoneRadio = new FlatOptionRadioButton();
         fadeInOneSecondRadio = new FlatOptionRadioButton();
@@ -136,7 +142,9 @@ partial class Form1
         fadeInGroupSixSecondsRadio = new FlatOptionRadioButton();
         fadeInGroupNineSecondsRadio = new FlatOptionRadioButton();
         fadeOutSectionPanel = new Panel();
+        fadeOutHeaderPanel = new Panel();
         transitionTimeHeaderLabel = new SectionHeaderLabel();
+        fadeOutCurveIcon = new PictureBox();
         transitionTimeChoicesPanel = new FlowLayoutPanel();
         transitionTimeHalfSecondRadio = new FlatOptionRadioButton();
         transitionTimeOneSecondRadio = new FlatOptionRadioButton();
@@ -197,9 +205,13 @@ partial class Form1
         transitionTimePanel.SuspendLayout();
         transitionSettingsPanel.SuspendLayout();
         fadeInSectionPanel.SuspendLayout();
+        fadeInHeaderPanel.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)fadeInCurveIcon).BeginInit();
         fadeInChoicesPanel.SuspendLayout();
         fadeInGroupChoicesPanel.SuspendLayout();
         fadeOutSectionPanel.SuspendLayout();
+        fadeOutHeaderPanel.SuspendLayout();
+        ((System.ComponentModel.ISupportInitialize)fadeOutCurveIcon).BeginInit();
         transitionTimeChoicesPanel.SuspendLayout();
         fadeOutGroupChoicesPanel.SuspendLayout();
         exitSourceAtSectionPanel.SuspendLayout();
@@ -506,15 +518,37 @@ partial class Form1
         fadeInSectionPanel.Controls.Add(fadeInGroupChoicesPanel);
         fadeInSectionPanel.Controls.Add(fadeInGroupDividerLabel);
         fadeInSectionPanel.Controls.Add(fadeInChoicesPanel);
-        fadeInSectionPanel.Controls.Add(fadeInHeaderLabel);
+        fadeInSectionPanel.Controls.Add(fadeInHeaderPanel);
+        //
+        // fadeInHeaderPanel
+        //
+        fadeInHeaderPanel.Dock = DockStyle.Top;
+        fadeInHeaderPanel.Margin = new Padding(0);
+        fadeInHeaderPanel.Name = "fadeInHeaderPanel";
+        fadeInHeaderPanel.Size = new Size(100, 26);
+        fadeInHeaderPanel.TabIndex = 0;
+        fadeInHeaderPanel.Controls.Add(fadeInHeaderLabel);
+        fadeInHeaderPanel.Controls.Add(fadeInCurveIcon);
+        //
+        // fadeInCurveIcon
+        //
+        fadeInCurveIcon.Cursor = Cursors.Hand;
+        fadeInCurveIcon.Location = new Point(52, 3);
+        fadeInCurveIcon.Margin = new Padding(0);
+        fadeInCurveIcon.Name = "fadeInCurveIcon";
+        fadeInCurveIcon.Size = new Size(16, 16);
+        fadeInCurveIcon.SizeMode = PictureBoxSizeMode.CenterImage;
+        fadeInCurveIcon.TabIndex = 1;
+        fadeInCurveIcon.TabStop = false;
+        fadeInCurveIcon.Click += FadeInCurveIcon_Click;
         //
         // fadeInHeaderLabel
         //
         fadeInHeaderLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
-        fadeInHeaderLabel.Dock = DockStyle.Top;
+        fadeInHeaderLabel.Dock = DockStyle.Fill;
         fadeInHeaderLabel.Margin = new Padding(0);
         fadeInHeaderLabel.Name = "fadeInHeaderLabel";
-        fadeInHeaderLabel.Padding = new Padding(10, 0, 4, 0);
+        fadeInHeaderLabel.Padding = new Padding(10, 0, 2, 0);
         fadeInHeaderLabel.Size = new Size(100, 26);
         fadeInHeaderLabel.TabIndex = 0;
         fadeInHeaderLabel.Text = "Fade In";
@@ -695,15 +729,37 @@ partial class Form1
         fadeOutSectionPanel.Controls.Add(fadeOutGroupChoicesPanel);
         fadeOutSectionPanel.Controls.Add(fadeOutGroupDividerLabel);
         fadeOutSectionPanel.Controls.Add(transitionTimeChoicesPanel);
-        fadeOutSectionPanel.Controls.Add(transitionTimeHeaderLabel);
+        fadeOutSectionPanel.Controls.Add(fadeOutHeaderPanel);
+        //
+        // fadeOutHeaderPanel
+        //
+        fadeOutHeaderPanel.Dock = DockStyle.Top;
+        fadeOutHeaderPanel.Margin = new Padding(0);
+        fadeOutHeaderPanel.Name = "fadeOutHeaderPanel";
+        fadeOutHeaderPanel.Size = new Size(100, 26);
+        fadeOutHeaderPanel.TabIndex = 0;
+        fadeOutHeaderPanel.Controls.Add(transitionTimeHeaderLabel);
+        fadeOutHeaderPanel.Controls.Add(fadeOutCurveIcon);
+        //
+        // fadeOutCurveIcon
+        //
+        fadeOutCurveIcon.Cursor = Cursors.Hand;
+        fadeOutCurveIcon.Location = new Point(60, 3);
+        fadeOutCurveIcon.Margin = new Padding(0);
+        fadeOutCurveIcon.Name = "fadeOutCurveIcon";
+        fadeOutCurveIcon.Size = new Size(16, 16);
+        fadeOutCurveIcon.SizeMode = PictureBoxSizeMode.CenterImage;
+        fadeOutCurveIcon.TabIndex = 1;
+        fadeOutCurveIcon.TabStop = false;
+        fadeOutCurveIcon.Click += FadeOutCurveIcon_Click;
         //
         // transitionTimeHeaderLabel
         //
         transitionTimeHeaderLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
-        transitionTimeHeaderLabel.Dock = DockStyle.Top;
+        transitionTimeHeaderLabel.Dock = DockStyle.Fill;
         transitionTimeHeaderLabel.Margin = new Padding(0);
         transitionTimeHeaderLabel.Name = "transitionTimeHeaderLabel";
-        transitionTimeHeaderLabel.Padding = new Padding(10, 0, 4, 0);
+        transitionTimeHeaderLabel.Padding = new Padding(10, 0, 2, 0);
         transitionTimeHeaderLabel.Size = new Size(100, 26);
         transitionTimeHeaderLabel.TabIndex = 0;
         transitionTimeHeaderLabel.Text = "Fade Out";
@@ -1211,11 +1267,15 @@ partial class Form1
         fadeOutGroupChoicesPanel.PerformLayout();
         transitionTimeChoicesPanel.ResumeLayout(false);
         transitionTimeChoicesPanel.PerformLayout();
+        ((System.ComponentModel.ISupportInitialize)fadeOutCurveIcon).EndInit();
+        fadeOutHeaderPanel.ResumeLayout(false);
         fadeOutSectionPanel.ResumeLayout(false);
         fadeInGroupChoicesPanel.ResumeLayout(false);
         fadeInGroupChoicesPanel.PerformLayout();
         fadeInChoicesPanel.ResumeLayout(false);
         fadeInChoicesPanel.PerformLayout();
+        ((System.ComponentModel.ISupportInitialize)fadeInCurveIcon).EndInit();
+        fadeInHeaderPanel.ResumeLayout(false);
         fadeInSectionPanel.ResumeLayout(false);
         transitionSettingsPanel.ResumeLayout(false);
         transitionSettingsPanel.PerformLayout();

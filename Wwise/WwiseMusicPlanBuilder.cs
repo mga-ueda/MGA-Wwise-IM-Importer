@@ -28,6 +28,14 @@ internal static class WwiseMusicPlanBuilder
         string? outputDirectory = null,
         IReadOnlyDictionary<int, PlaylistExitSourceMode>? partExitSourceModes = null,
         PlaylistExitSourceMode defaultExitSourceAt = PlaylistExitSourceMode.Immediate,
+        IReadOnlyDictionary<int, double>? partFadeInSeconds = null,
+        IReadOnlyDictionary<int, double>? partFadeOutSeconds = null,
+        double defaultFadeInSeconds = 0,
+        double defaultFadeOutSeconds = 0,
+        IReadOnlyDictionary<int, RegionFadeCurveKind>? partFadeInCurves = null,
+        IReadOnlyDictionary<int, RegionFadeCurveKind>? partFadeOutCurves = null,
+        RegionFadeCurveKind defaultFadeInCurve = RegionFadeCurveKind.SCurve,
+        RegionFadeCurveKind defaultFadeOutCurve = RegionFadeCurveKind.SCurve,
         string? containerNameOverride = null)
     {
         if (sampleRate == 0)
@@ -68,6 +76,22 @@ internal static class WwiseMusicPlanBuilder
                 unit.Parts,
                 partExitSourceModes,
                 defaultExitSourceAt);
+            var fadeInSeconds = ResolveUnitFadeSeconds(
+                unit.Parts,
+                partFadeInSeconds,
+                defaultFadeInSeconds);
+            var fadeOutSeconds = ResolveUnitFadeSeconds(
+                unit.Parts,
+                partFadeOutSeconds,
+                defaultFadeOutSeconds);
+            var fadeInCurve = ResolveUnitFadeCurve(
+                unit.Parts,
+                partFadeInCurves,
+                defaultFadeInCurve);
+            var fadeOutCurve = ResolveUnitFadeCurve(
+                unit.Parts,
+                partFadeOutCurves,
+                defaultFadeOutCurve);
             if (unit.Parts.Count == 1)
             {
                 playlists.Add(BuildSinglePartPlaylist(
@@ -79,7 +103,11 @@ internal static class WwiseMusicPlanBuilder
                     regions,
                     bars,
                     markers,
-                    exitSourceAt));
+                    exitSourceAt,
+                    fadeInSeconds,
+                    fadeOutSeconds,
+                    fadeInCurve,
+                    fadeOutCurve));
             }
             else
             {
@@ -91,7 +119,11 @@ internal static class WwiseMusicPlanBuilder
                     regions,
                     bars,
                     markers,
-                    exitSourceAt));
+                    exitSourceAt,
+                    fadeInSeconds,
+                    fadeOutSeconds,
+                    fadeInCurve,
+                    fadeOutCurve));
             }
         }
 
@@ -121,6 +153,50 @@ internal static class WwiseMusicPlanBuilder
         }
 
         return defaultExitSourceAt;
+    }
+
+    /// <summary>グループ時は代表パート（最小番号）の Fade 秒数を使う。</summary>
+    private static double ResolveUnitFadeSeconds(
+        IReadOnlyList<WaveformOutputPart> parts,
+        IReadOnlyDictionary<int, double>? partFadeSeconds,
+        double defaultSeconds)
+    {
+        if (parts.Count == 0)
+        {
+            return NormalizeFadeSeconds(defaultSeconds);
+        }
+
+        var representativeNumber = parts.Min(part => part.Number);
+        if (partFadeSeconds is not null
+            && partFadeSeconds.TryGetValue(representativeNumber, out var seconds))
+        {
+            return NormalizeFadeSeconds(seconds);
+        }
+
+        return NormalizeFadeSeconds(defaultSeconds);
+    }
+
+    private static double NormalizeFadeSeconds(double seconds) =>
+        seconds > 0 ? seconds : 0;
+
+    private static RegionFadeCurveKind ResolveUnitFadeCurve(
+        IReadOnlyList<WaveformOutputPart> parts,
+        IReadOnlyDictionary<int, RegionFadeCurveKind>? partFadeCurves,
+        RegionFadeCurveKind defaultCurve)
+    {
+        if (parts.Count == 0)
+        {
+            return defaultCurve;
+        }
+
+        var representativeNumber = parts.Min(part => part.Number);
+        if (partFadeCurves is not null
+            && partFadeCurves.TryGetValue(representativeNumber, out var curve))
+        {
+            return curve;
+        }
+
+        return defaultCurve;
     }
 
     /// <summary>
@@ -299,7 +375,11 @@ internal static class WwiseMusicPlanBuilder
         IReadOnlyList<WaveformRegionMark> regions,
         IReadOnlyList<WaveformBarMark> bars,
         IReadOnlyList<WaveformMarkerMark> markers,
-        PlaylistExitSourceMode exitSourceAt)
+        PlaylistExitSourceMode exitSourceAt,
+        double fadeInSeconds,
+        double fadeOutSeconds,
+        RegionFadeCurveKind fadeInCurve,
+        RegionFadeCurveKind fadeOutCurve)
     {
         var sourceWavPath = Path.Combine(directory, part.FileName);
         var partRegions = CollectPartRegions(part, regions);
@@ -323,6 +403,10 @@ internal static class WwiseMusicPlanBuilder
             SourceWavPath = sourceWavPath,
             SourcePartNumbers = [part.Number],
             ExitSourceAt = exitSourceAt,
+            FadeInSeconds = fadeInSeconds,
+            FadeOutSeconds = fadeOutSeconds,
+            FadeInCurve = fadeInCurve,
+            FadeOutCurve = fadeOutCurve,
             Segments = segments,
         };
     }
@@ -335,7 +419,11 @@ internal static class WwiseMusicPlanBuilder
         IReadOnlyList<WaveformRegionMark> regions,
         IReadOnlyList<WaveformBarMark> bars,
         IReadOnlyList<WaveformMarkerMark> markers,
-        PlaylistExitSourceMode exitSourceAt)
+        PlaylistExitSourceMode exitSourceAt,
+        double fadeInSeconds,
+        double fadeOutSeconds,
+        RegionFadeCurveKind fadeInCurve,
+        RegionFadeCurveKind fadeOutCurve)
     {
         var memberPlans = new List<(WaveformOutputPart Part, string WavPath, List<PartSegmentDraft> Segments)>();
         foreach (var part in parts)
@@ -444,6 +532,10 @@ internal static class WwiseMusicPlanBuilder
             SourceWavPath = memberPlans[0].WavPath,
             SourcePartNumbers = parts.Select(p => p.Number).ToArray(),
             ExitSourceAt = exitSourceAt,
+            FadeInSeconds = fadeInSeconds,
+            FadeOutSeconds = fadeOutSeconds,
+            FadeInCurve = fadeInCurve,
+            FadeOutCurve = fadeOutCurve,
             Segments = segments,
         };
     }

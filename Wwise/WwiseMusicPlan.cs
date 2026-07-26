@@ -31,6 +31,24 @@ internal sealed class WwisePlaylistPlan
     /// <summary>Any → この Playlist ルールに載せる Exit Source At（遷移先の記憶値）。</summary>
     public required PlaylistExitSourceMode ExitSourceAt { get; init; }
 
+    /// <summary>
+    /// Destination Fade-in の秒数（遷移先の記憶値。0＝None）。
+    /// WAAPI では MusicFade を作れないため、EXPORT 後に WWU 直編集で書く。
+    /// </summary>
+    public required double FadeInSeconds { get; init; }
+
+    /// <summary>
+    /// Source Fade-out の秒数（遷移先の記憶値。0＝None）。
+    /// WAAPI では MusicFade を作れないため、EXPORT 後に WWU 直編集で書く。
+    /// </summary>
+    public required double FadeOutSeconds { get; init; }
+
+    /// <summary>Destination Fade-in のカーブ（遷移先の記憶値）。</summary>
+    public required RegionFadeCurveKind FadeInCurve { get; init; }
+
+    /// <summary>Source Fade-out のカーブ（遷移先の記憶値）。</summary>
+    public required RegionFadeCurveKind FadeOutCurve { get; init; }
+
     public required IReadOnlyList<WwiseSegmentPlan> Segments { get; init; }
 }
 

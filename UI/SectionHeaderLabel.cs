@@ -7,6 +7,9 @@
 internal sealed class SectionHeaderLabel : Label
 {
     private Color _barColor = UiColors.SectionHeaderBack;
+    private int _barMarginTop = 3;
+    private int _barMarginBottom = 7;
+    private int _barRightInsetExtra;
 
     /// <summary>見出し帯の塗り色。周囲は BackColor で塗られる。</summary>
     public Color BarColor
@@ -24,6 +27,57 @@ internal sealed class SectionHeaderLabel : Label
         }
     }
 
+    /// <summary>帯上側の余白（96 DPI 基準 px）。</summary>
+    public int BarMarginTop
+    {
+        get => _barMarginTop;
+        set
+        {
+            var next = Math.Max(0, value);
+            if (_barMarginTop == next)
+            {
+                return;
+            }
+
+            _barMarginTop = next;
+            Invalidate();
+        }
+    }
+
+    /// <summary>帯下側の余白（96 DPI 基準 px）。下の UI との間隔用。</summary>
+    public int BarMarginBottom
+    {
+        get => _barMarginBottom;
+        set
+        {
+            var next = Math.Max(0, value);
+            if (_barMarginBottom == next)
+            {
+                return;
+            }
+
+            _barMarginBottom = next;
+            Invalidate();
+        }
+    }
+
+    /// <summary>帯右端をさらに内側へ寄せる量（デバイス px）。</summary>
+    public int BarRightInsetExtra
+    {
+        get => _barRightInsetExtra;
+        set
+        {
+            var next = Math.Max(0, value);
+            if (_barRightInsetExtra == next)
+            {
+                return;
+            }
+
+            _barRightInsetExtra = next;
+            Invalidate();
+        }
+    }
+
     public SectionHeaderLabel()
     {
         SetStyle(
@@ -33,29 +87,35 @@ internal sealed class SectionHeaderLabel : Label
             true);
     }
 
+    /// <summary>見出し帯（BarColor）の描画矩形。</summary>
+    public Rectangle GetBarBounds()
+    {
+        var marginLeft = S(3);
+        var marginRight = S(3) + _barRightInsetExtra;
+        var marginTop = S(_barMarginTop);
+        var marginBottom = S(_barMarginBottom);
+        return new Rectangle(
+            marginLeft,
+            marginTop,
+            Math.Max(0, Width - marginLeft - marginRight),
+            Math.Max(0, Height - marginTop - marginBottom));
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.Clear(BackColor);
 
-        // 下の UI との間隔を広めに取るため、下側マージンを厚くして帯を低くする。
-        var marginX = S(3);
-        var marginTop = S(3);
-        var marginBottom = S(7);
-        var bar = new Rectangle(
-            marginX,
-            marginTop,
-            Math.Max(0, Width - marginX * 2),
-            Math.Max(0, Height - marginTop - marginBottom));
+        var bar = GetBarBounds();
         using (var brush = new SolidBrush(_barColor))
         {
             e.Graphics.FillRectangle(brush, bar);
         }
 
-        // テキスト位置は従来どおり Padding 基準（下の選択肢と左端を揃える）。
+        // テキスト位置は Padding 基準（下の選択肢と左端を揃える）。帯右端は超えない。
         var textBounds = Rectangle.FromLTRB(
             Padding.Left,
             bar.Top,
-            Math.Max(Padding.Left, Width - Padding.Right),
+            Math.Max(Padding.Left, bar.Right),
             bar.Bottom);
         TextRenderer.DrawText(
             e.Graphics,
@@ -67,6 +127,7 @@ internal sealed class SectionHeaderLabel : Label
             | TextFormatFlags.VerticalCenter
             | TextFormatFlags.EndEllipsis
             | TextFormatFlags.NoPrefix
+            | TextFormatFlags.NoPadding
             | TextFormatFlags.SingleLine);
     }
 

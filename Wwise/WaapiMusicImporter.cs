@@ -15,6 +15,7 @@ namespace MgaWwiseIMImporter.Wwise;
 /// 3. object.set で Playlist／Segment／Track（＋WAV）と Cue を作成。
 /// 4. 必要なら MusicClip トリムとリージョン端フェード（非破壊）を設定する。
 ///    Fade Duration が WAAPI 上限（3.6 秒）を超える場合は WWU 直接編集で本値を書く。
+/// 5. Playlist 遷移の MusicFade（Time）は WAAPI 非対応のため、同系統の WWU 直編集で書く。
 /// </para>
 /// </summary>
 internal static class WaapiMusicImporter
@@ -24,6 +25,9 @@ internal static class WaapiMusicImporter
 
     /// <summary>MusicClip FadeInMode / FadeOutMode: Manual。</summary>
     private const int MusicClipFadeModeManual = 1;
+
+    /// <summary>MusicFade.FadeType: Fade-out。</summary>
+    private const int MusicFadeTypeOut = 1;
     public static async Task<string> ImportAsync(
         WaapiSettings waapiSettings,
         WwiseImportSettings importSettings,
@@ -261,12 +265,24 @@ internal static class WaapiMusicImporter
                 cancellationToken)
             .ConfigureAwait(false);
 
-        // 負の PlayAt、および WAAPI 上限を超える Fade Duration は
+        // 負の PlayAt、WAAPI 上限超の Clip Fade Duration、および Playlist 遷移 MusicFade は
         // プロジェクトを保存→クローズし、WWU（XML）を直接書き換えてから再オープンする。
-        await ApplyMusicClipWorkUnitPatchesAsync(
+        var transitionFadePatches = plan.IsMultiPart
+            ? plan.Playlists
+                .Select(p => new MusicTransitionFadePatch(
+                    p.Name,
+                    p.FadeInSeconds,
+                    p.FadeOutSeconds,
+                    p.FadeInCurve,
+                    p.FadeOutCurve))
+                .ToList()
+            : [];
+        await ApplyWorkUnitPatchesAsync(
                 client,
+                musicRootPath,
                 playAtFixes,
                 fadeDurationFixes,
+                transitionFadePatches,
                 Log,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -278,7 +294,9 @@ internal static class WaapiMusicImporter
                 Log(
                     UiStrings.LogTransitionAnyToPlaylist(
                         playlist.Name,
-                        playlist.ExitSourceAt.ToUiName()));
+                        playlist.ExitSourceAt.ToUiName(),
+                        playlist.FadeInSeconds,
+                        playlist.FadeOutSeconds));
             }
         }
 
@@ -427,6 +445,10 @@ internal static class WaapiMusicImporter
     /// Any → Playlist トランジションの Destination 参照を setReference で結ぶ。
     /// 作成時の @DestinationContextObject で足りる場合もあるが、Reference は空のままのことがある。
     /// </summary>
+    /// <summary>
+    /// DestinationContextObject は Reference のため、ネスト作成だけでは空になり得る。
+    /// ルール名はすべて Transition のため、Destination 参照／種別で対象を特定する。
+    /// </summary>
     private static async Task BindTransitionDestinationsAsync(
         WaapiHttpClient client,
         string containerPath,
@@ -434,7 +456,7 @@ internal static class WaapiMusicImporter
         Action<string> log,
         CancellationToken cancellationToken)
     {
-        var transitionsByName = await QueryMusicTransitionsByNameAsync(
+        var transitions = await QueryMusicTransitionDestinationsAsync(
                 client,
                 containerPath,
                 cancellationToken)
@@ -442,20 +464,23 @@ internal static class WaapiMusicImporter
 
         foreach (var playlist in plan.Playlists)
         {
-            if (!transitionsByName.TryGetValue(playlist.Name, out var transitionIds)
-                || transitionIds.Count == 0)
-            {
-                // 規則名で見つからなくても、object.set 時の Destination 参照が効いていることがある。
-                // 誤検知のエラーログは出さない。
-                continue;
-            }
-
             var playlistPath = $"{containerPath}\\{playlist.Name}";
             var playlistId = await TryGetObjectIdAsync(client, playlistPath, cancellationToken)
                 .ConfigureAwait(false);
             var destination = !string.IsNullOrEmpty(playlistId) ? playlistId : playlistPath;
 
-            foreach (var transitionId in transitionIds)
+            var matchedIds = transitions
+                .Where(t => IsTransitionDestinationForPlaylist(t, playlist.Name, playlistPath, playlistId))
+                .Select(t => t.Id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (matchedIds.Count == 0)
+            {
+                // object.set 時の Destination 参照が効いていることがある。
+                continue;
+            }
+
+            foreach (var transitionId in matchedIds)
             {
                 await client.CallAsync(
                         "ak.wwise.core.object.setProperty",
@@ -484,12 +509,19 @@ internal static class WaapiMusicImporter
         }
     }
 
-    private static async Task<Dictionary<string, List<string>>> QueryMusicTransitionsByNameAsync(
+    private readonly record struct MusicTransitionDestinationInfo(
+        string Id,
+        int? DestinationContextType,
+        string? DestinationId,
+        string? DestinationName,
+        string? DestinationPath);
+
+    private static async Task<List<MusicTransitionDestinationInfo>> QueryMusicTransitionDestinationsAsync(
         WaapiHttpClient client,
         string containerPath,
         CancellationToken cancellationToken)
     {
-        var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var list = new List<MusicTransitionDestinationInfo>();
         var escaped = containerPath.Replace("\"", "\\\"", StringComparison.Ordinal);
         var result = await client.CallAsync(
                 "ak.wwise.core.object.get",
@@ -499,51 +531,140 @@ internal static class WaapiMusicImporter
                 },
                 new Dictionary<string, object?>
                 {
-                    ["return"] = new[] { "id", "name", "type" },
+                    ["return"] = new[]
+                    {
+                        "id",
+                        "name",
+                        "@DestinationContextType",
+                        "@DestinationContextObject",
+                        "@DestinationContextObject.name",
+                        "@DestinationContextObject.path",
+                        "@DestinationContextObject.id",
+                    },
                 },
                 cancellationToken)
             .ConfigureAwait(false);
 
         if (!result.TryGetProperty("return", out var arr) || arr.ValueKind != JsonValueKind.Array)
         {
-            return map;
+            return list;
         }
 
         foreach (var item in arr.EnumerateArray())
         {
-            if (!item.TryGetProperty("id", out var idEl)
-                || !item.TryGetProperty("name", out var nameEl))
+            if (!item.TryGetProperty("id", out var idEl))
             {
                 continue;
             }
 
             var id = idEl.GetString();
-            var name = nameEl.GetString();
-            if (string.IsNullOrEmpty(id) || string.IsNullOrEmpty(name))
+            if (string.IsNullOrEmpty(id))
             {
                 continue;
             }
 
-            // TransitionRoot フォルダ（空名）と既定 Any→Any（Transition）は対象外。
-            if (name.Length == 0
-                || string.Equals(
-                    name,
-                    WaapiMusicTransitionDefaults.DefaultAnyToAnyName,
-                    StringComparison.OrdinalIgnoreCase))
+            // TransitionRoot フォルダ（空名）は除外。名前 Transition のルールは残す。
+            if (item.TryGetProperty("name", out var nameEl)
+                && string.IsNullOrEmpty(nameEl.GetString()))
             {
                 continue;
             }
 
-            if (!map.TryGetValue(name, out var list))
+            int? destinationType = null;
+            if (item.TryGetProperty("@DestinationContextType", out var typeEl)
+                && typeEl.ValueKind == JsonValueKind.Number)
             {
-                list = [];
-                map[name] = list;
+                destinationType = typeEl.GetInt32();
             }
 
-            list.Add(id);
+            string? destinationId = null;
+            string? destinationName = null;
+            string? destinationPath = null;
+            if (item.TryGetProperty("@DestinationContextObject", out var destEl))
+            {
+                if (destEl.ValueKind == JsonValueKind.String)
+                {
+                    destinationPath = destEl.GetString();
+                }
+                else if (destEl.ValueKind == JsonValueKind.Object)
+                {
+                    if (destEl.TryGetProperty("id", out var destIdEl))
+                    {
+                        destinationId = destIdEl.GetString();
+                    }
+
+                    if (destEl.TryGetProperty("name", out var destNameEl))
+                    {
+                        destinationName = destNameEl.GetString();
+                    }
+
+                    if (destEl.TryGetProperty("path", out var destPathEl))
+                    {
+                        destinationPath = destPathEl.GetString();
+                    }
+                }
+            }
+
+            if (item.TryGetProperty("@DestinationContextObject.id", out var flatId)
+                && flatId.ValueKind == JsonValueKind.String)
+            {
+                destinationId ??= flatId.GetString();
+            }
+
+            if (item.TryGetProperty("@DestinationContextObject.name", out var flatName)
+                && flatName.ValueKind == JsonValueKind.String)
+            {
+                destinationName ??= flatName.GetString();
+            }
+
+            if (item.TryGetProperty("@DestinationContextObject.path", out var flatPath)
+                && flatPath.ValueKind == JsonValueKind.String)
+            {
+                destinationPath ??= flatPath.GetString();
+            }
+
+            list.Add(new MusicTransitionDestinationInfo(
+                id,
+                destinationType,
+                destinationId,
+                destinationName,
+                destinationPath));
         }
 
-        return map;
+        return list;
+    }
+
+    private static bool IsTransitionDestinationForPlaylist(
+        MusicTransitionDestinationInfo transition,
+        string playlistName,
+        string playlistPath,
+        string? playlistId)
+    {
+        // Any→Any（DestinationContextType=Any）は対象外。
+        if (transition.DestinationContextType is 0)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(playlistId)
+            && string.Equals(transition.DestinationId, playlistId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(transition.DestinationName, playlistName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(transition.DestinationPath)
+            && (string.Equals(transition.DestinationPath, playlistPath, StringComparison.OrdinalIgnoreCase)
+                || transition.DestinationPath.EndsWith("\\" + playlistName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static async Task<string?> TryGetObjectIdAsync(
@@ -1591,18 +1712,28 @@ internal static class WaapiMusicImporter
         return durationFixes;
     }
 
+    private readonly record struct MusicTransitionFadePatch(
+        string TransitionName,
+        double FadeInSeconds,
+        double FadeOutSeconds,
+        RegionFadeCurveKind FadeInCurve,
+        RegionFadeCurveKind FadeOutCurve);
+
     /// <summary>
-    /// 負の PlayAt および WAAPI 上限超の Fade Duration を WWU 直接編集で設定する。
+    /// 負の PlayAt・WAAPI 上限超の Clip Fade Duration・Playlist 遷移 MusicFade を
+    /// WWU 直接編集で設定する。
     /// 手順: project.save → 対象 WWU 特定 → project.close → XML パッチ → project.open。
     /// </summary>
-    private static async Task ApplyMusicClipWorkUnitPatchesAsync(
+    private static async Task ApplyWorkUnitPatchesAsync(
         WaapiHttpClient client,
+        string musicRootPath,
         IReadOnlyList<MusicClipPlayAtFix> playAtFixes,
         IReadOnlyList<MusicClipFadeDurationFix> fadeFixes,
+        IReadOnlyList<MusicTransitionFadePatch> transitionFades,
         Action<string> log,
         CancellationToken cancellationToken)
     {
-        if (playAtFixes.Count == 0 && fadeFixes.Count == 0)
+        if (playAtFixes.Count == 0 && fadeFixes.Count == 0 && transitionFades.Count == 0)
         {
             return;
         }
@@ -1639,7 +1770,10 @@ internal static class WaapiMusicImporter
         }
 
         var patchList = patches.Values.ToList();
-        log(UiStrings.LogMusicClipWorkUnitPatchStart(playAtFixes.Count, fadeFixes.Count));
+        log(UiStrings.LogWorkUnitPatchStart(
+            playAtFixes.Count,
+            fadeFixes.Count,
+            transitionFades.Count));
 
         var clipFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var patch in patchList)
@@ -1657,6 +1791,24 @@ internal static class WaapiMusicImporter
             }
 
             clipFiles[patch.ClipId] = filePath;
+        }
+
+        // MusicTransition は TransitionRoot 配下で name 照会が不安定なため、
+        // Switch Container 自体の WWU を開き、Destination 参照でルールを特定する。
+        string? transitionWwuPath = null;
+        if (transitionFades.Count > 0)
+        {
+            transitionWwuPath = await QuerySingleReturnStringAsync(
+                    client,
+                    $"$ \"{musicRootPath}\"",
+                    "filePath",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (string.IsNullOrEmpty(transitionWwuPath) || !File.Exists(transitionWwuPath))
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrMusicTransitionWorkUnitNotFound(musicRootPath));
+            }
         }
 
         var projectPath = await QuerySingleReturnStringAsync(
@@ -1688,6 +1840,14 @@ internal static class WaapiMusicImporter
             foreach (var group in patchList.GroupBy(p => clipFiles[p.ClipId], StringComparer.OrdinalIgnoreCase))
             {
                 PatchMusicClipPropertiesInWorkUnitFile(group.Key, group.ToList(), log);
+            }
+
+            if (transitionWwuPath is not null)
+            {
+                PatchMusicTransitionFadesInWorkUnitFile(transitionWwuPath, transitionFades, log);
+                // MusicFade / Enable は TransitionInfo 配下で WAAPI 照会が不安定なため、
+                // 再オープン前に WWU 上で検証する。
+                VerifyMusicTransitionFadesInWorkUnitFile(transitionWwuPath, transitionFades);
             }
         }
         finally
@@ -1747,7 +1907,368 @@ internal static class WaapiMusicImporter
             }
         }
 
-        log(UiStrings.LogMusicClipWorkUnitPatchDone(patchList.Count));
+        if (patchList.Count > 0)
+        {
+            log(UiStrings.LogMusicClipWorkUnitPatchDone(patchList.Count));
+        }
+
+        if (transitionFades.Count > 0)
+        {
+            log(UiStrings.LogMusicTransitionFadePatchDone(transitionFades.Count));
+        }
+    }
+
+    private static void VerifyMusicTransitionFadesInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<MusicTransitionFadePatch> patches)
+    {
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var transitionNode = FindMusicTransitionElement(doc, patch.TransitionName)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrMusicTransitionXmlMissing(patch.TransitionName, wwuPath));
+
+            VerifyBoolProperty(
+                transitionNode,
+                "EnableSourceFadeOut",
+                patch.FadeOutSeconds > 0,
+                patch.TransitionName);
+            VerifyBoolProperty(
+                transitionNode,
+                "EnableDestinationFadeIn",
+                patch.FadeInSeconds > 0,
+                patch.TransitionName);
+
+            if (patch.FadeOutSeconds > 0)
+            {
+                VerifyMusicFadeTimeInXml(
+                    transitionNode,
+                    "SourceFadeOut",
+                    patch.FadeOutSeconds,
+                    patch.TransitionName,
+                    "Source Fade-out");
+            }
+            else if (transitionNode.SelectSingleNode("TransitionInfo/SourceFadeOut") is not null)
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrMusicTransitionFadeTimeVerifyFailed(
+                        patch.TransitionName, "Source Fade-out", 0, null));
+            }
+
+            if (patch.FadeInSeconds > 0)
+            {
+                VerifyMusicFadeTimeInXml(
+                    transitionNode,
+                    "DestinationFadeIn",
+                    patch.FadeInSeconds,
+                    patch.TransitionName,
+                    "Destination Fade-in");
+            }
+            else if (transitionNode.SelectSingleNode("TransitionInfo/DestinationFadeIn") is not null)
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrMusicTransitionFadeTimeVerifyFailed(
+                        patch.TransitionName, "Destination Fade-in", 0, null));
+            }
+        }
+    }
+
+    private static void VerifyBoolProperty(
+        System.Xml.XmlElement transitionNode,
+        string propertyName,
+        bool expected,
+        string transitionName)
+    {
+        var prop = transitionNode.SelectSingleNode($"PropertyList/Property[@Name='{propertyName}']")
+            as System.Xml.XmlElement;
+        var actualText = prop?.GetAttribute("Value");
+        var actual = string.Equals(actualText, "True", StringComparison.OrdinalIgnoreCase)
+            || actualText == "1";
+        if (prop is null)
+        {
+            // 未記載は false 扱い。
+            actual = false;
+        }
+
+        if (actual != expected)
+        {
+            throw new InvalidOperationException(
+                UiStrings.ErrMusicTransitionFadeVerifyFailed(
+                    transitionName, propertyName, expected, actual));
+        }
+    }
+
+    private static void VerifyMusicFadeTimeInXml(
+        System.Xml.XmlElement transitionNode,
+        string wrapperName,
+        double expectedSeconds,
+        string transitionName,
+        string fadeName)
+    {
+        var timeProp = transitionNode.SelectSingleNode(
+                $"TransitionInfo/{wrapperName}/MusicFade/PropertyList/Property[@Name='FadeTime']")
+            as System.Xml.XmlElement;
+        if (timeProp is null
+            || !double.TryParse(
+                timeProp.GetAttribute("Value"),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var actual)
+            || Math.Abs(actual - expectedSeconds) > 0.01)
+        {
+            double? actualNullable = timeProp is not null
+                && double.TryParse(
+                    timeProp.GetAttribute("Value"),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var parsed)
+                ? parsed
+                : null;
+            throw new InvalidOperationException(
+                UiStrings.ErrMusicTransitionFadeTimeVerifyFailed(
+                    transitionName, fadeName, expectedSeconds, actualNullable));
+        }
+    }
+
+    /// <summary>WWU（XML）内の MusicTransition に MusicFade Time を直接書き込む。</summary>
+    private static void PatchMusicTransitionFadesInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<MusicTransitionFadePatch> patches,
+        Action<string> log)
+    {
+        WaitForExclusiveFileAccess(wwuPath);
+
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var transitionNode = FindMusicTransitionElement(doc, patch.TransitionName);
+            if (transitionNode is null)
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrMusicTransitionXmlMissing(patch.TransitionName, wwuPath));
+            }
+
+            var propertyList = EnsureChildElement(doc, transitionNode, "PropertyList", prepend: true);
+            // ルール名は Playlist 名に書き換えない。空なら Transition に揃える。
+            if (string.IsNullOrWhiteSpace(transitionNode.GetAttribute("Name")))
+            {
+                transitionNode.SetAttribute("Name", WaapiMusicTransitionDefaults.DefaultAnyToAnyName);
+            }
+
+            UpsertBoolProperty(doc, propertyList, "EnableSourceFadeOut", patch.FadeOutSeconds > 0);
+            UpsertBoolProperty(doc, propertyList, "EnableDestinationFadeIn", patch.FadeInSeconds > 0);
+
+            var transitionInfo = EnsureChildElement(doc, transitionNode, "TransitionInfo", prepend: false);
+            UpsertMusicFade(
+                doc,
+                transitionInfo,
+                wrapperName: "SourceFadeOut",
+                fadeName: "Source Fade-out",
+                fadeType: MusicFadeTypeOut,
+                fadeTimeSeconds: patch.FadeOutSeconds,
+                // Source Fade-out は Offset も Time と同じ秒数にする。
+                fadeOffsetSeconds: patch.FadeOutSeconds,
+                fadeCurve: RegionEdgeFade.ToMusicFadeCurve(patch.FadeOutCurve),
+                enabled: patch.FadeOutSeconds > 0);
+            UpsertMusicFade(
+                doc,
+                transitionInfo,
+                wrapperName: "DestinationFadeIn",
+                fadeName: "Destination Fade-in",
+                fadeType: null,
+                fadeTimeSeconds: patch.FadeInSeconds,
+                fadeOffsetSeconds: 0,
+                fadeCurve: RegionEdgeFade.ToMusicFadeCurve(patch.FadeInCurve),
+                enabled: patch.FadeInSeconds > 0);
+        }
+
+        doc.Save(wwuPath);
+        log(UiStrings.LogMusicTransitionFadePatchFile(Path.GetFileName(wwuPath), patches.Count));
+    }
+
+    /// <summary>
+    /// Playlist 向け Any→Object ルールを探す。
+    /// WAAPI では名前が <c>Transition</c> のまま残ることがあるため、
+    /// DestinationContextObject の ObjectRef 名を優先し、Name 属性は次点とする。
+    /// </summary>
+    private static System.Xml.XmlElement? FindMusicTransitionElement(
+        System.Xml.XmlDocument doc,
+        string playlistName)
+    {
+        var nodes = doc.SelectNodes("//MusicTransition");
+        if (nodes is null)
+        {
+            return null;
+        }
+
+        System.Xml.XmlElement? byName = null;
+        foreach (System.Xml.XmlNode node in nodes)
+        {
+            if (node is not System.Xml.XmlElement element
+                || IsMusicTransitionFolder(element))
+            {
+                continue;
+            }
+
+            var destinationName = element.SelectSingleNode(
+                    "ReferenceList/Reference[@Name='DestinationContextObject']/ObjectRef")
+                as System.Xml.XmlElement;
+            if (destinationName is not null
+                && string.Equals(
+                    destinationName.GetAttribute("Name"),
+                    playlistName,
+                    StringComparison.Ordinal))
+            {
+                return element;
+            }
+
+            if (byName is null
+                && string.Equals(
+                    element.GetAttribute("Name"),
+                    playlistName,
+                    StringComparison.Ordinal))
+            {
+                byName = element;
+            }
+        }
+
+        return byName;
+    }
+
+    private static bool IsMusicTransitionFolder(System.Xml.XmlElement element)
+    {
+        var isFolder = element.SelectSingleNode("PropertyList/Property[@Name='IsFolder']")
+            as System.Xml.XmlElement;
+        return isFolder is not null
+            && string.Equals(isFolder.GetAttribute("Value"), "True", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void UpsertMusicFade(
+        System.Xml.XmlDocument doc,
+        System.Xml.XmlElement transitionInfo,
+        string wrapperName,
+        string fadeName,
+        int? fadeType,
+        double fadeTimeSeconds,
+        double fadeOffsetSeconds,
+        int fadeCurve,
+        bool enabled)
+    {
+        var wrapper = transitionInfo.SelectSingleNode(wrapperName) as System.Xml.XmlElement;
+        if (!enabled)
+        {
+            wrapper?.ParentNode?.RemoveChild(wrapper);
+            return;
+        }
+
+        if (wrapper is null)
+        {
+            wrapper = doc.CreateElement(wrapperName);
+            transitionInfo.AppendChild(wrapper);
+        }
+
+        var fade = wrapper.SelectSingleNode("MusicFade") as System.Xml.XmlElement;
+        if (fade is null)
+        {
+            fade = doc.CreateElement("MusicFade");
+            fade.SetAttribute("Name", fadeName);
+            fade.SetAttribute("ID", $"{{{Guid.NewGuid().ToString().ToUpperInvariant()}}}");
+            wrapper.AppendChild(fade);
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(fade.GetAttribute("Name")))
+            {
+                fade.SetAttribute("Name", fadeName);
+            }
+
+            if (string.IsNullOrEmpty(fade.GetAttribute("ID")))
+            {
+                fade.SetAttribute("ID", $"{{{Guid.NewGuid().ToString().ToUpperInvariant()}}}");
+            }
+        }
+
+        var propertyList = EnsureChildElement(doc, fade, "PropertyList", prepend: true);
+        UpsertInt16Property(doc, propertyList, "FadeCurve", fadeCurve);
+        UpsertReal64Property(doc, propertyList, "FadeTime", fadeTimeSeconds);
+        UpsertReal64Property(doc, propertyList, "FadeOffset", fadeOffsetSeconds);
+        if (fadeType is { } type)
+        {
+            UpsertInt16Property(doc, propertyList, "FadeType", type);
+        }
+    }
+
+    private static System.Xml.XmlElement EnsureChildElement(
+        System.Xml.XmlDocument doc,
+        System.Xml.XmlElement parent,
+        string name,
+        bool prepend)
+    {
+        if (parent.SelectSingleNode(name) is System.Xml.XmlElement existing)
+        {
+            return existing;
+        }
+
+        var created = doc.CreateElement(name);
+        if (prepend && parent.HasChildNodes)
+        {
+            parent.InsertBefore(created, parent.FirstChild);
+        }
+        else
+        {
+            parent.AppendChild(created);
+        }
+
+        return created;
+    }
+
+    private static void UpsertBoolProperty(
+        System.Xml.XmlDocument doc,
+        System.Xml.XmlElement propertyList,
+        string name,
+        bool value)
+    {
+        var text = value ? "True" : "False";
+        if (propertyList.SelectSingleNode($"Property[@Name='{name}']")
+            is System.Xml.XmlElement existing)
+        {
+            existing.SetAttribute("Type", "bool");
+            existing.SetAttribute("Value", text);
+            return;
+        }
+
+        var property = doc.CreateElement("Property");
+        property.SetAttribute("Name", name);
+        property.SetAttribute("Type", "bool");
+        property.SetAttribute("Value", text);
+        propertyList.AppendChild(property);
+    }
+
+    private static void UpsertInt16Property(
+        System.Xml.XmlDocument doc,
+        System.Xml.XmlElement propertyList,
+        string name,
+        int value)
+    {
+        var text = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (propertyList.SelectSingleNode($"Property[@Name='{name}']")
+            is System.Xml.XmlElement existing)
+        {
+            existing.SetAttribute("Type", "int16");
+            existing.SetAttribute("Value", text);
+            return;
+        }
+
+        var property = doc.CreateElement("Property");
+        property.SetAttribute("Name", name);
+        property.SetAttribute("Type", "int16");
+        property.SetAttribute("Value", text);
+        propertyList.AppendChild(property);
     }
 
     private sealed class MusicClipWorkUnitPatch(string clipId)

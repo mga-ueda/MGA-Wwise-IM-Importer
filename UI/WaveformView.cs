@@ -108,6 +108,15 @@ internal sealed class WaveformView : Control
     private readonly List<FadeHandleHitRegion> _fadeHandleHitRegions = [];
     private readonly List<FadeAreaHitRegion> _fadeAreaHitRegions = [];
     private ContextMenuStrip? _fadeCurveMenu;
+
+    /// <summary>新規リージョン端フェードの既定 Fade In カーブ（歯車メニューのアプリ設定）。</summary>
+    public RegionFadeCurveKind DefaultFadeInCurve { get; set; } =
+        RegionEdgeFade.BuiltinWaveformFadeInCurve;
+
+    /// <summary>新規リージョン端フェードの既定 Fade Out カーブ（歯車メニューのアプリ設定）。</summary>
+    public RegionFadeCurveKind DefaultFadeOutCurve { get; set; } =
+        RegionEdgeFade.BuiltinWaveformFadeOutCurve;
+
     private bool _isDraggingFadeHandle;
     private bool _fadeDragIsIn;
     private long _fadeDragInSample;
@@ -2693,7 +2702,13 @@ internal sealed class WaveformView : Control
         _fadeDragOtherHandleSample = hit.IsFadeIn
             ? existing?.EffectiveFadeOutStart
             : existing?.EffectiveFadeInEnd;
-        _fadeDragPreview = existing ?? new RegionEdgeFade(hit.InSample, hit.OutSample, null, null);
+        _fadeDragPreview = existing ?? new RegionEdgeFade(
+            hit.InSample,
+            hit.OutSample,
+            null,
+            null,
+            DefaultFadeInCurve,
+            DefaultFadeOutCurve);
         _fadeDragStartX = location.X;
         _fadeDragMoved = false;
         Capture = true;
@@ -2739,38 +2754,14 @@ internal sealed class WaveformView : Control
 
     private void ShowFadeCurveContextMenu(Point location, RegionEdgeFade fade, bool isFadeIn)
     {
-        _fadeCurveMenu?.Dispose();
-        var menu = new ContextMenuStrip
-        {
-            ShowImageMargin = true,
-            BackColor = UiColors.ForControlBack(UiColors.SurfaceBack),
-            ForeColor = UiColors.PrimaryFore,
-            Renderer = new DarkFadeCurveMenuRenderer(),
-            Padding = new Padding(2, 2, 2, 2),
-            ImageScalingSize = new Size(30, 18),
-        };
-        _fadeCurveMenu = menu;
-
         var current = isFadeIn ? fade.FadeInCurve : fade.FadeOutCurve;
-        var order = isFadeIn
-            ? RegionEdgeFade.MenuOrderFadeIn
-            : RegionEdgeFade.MenuOrderFadeOut;
-        foreach (var kind in order)
-        {
-            var item = new ToolStripMenuItem(UiStrings.LabelRegionFadeCurve(kind))
-            {
-                // Checked だと ImageRectangle 全体（余白込み）に枠が付くため使わない
-                Tag = kind,
-                Image = CreateFadeCurveIcon(kind, isFadeIn, selected: kind == current),
-                ImageScaling = ToolStripItemImageScaling.None,
-                Padding = new Padding(2, 1, 2, 1),
-            };
-            var capturedKind = kind;
-            item.Click += (_, _) => ApplyFadeCurve(fade, isFadeIn, capturedKind);
-            menu.Items.Add(item);
-        }
-
-        menu.Show(this, location);
+        FadeCurveIcons.ShowPicker(
+            this,
+            location,
+            current,
+            isFadeIn,
+            kind => ApplyFadeCurve(fade, isFadeIn, kind),
+            ref _fadeCurveMenu);
     }
 
     private void ApplyFadeCurve(RegionEdgeFade fade, bool isFadeIn, RegionFadeCurveKind kind)
@@ -2793,76 +2784,6 @@ internal sealed class WaveformView : Control
         RegionFadeChanged?.Invoke(
             this,
             new RegionFadeChangedEventArgs(next.Normalized(firstEnd, lastStart)));
-    }
-
-    /// <summary>
-    /// 左余白＋18×18 アイコン。背景は透明にしてホバーハイライトが透けるようにする。
-    /// イン側は立ち上がり（谷→山の順のメニュー）、アウト側は立ち下がり（山→谷の順）。
-    /// </summary>
-    private static Image CreateFadeCurveIcon(
-        RegionFadeCurveKind kind,
-        bool isFadeIn,
-        bool selected)
-    {
-        const int size = 18;
-        const int leftMargin = 12;
-        var bmp = new Bitmap(
-            size + leftMargin,
-            size,
-            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(bmp);
-        g.Clear(Color.Transparent);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-
-        using var pen = new Pen(Color.FromArgb(220, 220, 220), 1.4f);
-        var points = new PointF[17];
-        for (var i = 0; i < points.Length; i++)
-        {
-            var t = i / (double)(points.Length - 1);
-            var yGain = isFadeIn
-                ? RegionEdgeFade.EvaluateRising(kind, t)
-                : RegionEdgeFade.EvaluateFalling(kind, t);
-            points[i] = new PointF(
-                leftMargin + 1.5f + (float)t * (size - 3f),
-                size - 2f - yGain * (size - 4f));
-        }
-
-        g.DrawLines(pen, points);
-
-        if (selected)
-        {
-            using var selectPen = new Pen(Color.FromArgb(80, 170, 255), 1f);
-            g.DrawRectangle(selectPen, leftMargin, 0, size - 1, size - 1);
-        }
-
-        return bmp;
-    }
-
-    private sealed class DarkFadeCurveMenuRenderer : ToolStripProfessionalRenderer
-    {
-        public DarkFadeCurveMenuRenderer()
-            : base(new DarkFadeCurveColorTable())
-        {
-        }
-
-        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
-        {
-            // 選択表示はアイコンビットマップ側で行う
-        }
-    }
-
-    private sealed class DarkFadeCurveColorTable : ProfessionalColorTable
-    {
-        public override Color MenuItemSelected => Color.FromArgb(70, 70, 74);
-        public override Color MenuItemSelectedGradientBegin => MenuItemSelected;
-        public override Color MenuItemSelectedGradientEnd => MenuItemSelected;
-        public override Color MenuItemBorder => Color.FromArgb(90, 90, 94);
-        public override Color ToolStripDropDownBackground => Color.FromArgb(30, 30, 30);
-        public override Color ImageMarginGradientBegin => ToolStripDropDownBackground;
-        public override Color ImageMarginGradientMiddle => ToolStripDropDownBackground;
-        public override Color ImageMarginGradientEnd => ToolStripDropDownBackground;
-        public override Color SeparatorDark => Color.FromArgb(60, 60, 64);
-        public override Color SeparatorLight => SeparatorDark;
     }
 
     private bool TryHitFadeHandle(Point location, out FadeHandleHitRegion hit)
@@ -2965,8 +2886,8 @@ internal sealed class WaveformView : Control
             : null;
 
         RegionEdgeFade next;
-        var inCurve = _fadeDragPreview?.FadeInCurve ?? RegionFadeCurveKind.SCurve;
-        var outCurve = _fadeDragPreview?.FadeOutCurve ?? RegionFadeCurveKind.SCurve;
+        var inCurve = _fadeDragPreview?.FadeInCurve ?? DefaultFadeInCurve;
+        var outCurve = _fadeDragPreview?.FadeOutCurve ?? DefaultFadeOutCurve;
         if (_fadeDragIsIn)
         {
             var maxEnd = _fadeDragOtherHandleSample is { } other && other > inSample
@@ -4704,7 +4625,13 @@ internal sealed class WaveformView : Control
                 f.InSample == inSample && f.OutSample == outSample);
             if (fade.OutSample <= fade.InSample)
             {
-                fade = new RegionEdgeFade(inSample, outSample, null, null);
+                fade = new RegionEdgeFade(
+                    inSample,
+                    outSample,
+                    null,
+                    null,
+                    DefaultFadeInCurve,
+                    DefaultFadeOutCurve);
             }
 
             var fadeInEnd = fade.EffectiveFadeInEnd;
