@@ -1,49 +1,25 @@
 ﻿# MGA Wwise IMImporter
 
-[日本語 README](README.ja.md)
+[日本語](README.ja.md)
 
-Windows tool (in development) that reads Wave files and marker-track XML exported from Nuendo/Cubase, previews the waveform, writes split WAVs, and imports a Wwise Interactive Music hierarchy over WAAPI. Preview what you decide in the DAW, then deliver it to Wwise—typically much faster than hand-building the same structure in Authoring.
+Take Interactive Music from hand-built Wwise Authoring to **listen, decide, and deliver**.
 
-Designed so **the Interactive Music data in Wwise is the master waveform**: build one-shot and loop structure nondestructively on one master instead of pre-separating files. Drop multiple waves at once, or use marker-track XML, to implement any number of pieces together.
+This Windows tool (in development) previews Nuendo/Cubase **marker-track XML** and Wave on a timeline, then EXPORT builds the Interactive Music hierarchy over WAAPI—typically **far faster than assembling Music Playlist / Switch / Segment / Track / State Group / transitions by hand**.
 
-With Nuendo/Cubase marker-track XML you get the most from tempo and bar data, and markers overlay the wave like painted regions. Marker-bearing WAVs from Logic and similar DAWs also work well; in-app marker add / set-move often removes the need for a separate waveform editor.
+### Why it stands out
 
-**Volume, fades, and markers are fully nondestructive.** Nothing is baked into source or split WAVs; EXPORT writes Wwise properties (MusicClip Fade, MusicFade, Make-Up Gain, Cue, and so on).
+- **Wwise as the master** — Keep one-shot and loop material on a single master waveform. Structure is nondestructive; gains and fades are not baked into WAVs.
+- **Marker-track XML** — Tempo, bars, and painted markers/cycles from Nuendo/Cubase for visual Entry / Exit / loop design.
+- **Works without those DAWs** — Marker WAVs from Logic and similar tools, plus in-app marker add / set-move—often **no waveform editor required**.
+- **Many pieces at once** — Multi-wave drop or marker-track XML to implement any number of tracks together.
+- **Preview what you ship** — Playlist transitions, vertical layers, streaming, Keep Layer Balance (Make-Up Gain), then one EXPORT.
 
-## Manual
+Volume, fades, and cues land as Wwise properties (MusicClip Fade, MusicFade, Make-Up Gain, Custom Cue, …).
 
-- **[Japanese](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.ja.html)** / **[English](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.en.html)**
-- Hub: [https://mga-ueda.github.io/MGA-Wwise-IMImporter/](https://mga-ueda.github.io/MGA-Wwise-IMImporter/)
-- In the app, use the **Manual (`?`)** button left of the gear on the project bar (follows JP/EN)
+## Manual & download
 
-## Getting started
+- Manual: [Japanese](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.en.html) · [Hub](https://mga-ueda.github.io/MGA-Wwise-IMImporter/)
+- In-app: project-bar **Manual (`?`)** (left of the gear; follows JP/EN)
+- Builds: [Releases](https://github.com/mga-ueda/MGA-Wwise-IMImporter/releases)
 
-1. Enable WAAPI (HTTP) in Wwise Authoring and select a destination object
-2. Set this app’s export path under the connected project’s `Originals`
-3. Load with one of these patterns, then run **EXPORT**
-   - **Wave-only** — drop one `.wav` with no matching XML
-   - **Multi-wave** — drop two or more `.wav` files with no matching XML
-   - **WAV + matching XML** — drop a Nuendo/Cubase marker-track export pair
-
-See the manual section “Loading patterns” for details.
-
-Self-contained Windows x64 packages are on [Releases](https://github.com/mga-ueda/MGA-Wwise-IMImporter/releases). Development targets .NET 8 (`net8.0-windows`).
-
-## Settings files
-
-Project settings, extra markers, Keep Last Session data, and so on live next to the exe in `MgaWwiseIMImporter.ini` and `MgaWwiseIMImporter.lastwave.<project>.json`. When updating, replace only the exe or back up those files first.
-
-## Trademarks & licenses
-
-- **Wwise®** / **Audiokinetic®** are trademarks of Audiokinetic Inc. This tool is unofficial and does not bundle Audiokinetic software. A valid Wwise license is required for WAAPI.
-- **Nuendo®** / **Cubase®** / **Steinberg®** are trademarks of Steinberg Media Technologies GmbH. This tool is unofficial and only reads marker-track XML exports.
-- Bundled: [NAudio](https://github.com/naudio/NAudio) (Ms-PL), [UDEV Gothic](https://github.com/yuru7/udev-gothic) (SIL OFL 1.1; `Licenses/LICENSE-UDEV-GOTHIC.txt`)
-
-Footer text in the app:
-
-> © 2026 MIYABI GAME AUDIO INC.  GitHub  
-> Wwise® and Audiokinetic® are trademarks of Audiokinetic Inc.
-
-## Version
-
-The csproj `<Version>` (SemVer) is shared for display, update checks, and GitHub tags (e.g. `1.0.7-beta` ↔ tag `v1.0.7-beta`).
+Wwise® / Audiokinetic® and Nuendo® / Cubase® / Steinberg® are trademarks of their respective owners. This tool is unofficial.
