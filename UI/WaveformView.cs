@@ -387,7 +387,7 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// 無効化した Playlist パート番号。波形上は背景で覆って約 25% 不透明度に見せる。
+    /// 無効化した Playlist パート番号。上下レーン含め約 25% 不透明度に見せる。
     /// </summary>
     public void SetDisabledPlaylistParts(IEnumerable<int> partNumbers)
     {
@@ -3789,8 +3789,8 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// 無効 Playlist の波形部分だけをテーマ背景色で覆い、約 25% 不透明度に見せる。
-    /// ラベル行・名前レーンは覆わない。
+    /// 無効 Playlist の範囲をテーマ背景色で覆い、約 25% 不透明度に見せる。
+    /// Measure〜Marker・波形・Music Segment／Playlist レーン全体を覆う。
     /// </summary>
     private void DrawDisabledPlaylistDimOverlay(Graphics g)
     {
@@ -3803,8 +3803,26 @@ internal sealed class WaveformView : Control
         }
 
         var layoutContent = Rectangle.Inflate(ClientRectangle, -4, -4);
-        var (_, _, wave, _, _, _) = GetLayout(layoutContent, g);
-        if (wave.Width <= 0 || wave.Height <= 0)
+        var (_, labels, wave, playlistLane, segmentLane, _) = GetLayout(layoutContent, g);
+        if (wave.Width <= 0)
+        {
+            return;
+        }
+
+        var top = labels.Height > 0 ? labels.Top : wave.Top;
+        var bottom = wave.Bottom;
+        if (segmentLane.Height > 0)
+        {
+            bottom = Math.Max(bottom, segmentLane.Bottom);
+        }
+
+        if (playlistLane.Height > 0)
+        {
+            bottom = Math.Max(bottom, playlistLane.Bottom);
+        }
+
+        var bandHeight = bottom - top;
+        if (bandHeight <= 0)
         {
             return;
         }
@@ -3830,8 +3848,11 @@ internal sealed class WaveformView : Control
                     continue;
                 }
 
+                // 境界線が見切れないよう、対象範囲の前後 1px も含める。
+                x0 = Math.Max(wave.Left, x0 - 1f);
+                x1 = Math.Min(wave.Right, x1 + 1f);
                 var width = Math.Max(1f, x1 - x0);
-                g.FillRectangle(brush, x0, wave.Top, width, wave.Height);
+                g.FillRectangle(brush, x0, top, width, bandHeight);
             }
         }
         finally

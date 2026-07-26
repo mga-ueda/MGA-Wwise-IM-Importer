@@ -102,7 +102,7 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 | Alt＋Playlist 項目を左クリック | **グループ化された Playlist のみ**。同一グループ内で何かが再生中のとき、その Playlist を上乗せ再生（Same Time・Group Fade In）。再生中のものへ再クリックで個別停止（Group Fade Out）。合計最大 8 本。再生中の各 Playlist 絶対位置に、通常と同じシアンのシークバーを描画。停止中や未グループ／別グループでは無視 |
 | Shift＋Playlist 項目を左クリック／ドラッグ | グループ化（縦レイヤー）。既存グループも新しい ID で上書き可。最若番号 Playlist のマーカーへ同期。`Reset Per Part` 無効時の全体連番も基準 Playlist 側だけを対象 |
 | Ctrl＋Playlist 項目を左クリック／ドラッグ | グループ解除。各 Playlist 固有の元マーカー情報へ戻る |
-| Ctrl＋Shift＋Playlist 項目を左クリック／ドラッグ | 書き出し対象外／再有効化。一覧は `Excluded Region n` の赤文字、波形は約 25% 表示。再生・遷移・グループ化・マーカー編集・WAV 書き出し・Wwise インポートの対象外 |
+| Ctrl＋Shift＋Playlist 項目を左クリック／ドラッグ | 書き出し対象外／再有効化。一覧は `Excluded Region n` の赤文字、波形〜上下レーンは約 25% 表示。再生・遷移・グループ化・マーカー編集・WAV 書き出し・Wwise インポートの対象外 |
 | Compact Num. | Music Playlist 一覧下端（既定オフ）。無効項目を除いた書き出し WAV・Playlist・Segment 名の番号を 1 から詰める。オフでは元番号を維持し欠番を残す |
 | More Options | 右パネル下部の折りたたみ（既定開き）。開閉は `[Project.*] MoreOptionsExpanded` に保存。開閉時はウィンドウ高さを調整し Music Playlist の高さは維持。Music Playlist（Compact Num. 含む）の下端は Fade In セクション下端に揃える |
 | Stream | More Options 上段左。`Stream`（既定オン）→ `Prefetch Length` → `Look-ahead Time`（ms、0〜9999、既定 500）。`[Project.*] StreamEnabled`／`PrefetchLengthMs`／`LookAheadMs`。オフ時は Prefetch／Look-ahead は無効で、Wwise へもストリーミングなしで作成 |
