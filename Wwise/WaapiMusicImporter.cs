@@ -13,9 +13,15 @@ namespace MgaWwiseIMImporter.Wwise;
 ///    ラウドネス焼き込みが必要なときだけ切り出し WAV を書く。
 /// 2. 複数パート時は State Group／State を作成または更新し、Music Switch Container に割当。
 /// 3. object.set で Playlist／Segment／Track（＋WAV）と Cue を作成。
-/// 4. 必要なら MusicClip トリムとリージョン端フェード（非破壊）を設定する。
+/// 4. グループ化 Playlist はグループ名の State Group（State A/B/C…）を作り、
+///    Group Fade が全員同一なら Default Transition Time のみ、異なれば Custom Transition Time
+///    （遷移先 State ごと。このとき Default は Wwise 既定 1 秒のまま）、
+///    各 Music Track へ割当し、対応 State のみ Volume 0dB・他は -108dB を設定する。
+///    完了後に現在 State を先頭へ設定し、作成した Switch／Playlist を選択する（プレビュー用）。
+/// 5. 必要なら MusicClip トリムとリージョン端フェード（非破壊）を設定する。
 ///    Fade Duration が WAAPI 上限（3.6 秒）を超える場合は WWU 直接編集で本値を書く。
-/// 5. Playlist 遷移の MusicFade（Time）は WAAPI 非対応のため、同系統の WWU 直編集で書く。
+/// 6. Playlist 遷移の MusicFade（Time）と Group State の TransitionList／
+///    Track State Volume は WAAPI 非対応のため、同系統の WWU 直編集で書く。
 /// </para>
 /// </summary>
 internal static class WaapiMusicImporter
@@ -246,6 +252,18 @@ internal static class WaapiMusicImporter
                 cancellationToken)
             .ConfigureAwait(false);
 
+        // グループ化 Playlist: State Group（A/B/C…）作成 → Music Track へ割当。
+        // TransitionList / State Volume は WWU 直編集で後段に書く。
+        var (groupStateTransitionPatches, groupStateVolumePatches) = await ApplyGroupStateGroupsAsync(
+                client,
+                plan,
+                musicRootPath,
+                importSettings,
+                returnOptions,
+                Log,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         var playAtFixes = await ApplyMusicClipTrimsAsync(
                 client,
                 plan,
@@ -265,7 +283,8 @@ internal static class WaapiMusicImporter
                 cancellationToken)
             .ConfigureAwait(false);
 
-        // 負の PlayAt、WAAPI 上限超の Clip Fade Duration、および Playlist 遷移 MusicFade は
+        // 負の PlayAt、WAAPI 上限超の Clip Fade Duration、Playlist 遷移 MusicFade、
+        // Group State の TransitionList / Track State Volume は
         // プロジェクトを保存→クローズし、WWU（XML）を直接書き換えてから再オープンする。
         var transitionFadePatches = plan.IsMultiPart
             ? plan.Playlists
@@ -283,6 +302,28 @@ internal static class WaapiMusicImporter
                 playAtFixes,
                 fadeDurationFixes,
                 transitionFadePatches,
+                groupStateTransitionPatches,
+                groupStateVolumePatches,
+                Log,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // プロジェクト再オープン後に、State の現在値を先頭へ揃える（プレビュー用）。
+        // 失敗してもインポート自体は続行。
+        await SetInitialStatesForPreviewAsync(
+                client,
+                plan,
+                importSettings,
+                Log,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // 転送した Switch（複数 Playlist）または単一 Playlist を Project Explorer で選択。
+        // Switch 時は一度子を選んで展開してから Switch へ戻す。
+        await TrySelectImportedObjectAsync(
+                client,
+                musicRootPath,
+                plan,
                 Log,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -302,6 +343,19 @@ internal static class WaapiMusicImporter
 
         foreach (var playlist in plan.Playlists)
         {
+            if (playlist.GroupState is { } groupState)
+            {
+                Log(
+                    UiStrings.LogGroupStateSummary(
+                        groupState.Name,
+                        string.Join(", ", groupState.StateNames),
+                        FormatGroupStateFadeSummary(groupState),
+                        groupState.UseDefaultTransitionOnly,
+                        groupState.UseDefaultTransitionOnly
+                            ? groupState.DefaultTransitionSeconds
+                            : WwiseDefaultStateTransitionSeconds));
+            }
+
             Log(UiStrings.LogPlaylistSummary(playlist.Name, playlist.Segments.Count));
             for (var segmentIndex = 0; segmentIndex < playlist.Segments.Count; segmentIndex++)
             {
@@ -354,7 +408,11 @@ internal static class WaapiMusicImporter
                         ? 0.0
                         : media.SourceEndSample * 1000.0 / media.SampleRate;
                     Log(
-                        $"    Track {track.Name}: {Path.GetFileName(media.WavPath)}"
+                        $"    Track {track.Name}"
+                        + (string.IsNullOrEmpty(track.LayerStateName)
+                            ? string.Empty
+                            : $"  state={track.LayerStateName}")
+                        + $": {Path.GetFileName(media.WavPath)}"
                         + $"  src=[{media.SourceStartSample} .. {media.SourceEndSample})"
                         + $"  ({beginMs:0.###} .. {endMs:0.###} ms)"
                         + (media.ApplyClipTrim
@@ -387,6 +445,19 @@ internal static class WaapiMusicImporter
         foreach (var playlist in plan.Playlists)
         {
             sb.AppendLine(UiStrings.LogPlaylistSummary(playlist.Name, playlist.Segments.Count));
+            if (playlist.GroupState is { } groupState)
+            {
+                sb.AppendLine(
+                    UiStrings.LogGroupStateSummary(
+                        groupState.Name,
+                        string.Join(", ", groupState.StateNames),
+                        FormatGroupStateFadeSummary(groupState),
+                        groupState.UseDefaultTransitionOnly,
+                        groupState.UseDefaultTransitionOnly
+                            ? groupState.DefaultTransitionSeconds
+                            : WwiseDefaultStateTransitionSeconds));
+            }
+
             for (var i = 0; i < playlist.Segments.Count; i++)
             {
                 var segment = playlist.Segments[i];
@@ -416,8 +487,11 @@ internal static class WaapiMusicImporter
                     + $"  ({string.Join(", ", flags)})");
                 foreach (var track in segment.Tracks)
                 {
+                    var layer = string.IsNullOrEmpty(track.LayerStateName)
+                        ? string.Empty
+                        : $"  state={track.LayerStateName}";
                     sb.AppendLine(
-                        $"    Track {track.Name}"
+                        $"    Track {track.Name}{layer}"
                         + $"  clip=[{track.ClipStartMs:0.###} .. {track.ClipEndMs:0.###}] ms"
                         + $"  samples=[{track.AbsoluteStartSample} .. {track.AbsoluteEndSample})");
                 }
@@ -1035,6 +1109,443 @@ internal static class WaapiMusicImporter
             ["listMode"] = "replaceAll",
         };
     }
+
+    /// <summary>Wwise State Group の Default Transition Time 既定値（秒）。</summary>
+    private const double WwiseDefaultStateTransitionSeconds = 1;
+
+    /// <summary>グループ State で非アクティブなレイヤーへ載せる音量（dB）。</summary>
+    private const double GroupStateMuteVolumeDb = -108;
+
+    /// <summary>
+    /// グループ化 Playlist ごとに State Group（A/B/C…）を作り、各 Music Track へ割当する。
+    /// Group Fade が全員同一なら Default Transition Time のみ、異なれば Custom TransitionList。
+    /// TransitionList / State Volume は WWU 直編集用パッチとして返す。
+    /// </summary>
+    private static async Task<(
+        List<StateGroupTransitionPatch> TransitionPatches,
+        List<MusicTrackStateVolumePatch> VolumePatches)> ApplyGroupStateGroupsAsync(
+        WaapiHttpClient client,
+        WwiseMusicPlan plan,
+        string musicRootPath,
+        WwiseImportSettings importSettings,
+        Dictionary<string, object> returnOptions,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        var transitionPatches = new List<StateGroupTransitionPatch>();
+        var volumePatches = new List<MusicTrackStateVolumePatch>();
+        var grouped = plan.Playlists
+            .Where(playlist => playlist.GroupState is not null)
+            .ToList();
+        if (grouped.Count == 0)
+        {
+            return (transitionPatches, volumePatches);
+        }
+
+        foreach (var playlist in grouped)
+        {
+            var groupState = playlist.GroupState!;
+            var stateGroupPath = importSettings.ResolveStateGroupPath(groupState.Name);
+            log(UiStrings.LogCreatingGroupStateGroup(
+                groupState.Name,
+                string.Join(", ", groupState.StateNames),
+                FormatGroupStateFadeSummary(groupState),
+                groupState.UseDefaultTransitionOnly,
+                groupState.UseDefaultTransitionOnly
+                    ? groupState.DefaultTransitionSeconds
+                    : WwiseDefaultStateTransitionSeconds));
+
+            await CallObjectSetAsync(
+                    client,
+                    BuildGroupStateGroupSetArgs(groupState, importSettings),
+                    returnOptions,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            var stateIds = await QueryStateChildrenAsync(
+                    client,
+                    stateGroupPath,
+                    groupState.StateNames,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            var stateGroupId = await QuerySingleReturnStringAsync(
+                    client,
+                    $"$ \"{stateGroupPath}\"",
+                    "id",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (string.IsNullOrEmpty(stateGroupId))
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateMissing(stateGroupPath, "(id)"));
+            }
+
+            var statesWwuPath = await QuerySingleReturnStringAsync(
+                    client,
+                    $"$ \"{stateGroupPath}\"",
+                    "filePath",
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (string.IsNullOrEmpty(statesWwuPath) || !File.Exists(statesWwuPath))
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateWorkUnitNotFound(stateGroupPath));
+            }
+
+            transitionPatches.Add(new StateGroupTransitionPatch(
+                statesWwuPath,
+                groupState.Name,
+                stateIds,
+                groupState.TransitionSecondsByState,
+                groupState.UseDefaultTransitionOnly));
+
+            var playlistPath = ResolvePlaylistObjectPath(plan, musicRootPath, playlist);
+            foreach (var segment in playlist.Segments)
+            {
+                var segmentPath = $"{playlistPath}\\{segment.Name}";
+                foreach (var track in segment.Tracks)
+                {
+                    var activeState = track.LayerStateName;
+                    if (string.IsNullOrEmpty(activeState)
+                        || !stateIds.ContainsKey(activeState))
+                    {
+                        throw new InvalidOperationException(
+                            UiStrings.ErrGroupStateTrackActiveMissing(
+                                track.Name,
+                                segment.Name,
+                                activeState ?? "(null)"));
+                    }
+
+                    var trackPath = $"{segmentPath}\\{track.Name}";
+                    log(UiStrings.LogAssignGroupStateToTrack(
+                        track.Name,
+                        segment.Name,
+                        groupState.Name));
+                    await client.CallAsync(
+                            "ak.wwise.core.object.setStateGroups",
+                            new Dictionary<string, object?>
+                            {
+                                ["object"] = trackPath,
+                                ["stateGroups"] = new object[] { stateGroupPath },
+                            },
+                            cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+
+                    // Volume を State 連動プロパティとして有効化する。
+                    await client.CallAsync(
+                            "ak.wwise.core.object.setStateProperties",
+                            new Dictionary<string, object?>
+                            {
+                                ["object"] = trackPath,
+                                ["stateProperties"] = new[] { "Volume" },
+                            },
+                            cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+
+                    var trackId = await QuerySingleReturnStringAsync(
+                            client,
+                            $"$ \"{trackPath.Replace("\"", "\\\"", StringComparison.Ordinal)}\"",
+                            "id",
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    var trackWwuPath = await QuerySingleReturnStringAsync(
+                            client,
+                            $"$ \"{trackPath.Replace("\"", "\\\"", StringComparison.Ordinal)}\"",
+                            "filePath",
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (string.IsNullOrEmpty(trackId)
+                        || string.IsNullOrEmpty(trackWwuPath)
+                        || !File.Exists(trackWwuPath))
+                    {
+                        throw new InvalidOperationException(
+                            UiStrings.ErrGroupStateTrackWorkUnitNotFound(trackPath));
+                    }
+
+                    log(UiStrings.LogGroupStateTrackVolumePlan(
+                        track.Name,
+                        activeState,
+                        GroupStateMuteVolumeDb));
+                    volumePatches.Add(new MusicTrackStateVolumePatch(
+                        trackWwuPath,
+                        trackId,
+                        track.Name,
+                        groupState.Name,
+                        stateGroupId,
+                        stateIds,
+                        activeState,
+                        GroupStateMuteVolumeDb,
+                        WaapiMusicTransitionDefaults.ToWaapiMusicSyncType(
+                            track.ChangeOccursAt ?? PlaylistExitSourceMode.Immediate)));
+                }
+            }
+        }
+
+        return (transitionPatches, volumePatches);
+    }
+
+    /// <summary>
+    /// Authoring プレビュー用に、現在 State を先頭へ設定する。
+    /// Music Switch 用 State Group → 先頭 Playlist 名、グループ用 → A。
+    /// </summary>
+    private static async Task SetInitialStatesForPreviewAsync(
+        WaapiHttpClient client,
+        WwiseMusicPlan plan,
+        WwiseImportSettings importSettings,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        if (plan.IsMultiPart && plan.Playlists.Count > 0)
+        {
+            await TrySetSoundEngineStateAsync(
+                    client,
+                    importSettings.ResolveStateGroupPath(plan.ContainerName),
+                    plan.Playlists[0].Name,
+                    log,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        foreach (var playlist in plan.Playlists)
+        {
+            if (playlist.GroupState is not { } groupState
+                || groupState.StateNames.Count == 0)
+            {
+                continue;
+            }
+
+            await TrySetSoundEngineStateAsync(
+                    client,
+                    importSettings.ResolveStateGroupPath(groupState.Name),
+                    groupState.StateNames[0],
+                    log,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static async Task TrySetSoundEngineStateAsync(
+        WaapiHttpClient client,
+        string stateGroupPath,
+        string stateName,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        // ak.soundengine.setState はパス不可。State Group／State の name・GUID・Short ID のみ。
+        var groupName = stateGroupPath.Split('\\', StringSplitOptions.RemoveEmptyEntries)
+            .LastOrDefault() ?? stateGroupPath;
+        try
+        {
+            await client.CallAsync(
+                    "ak.soundengine.setState",
+                    new Dictionary<string, object?>
+                    {
+                        ["stateGroup"] = groupName,
+                        ["state"] = stateName,
+                    },
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            log(UiStrings.LogGroupStateSetInitial(groupName, stateName));
+        }
+        catch (Exception ex)
+        {
+            log(UiStrings.LogGroupStateSetInitialFailed(groupName, stateName, ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// インポートした最上位オブジェクト（Switch または単一 Playlist）を Project Explorer で選択する。
+    /// Switch の場合は、先に先頭 Playlist を Find してツリーを展開してから Switch を選び直す。
+    /// </summary>
+    private static async Task TrySelectImportedObjectAsync(
+        WaapiHttpClient client,
+        string musicRootPath,
+        WwiseMusicPlan plan,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (plan.IsMultiPart && plan.Playlists.Count > 0)
+            {
+                // 子を Find すると祖先ノードが展開される。続けて Switch を選び直す。
+                var firstChildPath = $"{musicRootPath}\\{plan.Playlists[0].Name}";
+                await FindInProjectExplorerAsync(client, firstChildPath, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            await FindInProjectExplorerAsync(client, musicRootPath, cancellationToken)
+                .ConfigureAwait(false);
+
+            log(UiStrings.LogImportedObjectSelected(
+                plan.IsMultiPart
+                    ? UiStrings.LabelMusicSwitchContainer
+                    : UiStrings.LabelMusicPlaylistContainer,
+                musicRootPath));
+        }
+        catch (Exception ex)
+        {
+            log(UiStrings.LogImportedObjectSelectFailed(musicRootPath, ex.Message));
+        }
+    }
+
+    private static Task FindInProjectExplorerAsync(
+        WaapiHttpClient client,
+        string objectPath,
+        CancellationToken cancellationToken) =>
+        client.CallAsync(
+            "ak.wwise.ui.commands.execute",
+            new Dictionary<string, object?>
+            {
+                ["command"] = "FindInProjectExplorerSyncGroup1",
+                ["objects"] = new[] { objectPath },
+            },
+            cancellationToken: cancellationToken);
+
+    private static string FormatGroupStateFadeSummary(WwiseGroupStatePlan groupState)
+    {
+        if (groupState.StateNames.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            ", ",
+            groupState.StateNames.Select(name =>
+            {
+                var seconds = groupState.TransitionSecondsByState.TryGetValue(name, out var value)
+                    ? value
+                    : 0d;
+                return $"{name}={seconds:0.###}s";
+            }));
+    }
+
+    private static Dictionary<string, object?> BuildGroupStateGroupSetArgs(
+        WwiseGroupStatePlan groupState,
+        WwiseImportSettings importSettings)
+    {
+        var stateChildren = groupState.StateNames
+            .Select(name => (object)new Dictionary<string, object?>
+            {
+                ["type"] = "State",
+                ["name"] = name,
+            })
+            .ToList();
+
+        // 全員同一 → Default のみ。個別 Custom 時は Default を Wwise 既定（1s）へ戻し、
+        // 以前のフォールバック最大値が残らないようにする。
+        var defaultTransitionSeconds = groupState.UseDefaultTransitionOnly
+            ? groupState.DefaultTransitionSeconds
+            : WwiseDefaultStateTransitionSeconds;
+
+        return new Dictionary<string, object?>
+        {
+            ["objects"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["object"] = importSettings.StateGroupParentPath.TrimEnd('\\'),
+                    ["children"] = new object[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["type"] = "StateGroup",
+                            ["name"] = groupState.Name,
+                            ["@DefaultTransitionTime"] = defaultTransitionSeconds,
+                            ["children"] = stateChildren,
+                        },
+                    },
+                },
+            },
+            ["onNameConflict"] = "merge",
+            ["listMode"] = "replaceAll",
+        };
+    }
+
+    private static async Task<IReadOnlyDictionary<string, string>> QueryStateChildrenAsync(
+        WaapiHttpClient client,
+        string stateGroupPath,
+        IReadOnlyList<string> expectedNames,
+        CancellationToken cancellationToken)
+    {
+        var escaped = stateGroupPath.Replace("\"", "\\\"", StringComparison.Ordinal);
+        var result = await client.CallAsync(
+                "ak.wwise.core.object.get",
+                new Dictionary<string, object?>
+                {
+                    ["waql"] = $"$ \"{escaped}\" select children where type = \"State\"",
+                },
+                new Dictionary<string, object?>
+                {
+                    ["return"] = new[] { "id", "name", "type" },
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var found = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (result.TryGetProperty("return", out var arr)
+            && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in arr.EnumerateArray())
+            {
+                var name = item.TryGetProperty("name", out var nameEl)
+                    ? nameEl.GetString()
+                    : null;
+                var id = item.TryGetProperty("id", out var idEl)
+                    ? idEl.GetString()
+                    : null;
+                if (!string.IsNullOrEmpty(name) && !string.IsNullOrEmpty(id))
+                {
+                    found[name] = id;
+                }
+            }
+        }
+
+        foreach (var expected in expectedNames)
+        {
+            if (!found.ContainsKey(expected))
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateMissing(stateGroupPath, expected));
+            }
+        }
+
+        // ルールは予定 State（A/B/C…）同士のみ。None 等は含めない。
+        return expectedNames.ToDictionary(
+            name => name,
+            name => found[name],
+            StringComparer.Ordinal);
+    }
+
+    private static string ResolvePlaylistObjectPath(
+        WwiseMusicPlan plan,
+        string musicRootPath,
+        WwisePlaylistPlan playlist) =>
+        plan.IsMultiPart
+            ? $"{musicRootPath}\\{playlist.Name}"
+            : musicRootPath;
+
+    private readonly record struct StateGroupTransitionPatch(
+        string WwuPath,
+        string StateGroupName,
+        IReadOnlyDictionary<string, string> StateIdsByName,
+        IReadOnlyDictionary<string, double> TransitionSecondsByState,
+        bool UseDefaultTransitionOnly);
+
+    /// <summary>
+    /// Music Track の State Volume（対応 State=0dB、他=-108dB）と
+    /// Change Occurs At（StateGroupInfo/@MusicSyncType）を WWU へ書くためのパッチ。
+    /// </summary>
+    private readonly record struct MusicTrackStateVolumePatch(
+        string WwuPath,
+        string TrackId,
+        string TrackName,
+        string StateGroupName,
+        string StateGroupId,
+        IReadOnlyDictionary<string, string> StateIdsByName,
+        string ActiveStateName,
+        double MuteVolumeDb,
+        int MusicSyncType);
 
     /// <summary>
     /// Music Switch Container 本体（Playlist 子は空、State 割当は後段）。
@@ -1720,8 +2231,8 @@ internal static class WaapiMusicImporter
         RegionFadeCurveKind FadeOutCurve);
 
     /// <summary>
-    /// 負の PlayAt・WAAPI 上限超の Clip Fade Duration・Playlist 遷移 MusicFade を
-    /// WWU 直接編集で設定する。
+    /// 負の PlayAt・WAAPI 上限超の Clip Fade Duration・Playlist 遷移 MusicFade・
+    /// Group State の旧 TransitionList クリア／Track State Volume を WWU 直接編集で設定する。
     /// 手順: project.save → 対象 WWU 特定 → project.close → XML パッチ → project.open。
     /// </summary>
     private static async Task ApplyWorkUnitPatchesAsync(
@@ -1730,10 +2241,16 @@ internal static class WaapiMusicImporter
         IReadOnlyList<MusicClipPlayAtFix> playAtFixes,
         IReadOnlyList<MusicClipFadeDurationFix> fadeFixes,
         IReadOnlyList<MusicTransitionFadePatch> transitionFades,
+        IReadOnlyList<StateGroupTransitionPatch> groupStateTransitions,
+        IReadOnlyList<MusicTrackStateVolumePatch> groupStateVolumes,
         Action<string> log,
         CancellationToken cancellationToken)
     {
-        if (playAtFixes.Count == 0 && fadeFixes.Count == 0 && transitionFades.Count == 0)
+        if (playAtFixes.Count == 0
+            && fadeFixes.Count == 0
+            && transitionFades.Count == 0
+            && groupStateTransitions.Count == 0
+            && groupStateVolumes.Count == 0)
         {
             return;
         }
@@ -1773,7 +2290,8 @@ internal static class WaapiMusicImporter
         log(UiStrings.LogWorkUnitPatchStart(
             playAtFixes.Count,
             fadeFixes.Count,
-            transitionFades.Count));
+            transitionFades.Count,
+            groupStateTransitions.Count + groupStateVolumes.Count));
 
         var clipFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var patch in patchList)
@@ -1849,6 +2367,38 @@ internal static class WaapiMusicImporter
                 // 再オープン前に WWU 上で検証する。
                 VerifyMusicTransitionFadesInWorkUnitFile(transitionWwuPath, transitionFades);
             }
+
+            if (groupStateTransitions.Count > 0)
+            {
+                foreach (var group in groupStateTransitions.GroupBy(
+                             p => p.WwuPath,
+                             StringComparer.OrdinalIgnoreCase))
+                {
+                    PatchStateGroupTransitionListInWorkUnitFile(
+                        group.Key,
+                        group.ToList(),
+                        log);
+                    VerifyStateGroupTransitionListInWorkUnitFile(
+                        group.Key,
+                        group.ToList());
+                }
+            }
+
+            if (groupStateVolumes.Count > 0)
+            {
+                foreach (var group in groupStateVolumes.GroupBy(
+                             p => p.WwuPath,
+                             StringComparer.OrdinalIgnoreCase))
+                {
+                    PatchMusicTrackStateVolumesInWorkUnitFile(
+                        group.Key,
+                        group.ToList(),
+                        log);
+                    VerifyMusicTrackStateVolumesInWorkUnitFile(
+                        group.Key,
+                        group.ToList());
+                }
+            }
         }
         finally
         {
@@ -1916,6 +2466,624 @@ internal static class WaapiMusicImporter
         {
             log(UiStrings.LogMusicTransitionFadePatchDone(transitionFades.Count));
         }
+
+        if (groupStateTransitions.Count > 0)
+        {
+            log(UiStrings.LogGroupStateTransitionPatchDone(groupStateTransitions.Count));
+        }
+
+        if (groupStateVolumes.Count > 0)
+        {
+            log(UiStrings.LogGroupStateVolumePatchDone(groupStateVolumes.Count));
+        }
+    }
+
+    /// <summary>
+    /// Group Fade が全員同一なら TransitionList をクリア（Default のみ）。
+    /// 異なれば Custom Transition Time ルールを書く（From→To の Time は遷移先 To）。
+    /// Default Transition Time は WAAPI 側で設定済み。
+    /// </summary>
+    private static void PatchStateGroupTransitionListInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<StateGroupTransitionPatch> patches,
+        Action<string> log)
+    {
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+        var ruleCount = 0;
+        var clearedGroups = 0;
+
+        foreach (var patch in patches)
+        {
+            var stateGroup = FindStateGroupElement(doc, patch.StateGroupName)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateXmlMissing(patch.StateGroupName, wwuPath));
+
+            if (patch.UseDefaultTransitionOnly)
+            {
+                var existing = stateGroup.SelectSingleNode("TransitionList") as System.Xml.XmlElement;
+                if (existing is not null)
+                {
+                    stateGroup.RemoveChild(existing);
+                    clearedGroups++;
+                }
+
+                continue;
+            }
+
+            var names = patch.StateIdsByName.Keys.ToList();
+            var transitionList = stateGroup.SelectSingleNode("TransitionList") as System.Xml.XmlElement;
+            if (transitionList is null)
+            {
+                transitionList = doc.CreateElement("TransitionList");
+                var childrenList = stateGroup.SelectSingleNode("ChildrenList");
+                if (childrenList?.NextSibling is System.Xml.XmlNode insertBefore)
+                {
+                    stateGroup.InsertBefore(transitionList, insertBefore);
+                }
+                else
+                {
+                    stateGroup.AppendChild(transitionList);
+                }
+            }
+            else
+            {
+                transitionList.RemoveAll();
+            }
+
+            foreach (var fromName in names)
+            {
+                foreach (var toName in names)
+                {
+                    if (string.Equals(fromName, toName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var fromId = patch.StateIdsByName[fromName];
+                    var toId = patch.StateIdsByName[toName];
+                    var seconds = ResolveTransitionSecondsForDestination(patch, toName);
+                    var transition = doc.CreateElement("Transition");
+
+                    var startState = doc.CreateElement("StartState");
+                    startState.SetAttribute("Name", fromName);
+                    startState.SetAttribute("ID", fromId);
+                    transition.AppendChild(startState);
+
+                    var endState = doc.CreateElement("EndState");
+                    endState.SetAttribute("Name", toName);
+                    endState.SetAttribute("ID", toId);
+                    transition.AppendChild(endState);
+
+                    var time = doc.CreateElement("Time");
+                    time.InnerText = FormatTransitionTime(seconds);
+                    transition.AppendChild(time);
+
+                    var isShared = doc.CreateElement("IsShared");
+                    isShared.InnerText = "false";
+                    transition.AppendChild(isShared);
+
+                    transitionList.AppendChild(transition);
+                    ruleCount++;
+                }
+            }
+        }
+
+        doc.Save(wwuPath);
+        if (clearedGroups > 0)
+        {
+            log(UiStrings.LogGroupStateTransitionClearFile(Path.GetFileName(wwuPath), clearedGroups));
+        }
+
+        if (ruleCount > 0)
+        {
+            log(UiStrings.LogGroupStateTransitionPatchFile(Path.GetFileName(wwuPath), ruleCount));
+        }
+    }
+
+    private static void VerifyStateGroupTransitionListInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<StateGroupTransitionPatch> patches)
+    {
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var stateGroup = FindStateGroupElement(doc, patch.StateGroupName)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateXmlMissing(patch.StateGroupName, wwuPath));
+
+            var expected = CountStateTransitionRules(patch);
+            var transitions = stateGroup.SelectNodes("TransitionList/Transition");
+            var actual = transitions?.Count ?? 0;
+            if (actual != expected)
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateTransitionVerifyFailed(
+                        patch.StateGroupName,
+                        expected,
+                        actual));
+            }
+
+            if (patch.UseDefaultTransitionOnly)
+            {
+                continue;
+            }
+
+            var names = patch.StateIdsByName.Keys.ToList();
+            foreach (var fromName in names)
+            {
+                foreach (var toName in names)
+                {
+                    if (string.Equals(fromName, toName, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var node = FindStateTransitionElement(stateGroup, fromName, toName)
+                        ?? throw new InvalidOperationException(
+                            UiStrings.ErrGroupStateTransitionRuleMissing(
+                                patch.StateGroupName,
+                                fromName,
+                                toName));
+
+                    var expectedSeconds = ResolveTransitionSecondsForDestination(patch, toName);
+                    var timeText = node.SelectSingleNode("Time")?.InnerText;
+                    if (!double.TryParse(
+                            timeText,
+                            System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            out var seconds)
+                        || Math.Abs(seconds - expectedSeconds) > 1e-6)
+                    {
+                        throw new InvalidOperationException(
+                            UiStrings.ErrGroupStateTransitionTimeVerifyFailed(
+                                patch.StateGroupName,
+                                fromName,
+                                toName,
+                                expectedSeconds,
+                                timeText));
+                    }
+                }
+            }
+        }
+    }
+
+    private static System.Xml.XmlElement? FindStateGroupElement(
+        System.Xml.XmlDocument doc,
+        string stateGroupName)
+    {
+        var nodes = doc.SelectNodes("//StateGroup");
+        if (nodes is null)
+        {
+            return null;
+        }
+
+        foreach (System.Xml.XmlNode node in nodes)
+        {
+            if (node is System.Xml.XmlElement element
+                && string.Equals(
+                    element.GetAttribute("Name"),
+                    stateGroupName,
+                    StringComparison.Ordinal))
+            {
+                return element;
+            }
+        }
+
+        return null;
+    }
+
+    private static System.Xml.XmlElement? FindStateTransitionElement(
+        System.Xml.XmlElement stateGroup,
+        string fromName,
+        string toName)
+    {
+        var nodes = stateGroup.SelectNodes("TransitionList/Transition");
+        if (nodes is null)
+        {
+            return null;
+        }
+
+        foreach (System.Xml.XmlNode node in nodes)
+        {
+            if (node is not System.Xml.XmlElement transition)
+            {
+                continue;
+            }
+
+            var start = transition.SelectSingleNode("StartState") as System.Xml.XmlElement;
+            var end = transition.SelectSingleNode("EndState") as System.Xml.XmlElement;
+            if (start is null || end is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(start.GetAttribute("Name"), fromName, StringComparison.Ordinal)
+                && string.Equals(end.GetAttribute("Name"), toName, StringComparison.Ordinal))
+            {
+                return transition;
+            }
+        }
+
+        return null;
+    }
+
+    private static int CountStateTransitionRules(StateGroupTransitionPatch patch)
+    {
+        if (patch.UseDefaultTransitionOnly)
+        {
+            return 0;
+        }
+
+        var n = patch.StateIdsByName.Count;
+        return n <= 1 ? 0 : n * (n - 1);
+    }
+
+    private static double ResolveTransitionSecondsForDestination(
+        StateGroupTransitionPatch patch,
+        string toStateName) =>
+        patch.TransitionSecondsByState.TryGetValue(toStateName, out var seconds)
+            ? Math.Max(0, seconds)
+            : 0;
+
+    private static string FormatTransitionTime(double seconds) =>
+        seconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Music Track の StateInfo／CustomStateList に Volume を書く。
+    /// 対応 State は 0dB（Property 省略）、他 State は MuteVolumeDb。
+    /// </summary>
+    private static void PatchMusicTrackStateVolumesInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<MusicTrackStateVolumePatch> patches,
+        Action<string> log)
+    {
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var track = FindMusicTrackElementById(doc, patch.TrackId)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateTrackXmlMissing(patch.TrackName, patch.TrackId, wwuPath));
+
+            var stateInfo = track.SelectSingleNode("StateInfo") as System.Xml.XmlElement;
+            if (stateInfo is null)
+            {
+                stateInfo = doc.CreateElement("StateInfo");
+                var objectLists = track.SelectSingleNode("ObjectLists");
+                if (objectLists is not null)
+                {
+                    track.InsertBefore(stateInfo, objectLists);
+                }
+                else
+                {
+                    track.AppendChild(stateInfo);
+                }
+            }
+
+            // StateGroupList を確実に用意する（setStateGroups 済みでも欠けている場合に備える）。
+            var stateGroupList = stateInfo.SelectSingleNode("StateGroupList") as System.Xml.XmlElement;
+            if (stateGroupList is null)
+            {
+                stateGroupList = doc.CreateElement("StateGroupList");
+                var customListExisting = stateInfo.SelectSingleNode("CustomStateList");
+                if (customListExisting is not null)
+                {
+                    stateInfo.InsertBefore(stateGroupList, customListExisting);
+                }
+                else
+                {
+                    stateInfo.AppendChild(stateGroupList);
+                }
+            }
+
+            if (!StateGroupListContains(stateGroupList, patch.StateGroupName))
+            {
+                stateGroupList.RemoveAll();
+                var groupInfo = doc.CreateElement("StateGroupInfo");
+                var groupRef = doc.CreateElement("StateGroupRef");
+                groupRef.SetAttribute("Name", patch.StateGroupName);
+                groupRef.SetAttribute("ID", patch.StateGroupId);
+                groupInfo.AppendChild(groupRef);
+                stateGroupList.AppendChild(groupInfo);
+            }
+
+            ApplyMusicSyncTypeToStateGroupInfo(stateGroupList, patch);
+
+            var customStateList = stateInfo.SelectSingleNode("CustomStateList") as System.Xml.XmlElement;
+            if (customStateList is null)
+            {
+                customStateList = doc.CreateElement("CustomStateList");
+                stateInfo.AppendChild(customStateList);
+            }
+            else
+            {
+                customStateList.RemoveAll();
+            }
+
+            foreach (var (stateName, stateId) in patch.StateIdsByName)
+            {
+                var isActive = string.Equals(
+                    stateName,
+                    patch.ActiveStateName,
+                    StringComparison.Ordinal);
+                customStateList.AppendChild(
+                    BuildCustomStateVolumeElement(
+                        doc,
+                        stateName,
+                        stateId,
+                        isActive ? null : patch.MuteVolumeDb));
+            }
+        }
+
+        doc.Save(wwuPath);
+        log(UiStrings.LogGroupStateVolumePatchFile(Path.GetFileName(wwuPath), patches.Count));
+    }
+
+    private static void VerifyMusicTrackStateVolumesInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<MusicTrackStateVolumePatch> patches)
+    {
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var track = FindMusicTrackElementById(doc, patch.TrackId)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateTrackXmlMissing(patch.TrackName, patch.TrackId, wwuPath));
+
+            foreach (var (stateName, _) in patch.StateIdsByName)
+            {
+                var isActive = string.Equals(
+                    stateName,
+                    patch.ActiveStateName,
+                    StringComparison.Ordinal);
+                var expected = isActive ? 0.0 : patch.MuteVolumeDb;
+                var actual = ReadCustomStateVolume(track, stateName);
+                if (actual is null
+                    || Math.Abs(actual.Value - expected) > 1e-6)
+                {
+                    throw new InvalidOperationException(
+                        UiStrings.ErrGroupStateVolumeVerifyFailed(
+                            patch.TrackName,
+                            stateName,
+                            expected,
+                            actual?.ToString(
+                                System.Globalization.CultureInfo.InvariantCulture)
+                            ?? "(null)"));
+                }
+            }
+
+            var syncType = ReadStateGroupMusicSyncType(track, patch.StateGroupName);
+            if (syncType != patch.MusicSyncType)
+            {
+                throw new InvalidOperationException(
+                    UiStrings.ErrGroupStateMusicSyncTypeVerifyFailed(
+                        patch.TrackName,
+                        patch.StateGroupName,
+                        patch.MusicSyncType,
+                        syncType));
+            }
+        }
+    }
+
+    private static System.Xml.XmlElement BuildCustomStateVolumeElement(
+        System.Xml.XmlDocument doc,
+        string stateName,
+        string stateId,
+        double? volumeDb)
+    {
+        var wrapper = doc.CreateElement("CustomState");
+        var stateRef = doc.CreateElement("StateRef");
+        stateRef.SetAttribute("Name", stateName);
+        stateRef.SetAttribute("ID", stateId);
+        wrapper.AppendChild(stateRef);
+
+        var custom = doc.CreateElement("CustomState");
+        custom.SetAttribute("Name", string.Empty);
+        custom.SetAttribute("ID", $"{{{Guid.NewGuid().ToString().ToUpperInvariant()}}}");
+        if (volumeDb is { } db)
+        {
+            var propertyList = doc.CreateElement("PropertyList");
+            var property = doc.CreateElement("Property");
+            property.SetAttribute("Name", "Volume");
+            property.SetAttribute("Type", "Real64");
+            property.SetAttribute(
+                "Value",
+                db.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+            propertyList.AppendChild(property);
+            custom.AppendChild(propertyList);
+        }
+
+        wrapper.AppendChild(custom);
+        return wrapper;
+    }
+
+    private static double? ReadCustomStateVolume(System.Xml.XmlElement track, string stateName)
+    {
+        var nodes = track.SelectNodes("StateInfo/CustomStateList/CustomState");
+        if (nodes is null)
+        {
+            return null;
+        }
+
+        foreach (System.Xml.XmlNode node in nodes)
+        {
+            if (node is not System.Xml.XmlElement wrapper)
+            {
+                continue;
+            }
+
+            var stateRef = wrapper.SelectSingleNode("StateRef") as System.Xml.XmlElement;
+            if (stateRef is null
+                || !string.Equals(
+                    stateRef.GetAttribute("Name"),
+                    stateName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var volumeNode = wrapper.SelectSingleNode(
+                "CustomState/PropertyList/Property[@Name='Volume']") as System.Xml.XmlElement;
+            if (volumeNode is null)
+            {
+                // Property 省略 = 0 dB
+                return 0.0;
+            }
+
+            var value = volumeNode.GetAttribute("Value");
+            if (double.TryParse(
+                    value,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var db))
+            {
+                return db;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private static System.Xml.XmlElement? FindMusicTrackElementById(
+        System.Xml.XmlDocument doc,
+        string trackId)
+    {
+        var nodes = doc.SelectNodes("//MusicTrack");
+        if (nodes is null)
+        {
+            return null;
+        }
+
+        foreach (System.Xml.XmlNode node in nodes)
+        {
+            if (node is System.Xml.XmlElement element
+                && string.Equals(
+                    element.GetAttribute("ID"),
+                    trackId,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return element;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool StateGroupListContains(
+        System.Xml.XmlElement stateGroupList,
+        string stateGroupName)
+    {
+        var refs = stateGroupList.SelectNodes("StateGroupInfo/StateGroupRef");
+        if (refs is null)
+        {
+            return false;
+        }
+
+        foreach (System.Xml.XmlNode node in refs)
+        {
+            if (node is System.Xml.XmlElement element
+                && string.Equals(
+                    element.GetAttribute("Name"),
+                    stateGroupName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// StateGroupInfo/@MusicSyncType（UI: Change Occurs At）を設定する。
+    /// </summary>
+    private static void ApplyMusicSyncTypeToStateGroupInfo(
+        System.Xml.XmlElement stateGroupList,
+        MusicTrackStateVolumePatch patch)
+    {
+        var infos = stateGroupList.SelectNodes("StateGroupInfo");
+        if (infos is null)
+        {
+            return;
+        }
+
+        foreach (System.Xml.XmlNode node in infos)
+        {
+            if (node is not System.Xml.XmlElement groupInfo)
+            {
+                continue;
+            }
+
+            var groupRef = groupInfo.SelectSingleNode("StateGroupRef") as System.Xml.XmlElement;
+            if (groupRef is null
+                || !string.Equals(
+                    groupRef.GetAttribute("Name"),
+                    patch.StateGroupName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            groupInfo.SetAttribute(
+                "MusicSyncType",
+                patch.MusicSyncType.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture));
+            return;
+        }
+    }
+
+    private static int? ReadStateGroupMusicSyncType(
+        System.Xml.XmlElement track,
+        string stateGroupName)
+    {
+        var infos = track.SelectNodes("StateInfo/StateGroupList/StateGroupInfo");
+        if (infos is null)
+        {
+            return null;
+        }
+
+        foreach (System.Xml.XmlNode node in infos)
+        {
+            if (node is not System.Xml.XmlElement groupInfo)
+            {
+                continue;
+            }
+
+            var groupRef = groupInfo.SelectSingleNode("StateGroupRef") as System.Xml.XmlElement;
+            if (groupRef is null
+                || !string.Equals(
+                    groupRef.GetAttribute("Name"),
+                    stateGroupName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var raw = groupInfo.GetAttribute("MusicSyncType");
+            if (string.IsNullOrEmpty(raw))
+            {
+                // スキーマ既定は Immediate (0)。
+                return 0;
+            }
+
+            return int.TryParse(
+                raw,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var value)
+                ? value
+                : null;
+        }
+
+        return null;
     }
 
     private static void VerifyMusicTransitionFadesInWorkUnitFile(

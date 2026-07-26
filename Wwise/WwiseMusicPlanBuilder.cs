@@ -6,7 +6,9 @@ namespace MgaWwiseIMImporter.Wwise;
 /// エクスポート計画（パート／リージョン／マーカー）から Wwise の Music 構造計画を組み立てる。
 /// <list type="bullet">
 /// <item>未グループのパート 1 つ = Music Playlist Container 1 つ。</item>
-/// <item>グループ（2 パート以上）= Music Playlist Container 1 つ（同期 Segment 内に複数 Music Track）。</item>
+/// <item>グループ（2 パート以上）= Music Playlist Container 1 つ（同期 Segment 内に複数 Music Track）。
+/// あわせてグループ名の State Group と State（A/B/C…）を作る。Group Fade が全員同一なら Default Transition Time のみ、
+/// 異なれば Custom TransitionList（遷移先ごと）。各 Music Track へ割当し対応 State のみ 0dB・他は -108dB の Volume を設定する。</item>
 /// <item>最終 Playlist が複数なら Music Switch Container の下に並べる。</item>
 /// <item>リージョン 1 つ = Music Segment 1 つ。ただし -A は次のリージョンと、-E は直前のリージョンと同一セグメントに束ねる。</item>
 /// <item>-A 部分は Entry Cue より前（アウフタクト）、-E 部分は Exit Cue より後として扱う。</item>
@@ -36,6 +38,10 @@ internal static class WwiseMusicPlanBuilder
         IReadOnlyDictionary<int, RegionFadeCurveKind>? partFadeOutCurves = null,
         RegionFadeCurveKind defaultFadeInCurve = RegionFadeCurveKind.SCurve,
         RegionFadeCurveKind defaultFadeOutCurve = RegionFadeCurveKind.SCurve,
+        IReadOnlyDictionary<int, double>? partGroupFadeSeconds = null,
+        double defaultGroupFadeSeconds = 0,
+        IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes = null,
+        PlaylistExitSourceMode defaultChangeOccursAt = PlaylistExitSourceMode.Immediate,
         string? containerNameOverride = null)
     {
         if (sampleRate == 0)
@@ -123,7 +129,11 @@ internal static class WwiseMusicPlanBuilder
                     fadeInSeconds,
                     fadeOutSeconds,
                     fadeInCurve,
-                    fadeOutCurve));
+                    fadeOutCurve,
+                    partGroupFadeSeconds,
+                    defaultGroupFadeSeconds,
+                    partChangeOccursAtModes,
+                    defaultChangeOccursAt));
             }
         }
 
@@ -155,6 +165,20 @@ internal static class WwiseMusicPlanBuilder
         return defaultExitSourceAt;
     }
 
+    private static PlaylistExitSourceMode ResolvePartChangeOccursAt(
+        int partNumber,
+        IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes,
+        PlaylistExitSourceMode defaultChangeOccursAt)
+    {
+        if (partChangeOccursAtModes is not null
+            && partChangeOccursAtModes.TryGetValue(partNumber, out var mode))
+        {
+            return mode;
+        }
+
+        return defaultChangeOccursAt;
+    }
+
     /// <summary>グループ時は代表パート（最小番号）の Fade 秒数を使う。</summary>
     private static double ResolveUnitFadeSeconds(
         IReadOnlyList<WaveformOutputPart> parts,
@@ -178,6 +202,26 @@ internal static class WwiseMusicPlanBuilder
 
     private static double NormalizeFadeSeconds(double seconds) =>
         seconds > 0 ? seconds : 0;
+
+    private static bool AreAllTransitionSecondsEqual(IEnumerable<double> values)
+    {
+        using var enumerator = values.GetEnumerator();
+        if (!enumerator.MoveNext())
+        {
+            return true;
+        }
+
+        var first = enumerator.Current;
+        while (enumerator.MoveNext())
+        {
+            if (Math.Abs(enumerator.Current - first) > 1e-9)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static RegionFadeCurveKind ResolveUnitFadeCurve(
         IReadOnlyList<WaveformOutputPart> parts,
@@ -423,11 +467,39 @@ internal static class WwiseMusicPlanBuilder
         double fadeInSeconds,
         double fadeOutSeconds,
         RegionFadeCurveKind fadeInCurve,
-        RegionFadeCurveKind fadeOutCurve)
+        RegionFadeCurveKind fadeOutCurve,
+        IReadOnlyDictionary<int, double>? partGroupFadeSeconds,
+        double defaultGroupFadeSeconds,
+        IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes,
+        PlaylistExitSourceMode defaultChangeOccursAt)
     {
-        var memberPlans = new List<(WaveformOutputPart Part, string WavPath, List<PartSegmentDraft> Segments)>();
-        foreach (var part in parts)
+        var orderedParts = parts
+            .OrderBy(part => part.Number)
+            .ToArray();
+        var stateNames = BuildGroupStateNames(orderedParts.Length);
+        var transitionSecondsByState = new Dictionary<string, double>(StringComparer.Ordinal);
+        for (var memberIndex = 0; memberIndex < orderedParts.Length; memberIndex++)
         {
+            var part = orderedParts[memberIndex];
+            var seconds = defaultGroupFadeSeconds;
+            if (partGroupFadeSeconds is not null
+                && partGroupFadeSeconds.TryGetValue(part.Number, out var partSeconds))
+            {
+                seconds = partSeconds;
+            }
+
+            transitionSecondsByState[stateNames[memberIndex]] = NormalizeFadeSeconds(seconds);
+        }
+
+        var useDefaultOnly = AreAllTransitionSecondsEqual(transitionSecondsByState.Values);
+        var defaultTransitionSeconds = useDefaultOnly && transitionSecondsByState.Count > 0
+            ? transitionSecondsByState.Values.First()
+            : 0d;
+
+        var memberPlans = new List<(WaveformOutputPart Part, string WavPath, string StateName, List<PartSegmentDraft> Segments)>();
+        for (var memberIndex = 0; memberIndex < orderedParts.Length; memberIndex++)
+        {
+            var part = orderedParts[memberIndex];
             var wavPath = Path.Combine(directory, part.FileName);
             var partRegions = CollectPartRegions(part, regions);
             var groups = GroupRegions(partRegions);
@@ -444,7 +516,7 @@ internal static class WwiseMusicPlanBuilder
                     markers));
             }
 
-            memberPlans.Add((part, wavPath, drafts));
+            memberPlans.Add((part, wavPath, stateNames[memberIndex], drafts));
         }
 
         var maxCount = memberPlans.Max(m => m.Segments.Count);
@@ -492,6 +564,11 @@ internal static class WwiseMusicPlanBuilder
                     ClipEndMs = draft.ClipEndMs,
                     AbsoluteStartSample = draft.AbsoluteStartSample,
                     AbsoluteEndSample = draft.AbsoluteEndSample,
+                    LayerStateName = member.StateName,
+                    ChangeOccursAt = ResolvePartChangeOccursAt(
+                        member.Part.Number,
+                        partChangeOccursAtModes,
+                        defaultChangeOccursAt),
                 });
             }
 
@@ -530,14 +607,39 @@ internal static class WwiseMusicPlanBuilder
         {
             Name = playlistName,
             SourceWavPath = memberPlans[0].WavPath,
-            SourcePartNumbers = parts.Select(p => p.Number).ToArray(),
+            SourcePartNumbers = orderedParts.Select(p => p.Number).ToArray(),
             ExitSourceAt = exitSourceAt,
             FadeInSeconds = fadeInSeconds,
             FadeOutSeconds = fadeOutSeconds,
             FadeInCurve = fadeInCurve,
             FadeOutCurve = fadeOutCurve,
+            GroupState = new WwiseGroupStatePlan
+            {
+                Name = playlistName,
+                StateNames = stateNames,
+                UseDefaultTransitionOnly = useDefaultOnly,
+                DefaultTransitionSeconds = defaultTransitionSeconds,
+                TransitionSecondsByState = transitionSecondsByState,
+            },
             Segments = segments,
         };
+    }
+
+    /// <summary>グループ内 State 名（0→A, 1→B, …）。</summary>
+    internal static IReadOnlyList<string> BuildGroupStateNames(int count)
+    {
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        var names = new string[count];
+        for (var i = 0; i < count; i++)
+        {
+            names[i] = IndexToLetters(i).ToUpperInvariant();
+        }
+
+        return names;
     }
 
     private static WwiseSegmentPlan ToSingleTrackSegment(

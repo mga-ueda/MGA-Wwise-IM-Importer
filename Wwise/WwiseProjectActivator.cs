@@ -99,6 +99,38 @@ internal static class WwiseProjectActivator
     }
 
     /// <summary>
+    /// 接続中の Wwise Authoring を前面化する（プロジェクトの開閉はしない）。
+    /// </summary>
+    public static async Task<(bool Ok, string Message)> BringToForegroundAsync(
+        WaapiSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var client = new WaapiHttpClient(
+                settings.Url,
+                TimeSpan.FromMilliseconds(Math.Max(settings.TimeoutMs, 10000)));
+
+            var info = await client.CallAsync("ak.wwise.core.getInfo", cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (TryGetProcessId(info, out var processId))
+            {
+                _ = AllowSetForegroundWindow(processId);
+            }
+
+            await client.CallAsync(
+                    "ak.wwise.ui.bringToForeground",
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            return (true, UiStrings.LogWwiseBroughtToFront);
+        }
+        catch (Exception ex)
+        {
+            return (false, UiStrings.LogWwiseBringToFrontFailed(ex.Message));
+        }
+    }
+
+    /// <summary>
     /// WAAPI 不通時: インストール済み Wwise.exe を .wproj の版に合わせて直接起動する。
     /// （.wproj の既定関連付けは Wwise Launcher のため、シェル実行だけでは Authoring が開かないことがある。）
     /// </summary>

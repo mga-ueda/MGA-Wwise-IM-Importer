@@ -13,6 +13,7 @@ internal sealed class WaapiStatusBar : Panel
     private readonly Label _pathLabel;
     private readonly TransportIconButton _keepLockButton;
     private readonly Label _keepStateLabel;
+    private readonly FlatOptionCheckBox _autoActiveCheckBox;
     private readonly DarkToolTip _toolTip = new();
     private readonly Font _badgeFont = new("Yu Gothic UI", 9F, FontStyle.Bold);
 
@@ -84,6 +85,17 @@ internal sealed class WaapiStatusBar : Panel
             TabStop = false,
         };
 
+        _autoActiveCheckBox = new FlatOptionCheckBox
+        {
+            AutoSize = true,
+            Checked = true,
+            Font = new Font("Yu Gothic UI", 9F),
+            Text = UiStrings.LabelAutoActive,
+            TabStop = false,
+        };
+        _autoActiveCheckBox.CheckedChanged += AutoActiveCheckBox_CheckedChanged;
+
+        Controls.Add(_autoActiveCheckBox);
         Controls.Add(_keepStateLabel);
         Controls.Add(_keepLockButton);
         Controls.Add(_pathLabel);
@@ -106,6 +118,7 @@ internal sealed class WaapiStatusBar : Panel
 
             UpdateKeepLockAppearance();
             _titleLabel.Text = UiStrings.WaapiTitle;
+            _autoActiveCheckBox.Text = UiStrings.LabelAutoActive;
             ApplyToolTips();
             LayoutLabels();
         };
@@ -113,6 +126,9 @@ internal sealed class WaapiStatusBar : Panel
 
     /// <summary>Keep Target（鍵アイコン）の変更。</summary>
     public event EventHandler? KeepTargetChanged;
+
+    /// <summary>Auto Active の変更。</summary>
+    public event EventHandler? AutoActiveChanged;
 
     /// <summary>ロック中プロジェクト名のクリック（開く／前面化）。</summary>
     public event EventHandler? ProjectNameClick;
@@ -145,6 +161,22 @@ internal sealed class WaapiStatusBar : Panel
         }
     }
 
+    public bool AutoActiveChecked
+    {
+        get => _autoActiveCheckBox.Checked;
+        set
+        {
+            if (_autoActiveCheckBox.Checked == value)
+            {
+                return;
+            }
+
+            _autoActiveCheckBox.CheckedChanged -= AutoActiveCheckBox_CheckedChanged;
+            _autoActiveCheckBox.Checked = value;
+            _autoActiveCheckBox.CheckedChanged += AutoActiveCheckBox_CheckedChanged;
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -164,6 +196,9 @@ internal sealed class WaapiStatusBar : Panel
         ApplyDetailLabelBackColors();
         _keepStateLabel.ForeColor = UiColors.StatusBarTitleFore;
         _keepStateLabel.BackColor = BackColor;
+        _autoActiveCheckBox.ForeColor = UiColors.ActionOptionFore;
+        _autoActiveCheckBox.BackColor = BackColor;
+        _autoActiveCheckBox.ApplyColors();
         ApplyKeepLockColors();
         ApplyProjectNameColors();
 
@@ -254,6 +289,12 @@ internal sealed class WaapiStatusBar : Panel
         _toolTip.SetToolTip(
             _projectNameLabel,
             _projectNameClickable ? UiStrings.TipWwiseProjectNameOpen : string.Empty);
+        _toolTip.SetToolTip(_autoActiveCheckBox, UiStrings.TipAutoActive);
+    }
+
+    private void AutoActiveCheckBox_CheckedChanged(object? sender, EventArgs e)
+    {
+        AutoActiveChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void KeepLockButton_Click(object? sender, EventArgs e)
@@ -639,6 +680,16 @@ internal sealed class WaapiStatusBar : Panel
         x = PlaceDetailLabel(_sepAfterProject, x, Measure);
         x = PlaceDetailLabel(_pathLabel, x, Measure);
 
+        // Auto Active は右端固定（長パスでも見失わない）。
+        var autoSize = _autoActiveCheckBox.GetPreferredSize(Size.Empty);
+        var autoLeft = Math.Max(
+            Padding.Left,
+            ClientSize.Width - Padding.Right - autoSize.Width);
+        _autoActiveCheckBox.Size = autoSize;
+        _autoActiveCheckBox.Location = new Point(
+            autoLeft,
+            Math.Max(0, (ClientSize.Height - autoSize.Height) / 2));
+
         _keepLockButton.Visible = _showKeepLock;
         _keepLockButton.Enabled = _keepLockEnabled;
         _keepStateLabel.Visible = _showKeepLock;
@@ -651,7 +702,11 @@ internal sealed class WaapiStatusBar : Panel
             _keepStateLabel.AutoSize = false;
             _keepStateLabel.Size = stateSize;
 
-            var lockLeft = x + gapBeforeLock;
+            const int gapBeforeAuto = 10;
+            var lockClusterWidth = _keepLockButton.Width + gapBeforeState + stateSize.Width;
+            var lockLeft = Math.Min(
+                x + gapBeforeLock,
+                Math.Max(x, autoLeft - gapBeforeAuto - lockClusterWidth));
             var lockTop = Math.Max(0, (ClientSize.Height - _keepLockButton.Height) / 2);
             _keepLockButton.Location = new Point(lockLeft, lockTop);
 

@@ -403,8 +403,28 @@ internal static class UiStrings
         seconds);
 
     public static string TipGroupFadeHeader => Get(
-        "同一グループ内の遷移だけで使う Group Fade です。通常の Fade はグループ内では無効になります。",
-        "Group Fade used only for transitions inside the same group. Normal Fade is disabled within a group.");
+        "同一グループ内の遷移だけで使う Group Fade です。通常の Fade はグループ内では無効になります。"
+        + " グループ化していても Playlist ごとに個別設定できます。",
+        "Group Fade used only for transitions inside the same group. Normal Fade is disabled within a group."
+        + " Even when grouped, each playlist can have its own value.");
+
+    public static string TipOptionsHeader => Get(
+        "Options（今後追加予定）。現在は空です。",
+        "Options (placeholder for future settings). Currently empty.");
+
+    public static string TipAutoActive => Get(
+        "オンのとき、EXPORT 完了後に Wwise を前面化します。"
+        + " Always on Top がオンのときは、このアプリを最小化してから前面化します。",
+        "When on, brings Wwise to the foreground after EXPORT completes."
+        + " If Always on Top is on, this app is minimized first.");
+
+    public static string TipChangeOccursAtHeader => Get(
+        "Change Occurs At（表示は Chg Occ At）。"
+        + " 同一グループ内でレイヤーを切り替える（上乗せ／停止・Same Time 遷移）タイミングです。"
+        + " Group Fade と同様、Playlist ごとに個別設定できます。",
+        "Change Occurs At (shown as Chg Occ At)."
+        + " When layer changes occur within the same group (overlay / stop / Same Time transitions)."
+        + " Like Group Fade, each playlist can have its own value.");
 
     public static string TipExitImmediate => Get(
         "即座に退出して遷移します。",
@@ -936,6 +956,216 @@ internal static class UiStrings
         "Creating State Group...",
         "Creating State Group...");
 
+    public static string LogCreatingGroupStateGroup(
+        string groupName,
+        string stateNames,
+        string fadeSummary,
+        bool useDefaultOnly,
+        double defaultTransitionSeconds) => Format(
+        useDefaultOnly
+            ? "Creating Group State Group: {0} [{1}]  fades=[{2}]  Default only={3:0.###}s (no Custom TransitionList)"
+            : "Creating Group State Group: {0} [{1}]  fades=[{2}]  Custom TransitionList  Default=Wwise {3:0.###}s",
+        useDefaultOnly
+            ? "Creating Group State Group: {0} [{1}]  fades=[{2}]  Default only={3:0.###}s (no Custom TransitionList)"
+            : "Creating Group State Group: {0} [{1}]  fades=[{2}]  Custom TransitionList  Default=Wwise {3:0.###}s",
+        groupName,
+        stateNames,
+        fadeSummary,
+        defaultTransitionSeconds);
+
+    public static string LogAssignGroupStateToTrack(
+        string trackName,
+        string segmentName,
+        string groupName) => Format(
+        "Assigning State Group '{2}' to Music Track '{0}' (Segment '{1}')...",
+        "Assigning State Group '{2}' to Music Track '{0}' (Segment '{1}')...",
+        trackName,
+        segmentName,
+        groupName);
+
+    public static string LogGroupStateSetInitial(string groupName, string stateName) => Format(
+        "Message : Group State '{0}' の現在値を '{1}' に設定しました（プレビュー用）。",
+        "Message : Set Group State '{0}' current value to '{1}' (for preview).",
+        groupName,
+        stateName);
+
+    public static string LogGroupStateSetInitialFailed(
+        string groupName,
+        string stateName,
+        string message) => Format(
+        "Message : Group State '{0}' を '{1}' に設定できませんでした（続行）: {2}",
+        "Message : Could not set Group State '{0}' to '{1}' (continuing): {2}",
+        groupName,
+        stateName,
+        message);
+
+    public static string LogImportedObjectSelected(string objectKind, string path) => Format(
+        "Message : 転送オブジェクトを選択しました（{0}）→ {1}",
+        "Message : Selected imported object ({0}) → {1}",
+        objectKind,
+        path);
+
+    public static string LogImportedObjectSelectFailed(string path, string message) => Format(
+        "Message : 転送オブジェクトを選択できませんでした（続行）: {0} / {1}",
+        "Message : Could not select imported object (continuing): {0} / {1}",
+        path,
+        message);
+
+    public static string LogGroupStateTrackVolumePlan(
+        string trackName,
+        string activeState,
+        double muteDb) => Format(
+        "Group State Volume: Track '{0}'  {1}=0dB / others={2:0.###}dB",
+        "Group State Volume: Track '{0}'  {1}=0dB / others={2:0.###}dB",
+        trackName,
+        activeState,
+        muteDb);
+
+    public static string LogGroupStateSummary(
+        string groupName,
+        string stateNames,
+        string fadeSummary,
+        bool useDefaultOnly,
+        double defaultTransitionSeconds) => Format(
+        useDefaultOnly
+            ? "  Group State: {0} [{1}]  Default only={3:0.###}s  fades=[{2}]"
+            : "  Group State: {0} [{1}]  Custom fades=[{2}]  Default=Wwise {3:0.###}s",
+        useDefaultOnly
+            ? "  Group State: {0} [{1}]  Default only={3:0.###}s  fades=[{2}]"
+            : "  Group State: {0} [{1}]  Custom fades=[{2}]  Default=Wwise {3:0.###}s",
+        groupName,
+        stateNames,
+        fadeSummary,
+        defaultTransitionSeconds);
+
+    public static string LogGroupStateTransitionClearFile(string fileName, int clearedCount) => Format(
+        "Message : WWU の State Group Custom TransitionList をクリアしました（Default のみ）→ {0}（{1} 件）",
+        "Message : Cleared State Group Custom TransitionList (Default only) in work unit → {0} ({1})",
+        fileName,
+        clearedCount);
+
+    public static string LogGroupStateTransitionPatchFile(string fileName, int ruleCount) => Format(
+        "Message : WWU の State Group Custom Transition Time を更新しました → {0}（{1} ルール）",
+        "Message : Patched State Group Custom Transition Times in work unit → {0} ({1} rule(s))",
+        fileName,
+        ruleCount);
+
+    public static string LogGroupStateTransitionPatchDone(int groupCount) => Format(
+        "Message : Group State TransitionList パッチ完了（{0} State Group）。",
+        "Message : Group State TransitionList patch done ({0} State Group(s)).",
+        groupCount);
+
+    public static string LogGroupStateVolumePatchFile(string fileName, int trackCount) => Format(
+        "Message : WWU の Music Track State Volume を直接更新しました → {0}（Track {1} 件）",
+        "Message : Patched Music Track State Volume in work unit → {0} ({1} track(s))",
+        fileName,
+        trackCount);
+
+    public static string LogGroupStateVolumePatchDone(int trackCount) => Format(
+        "Message : Group State Volume WWU パッチ完了（{0} Track）。",
+        "Message : Group State Volume WWU patch done ({0} track(s)).",
+        trackCount);
+
+    public static string ErrGroupStateWorkUnitNotFound(string stateGroupPath) => Format(
+        "グループ State Group の Work Unit が見つかりません: {0}",
+        "Group State Group work unit not found: {0}",
+        stateGroupPath);
+
+    public static string ErrGroupStateTrackWorkUnitNotFound(string trackPath) => Format(
+        "Music Track の Work Unit が見つかりません: {0}",
+        "Music Track work unit not found: {0}",
+        trackPath);
+
+    public static string ErrGroupStateTrackActiveMissing(
+        string trackName,
+        string segmentName,
+        string activeState) => Format(
+        "Music Track '{0}' (Segment '{1}') のレイヤー State '{2}' が不正です。",
+        "Music Track '{0}' (Segment '{1}') has invalid layer State '{2}'.",
+        trackName,
+        segmentName,
+        activeState);
+
+    public static string ErrGroupStateMissing(string stateGroupPath, string stateName) => Format(
+        "グループ State Group '{0}' に State '{1}' がありません。",
+        "State '{1}' is missing from Group State Group '{0}'.",
+        stateGroupPath,
+        stateName);
+
+    public static string ErrGroupStateXmlMissing(string stateGroupName, string wwuPath) => Format(
+        "WWU 内に State Group '{0}' が見つかりません: {1}",
+        "State Group '{0}' not found in work unit: {1}",
+        stateGroupName,
+        wwuPath);
+
+    public static string ErrGroupStateTrackXmlMissing(
+        string trackName,
+        string trackId,
+        string wwuPath) => Format(
+        "WWU 内に Music Track '{0}' ({1}) が見つかりません: {2}",
+        "Music Track '{0}' ({1}) not found in work unit: {2}",
+        trackName,
+        trackId,
+        wwuPath);
+
+    public static string ErrGroupStateTransitionVerifyFailed(
+        string stateGroupName,
+        int expected,
+        int actual) => Format(
+        "State Group '{0}' の TransitionList 件数が不一致です（expected={1}, actual={2}）。",
+        "State Group '{0}' TransitionList count mismatch (expected={1}, actual={2}).",
+        stateGroupName,
+        expected,
+        actual);
+
+    public static string ErrGroupStateTransitionRuleMissing(
+        string stateGroupName,
+        string fromName,
+        string toName) => Format(
+        "State Group '{0}' に Transition ルール {1} → {2} がありません。",
+        "State Group '{0}' is missing transition rule {1} → {2}.",
+        stateGroupName,
+        fromName,
+        toName);
+
+    public static string ErrGroupStateTransitionTimeVerifyFailed(
+        string stateGroupName,
+        string fromName,
+        string toName,
+        double expected,
+        string? actual) => Format(
+        "State Group '{0}' の Transition {1} → {2} の Time が不一致です（expected={3:0.###}, actual={4}）。",
+        "State Group '{0}' transition {1} → {2} Time mismatch (expected={3:0.###}, actual={4}).",
+        stateGroupName,
+        fromName,
+        toName,
+        expected,
+        actual ?? "(null)");
+
+    public static string ErrGroupStateVolumeVerifyFailed(
+        string trackName,
+        string stateName,
+        double expectedDb,
+        string actual) => Format(
+        "Music Track '{0}' の State '{1}' Volume が不一致です（expected={2:0.###}dB, actual={3}）。",
+        "Music Track '{0}' State '{1}' Volume mismatch (expected={2:0.###}dB, actual={3}).",
+        trackName,
+        stateName,
+        expectedDb,
+        actual);
+
+    public static string ErrGroupStateMusicSyncTypeVerifyFailed(
+        string trackName,
+        string stateGroupName,
+        int expected,
+        int? actual) => Format(
+        "Music Track '{0}' の State Group '{1}' Change Occurs At (MusicSyncType) が不一致です（expected={2}, actual={3}）。",
+        "Music Track '{0}' State Group '{1}' Change Occurs At (MusicSyncType) mismatch (expected={2}, actual={3}).",
+        trackName,
+        stateGroupName,
+        expected,
+        actual?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(null)");
+
     public static string LogCreatingMusicSwitch => Get(
         "Creating Music Switch Container...",
         "Creating Music Switch Container...");
@@ -1066,6 +1296,15 @@ internal static class UiStrings
         "Keep Target : brought Wwise to the front → {0}",
         projectName);
 
+    public static string LogWwiseBroughtToFront => Get(
+        "Message : Wwise を前面にしました。",
+        "Message : Brought Wwise to the foreground.");
+
+    public static string LogWwiseBringToFrontFailed(string detail) => Format(
+        "Message : Wwise の前面化に失敗しました: {0}",
+        "Message : Failed to bring Wwise to the foreground: {0}",
+        detail);
+
     public static string LogWwiseProjectOpened(string projectName) => Format(
         "Keep Target : Wwise プロジェクトを開きました → {0}",
         "Keep Target : opened Wwise project → {0}",
@@ -1177,16 +1416,12 @@ internal static class UiStrings
         int fadeInRequested,
         int fadeOutApplied,
         int fadeOutRequested,
-        int groupFadeInApplied,
-        int groupFadeInRequested,
-        int groupFadeOutApplied,
-        int groupFadeOutRequested) => Format(
+        int groupFadeApplied,
+        int groupFadeRequested) => Format(
         "Message : 前回セッションを部分復元: グループ {0}/{1}、無効 {2}/{3}、マーカー {4}/{5}、"
-        + "Exit Source {6}/{7}、Fade In {8}/{9}、Fade Out {10}/{11}、"
-        + "Fade In Group {12}/{13}、Fade Out Group {14}/{15}",
+        + "Exit Source {6}/{7}、Fade In {8}/{9}、Fade Out {10}/{11}、Group Fade {12}/{13}",
         "Message : Partially restored last session: groups {0}/{1}, disabled {2}/{3}, markers {4}/{5}, "
-        + "Exit Source {6}/{7}, Fade In {8}/{9}, Fade Out {10}/{11}, "
-        + "Fade In Group {12}/{13}, Fade Out Group {14}/{15}",
+        + "Exit Source {6}/{7}, Fade In {8}/{9}, Fade Out {10}/{11}, Group Fade {12}/{13}",
         groupApplied,
         groupRequested,
         disabledApplied,
@@ -1199,10 +1434,8 @@ internal static class UiStrings
         fadeInRequested,
         fadeOutApplied,
         fadeOutRequested,
-        groupFadeInApplied,
-        groupFadeInRequested,
-        groupFadeOutApplied,
-        groupFadeOutRequested);
+        groupFadeApplied,
+        groupFadeRequested);
 
     public static string PresentYes => Get("あり", "present");
     public static string PresentNo => Get("なし", "missing");
@@ -1675,7 +1908,10 @@ internal static class UiStrings
     // Form1: Fade / Exit Source At / Group / Playlist header
     public static string LabelFadeIn => Get("Fade In", "Fade In");
     public static string LabelFadeOut => Get("Fade Out", "Fade Out");
+    public static string LabelOptions => Get("Options", "Options");
+    public static string LabelAutoActive => Get("Auto Active", "Auto Active");
     public static string LabelGroup => Get("Group", "Group");
+    public static string LabelChangeOccursAt => Get("Chg Occ At", "Chg Occ At");
     public static string LabelExitSourceAt => Get("Exit Source At", "Exit Source At");
     public static string LabelMusicPlaylist => Get("Music Playlist", "Music Playlist");
     public static string LabelImmediate => Get("Immediate", "Immediate");
@@ -2058,12 +2294,14 @@ internal static class UiStrings
     public static string LogWorkUnitPatchStart(
         int playAtCount,
         int clipFadeCount,
-        int transitionFadeCount) => Format(
-        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Clip Fade 超過={1} 件 / Playlist 遷移 Fade={2} 件）。保存→クローズ→パッチ→再オープンを行います。",
-        "Message : Starting WWU patch (PlayAt={0}, Clip Fade over limit={1}, Playlist transition Fade={2}). save → close → patch → reopen.",
+        int transitionFadeCount,
+        int groupStateTransitionCount) => Format(
+        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Clip Fade 超過={1} 件 / Playlist 遷移 Fade={2} 件 / Group State Transition={3} 件）。保存→クローズ→パッチ→再オープンを行います。",
+        "Message : Starting WWU patch (PlayAt={0}, Clip Fade over limit={1}, Playlist transition Fade={2}, Group State Transition={3}). save → close → patch → reopen.",
         playAtCount,
         clipFadeCount,
-        transitionFadeCount);
+        transitionFadeCount,
+        groupStateTransitionCount);
 
     public static string LogMusicClipWorkUnitPatchDone(int count) => Format(
         "Message : MusicClip WWU パッチ完了（{0} クリップ）。",

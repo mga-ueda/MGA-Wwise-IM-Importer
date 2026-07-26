@@ -42,6 +42,9 @@ internal sealed class LastWaveSessionState
     /// <summary>パート番号 → Exit Source At（列挙名）。</summary>
     public Dictionary<string, string> PartExitSourceModes { get; set; } = new(StringComparer.Ordinal);
 
+    /// <summary>パート番号 → Change Occurs At（列挙名）。</summary>
+    public Dictionary<string, string> PartChangeOccursAtModes { get; set; } = new(StringComparer.Ordinal);
+
     /// <summary>パート番号 → Fade In 秒数。</summary>
     public Dictionary<string, double> PartFadeInSeconds { get; set; } = new(StringComparer.Ordinal);
 
@@ -54,11 +57,14 @@ internal sealed class LastWaveSessionState
     /// <summary>パート番号 → Fade Out カーブ（列挙名）。</summary>
     public Dictionary<string, string> PartFadeOutCurves { get; set; } = new(StringComparer.Ordinal);
 
-    /// <summary>パート番号 → 同一グループ内遷移用 Fade In 秒数。</summary>
-    public Dictionary<string, double> PartGroupFadeInSeconds { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>パート番号 → 同一グループ内遷移用 Group Fade 秒数（In／Out 共通）。</summary>
+    public Dictionary<string, double> PartGroupFadeSeconds { get; set; } = new(StringComparer.Ordinal);
 
-    /// <summary>パート番号 → 同一グループ内遷移用 Fade Out 秒数。</summary>
-    public Dictionary<string, double> PartGroupFadeOutSeconds { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>旧形式（Group Fade In）。読み込み時のみ互換用。</summary>
+    public Dictionary<string, double>? PartGroupFadeInSeconds { get; set; }
+
+    /// <summary>旧形式（Group Fade Out）。読み込み時のみ互換用。</summary>
+    public Dictionary<string, double>? PartGroupFadeOutSeconds { get; set; }
 
     /// <summary>連続リージョン固まりのイン／アウト端フェード（プレビュー用）。</summary>
     public List<LastWaveRegionEdgeFadeState> RegionEdgeFades { get; set; } = [];
@@ -108,12 +114,12 @@ internal sealed class LastWaveSessionState
         IEnumerable<long> userMarkerSampleOffsets,
         IEnumerable<int> disabledPartNumbers,
         IReadOnlyDictionary<int, PlaylistExitSourceMode> partExitSourceModes,
+        IReadOnlyDictionary<int, PlaylistExitSourceMode> partChangeOccursAtModes,
         IReadOnlyDictionary<int, double> partFadeInSeconds,
         IReadOnlyDictionary<int, double> partFadeOutSeconds,
         IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeInCurves,
         IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeOutCurves,
-        IReadOnlyDictionary<int, double> partGroupFadeInSeconds,
-        IReadOnlyDictionary<int, double> partGroupFadeOutSeconds,
+        IReadOnlyDictionary<int, double> partGroupFadeSeconds,
         IReadOnlyList<WaveformMarkerMark>? waveOnlySessionMarkers = null,
         IReadOnlyList<RegionEdgeFade>? regionEdgeFades = null,
         IReadOnlyList<string>? wavePaths = null)
@@ -158,6 +164,10 @@ internal sealed class LastWaveSessionState
                 pair => pair.Key.ToString(),
                 pair => pair.Value.ToString(),
                 StringComparer.Ordinal),
+            PartChangeOccursAtModes = partChangeOccursAtModes.ToDictionary(
+                pair => pair.Key.ToString(),
+                pair => pair.Value.ToString(),
+                StringComparer.Ordinal),
             PartFadeInSeconds = partFadeInSeconds.ToDictionary(
                 pair => pair.Key.ToString(),
                 pair => pair.Value,
@@ -174,11 +184,7 @@ internal sealed class LastWaveSessionState
                 pair => pair.Key.ToString(),
                 pair => pair.Value.ToString(),
                 StringComparer.Ordinal),
-            PartGroupFadeInSeconds = partGroupFadeInSeconds.ToDictionary(
-                pair => pair.Key.ToString(),
-                pair => pair.Value,
-                StringComparer.Ordinal),
-            PartGroupFadeOutSeconds = partGroupFadeOutSeconds.ToDictionary(
+            PartGroupFadeSeconds = partGroupFadeSeconds.ToDictionary(
                 pair => pair.Key.ToString(),
                 pair => pair.Value,
                 StringComparer.Ordinal),
@@ -378,22 +384,64 @@ internal sealed class LastWaveSessionState
         return true;
     }
 
+    public bool TryGetPartChangeOccursAtModes(out Dictionary<int, PlaylistExitSourceMode> partChangeOccursAtModes)
+    {
+        partChangeOccursAtModes = new Dictionary<int, PlaylistExitSourceMode>();
+        if (PartChangeOccursAtModes is null || PartChangeOccursAtModes.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var pair in PartChangeOccursAtModes)
+        {
+            if (!int.TryParse(pair.Key, out var partNumber)
+                || !Enum.TryParse<PlaylistExitSourceMode>(pair.Value, ignoreCase: true, out var mode))
+            {
+                return false;
+            }
+
+            partChangeOccursAtModes[partNumber] = mode;
+        }
+
+        return true;
+    }
+
     public bool TryGetPartFadeSeconds(
         out Dictionary<int, double> partFadeInSeconds,
         out Dictionary<int, double> partFadeOutSeconds,
-        out Dictionary<int, double> partGroupFadeInSeconds,
-        out Dictionary<int, double> partGroupFadeOutSeconds)
+        out Dictionary<int, double> partGroupFadeSeconds)
     {
         partFadeInSeconds = new Dictionary<int, double>();
         partFadeOutSeconds = new Dictionary<int, double>();
-        partGroupFadeInSeconds = new Dictionary<int, double>();
-        partGroupFadeOutSeconds = new Dictionary<int, double>();
+        partGroupFadeSeconds = new Dictionary<int, double>();
         if (!TryParseFadeMap(PartFadeInSeconds, partFadeInSeconds)
-            || !TryParseFadeMap(PartFadeOutSeconds, partFadeOutSeconds)
-            || !TryParseFadeMap(PartGroupFadeInSeconds, partGroupFadeInSeconds)
-            || !TryParseFadeMap(PartGroupFadeOutSeconds, partGroupFadeOutSeconds))
+            || !TryParseFadeMap(PartFadeOutSeconds, partFadeOutSeconds))
         {
             return false;
+        }
+
+        // 新形式を優先。無ければ旧 In／Out を Max で統合する。
+        if (!TryParseFadeMap(PartGroupFadeSeconds, partGroupFadeSeconds))
+        {
+            return false;
+        }
+
+        if (partGroupFadeSeconds.Count == 0)
+        {
+            var legacyIn = new Dictionary<int, double>();
+            var legacyOut = new Dictionary<int, double>();
+            if (!TryParseFadeMap(PartGroupFadeInSeconds, legacyIn)
+                || !TryParseFadeMap(PartGroupFadeOutSeconds, legacyOut))
+            {
+                return false;
+            }
+
+            foreach (var partNumber in legacyIn.Keys.Concat(legacyOut.Keys).Distinct())
+            {
+                legacyIn.TryGetValue(partNumber, out var fadeIn);
+                legacyOut.TryGetValue(partNumber, out var fadeOut);
+                partGroupFadeSeconds[partNumber] = Math.Max(fadeIn, fadeOut);
+            }
         }
 
         return true;

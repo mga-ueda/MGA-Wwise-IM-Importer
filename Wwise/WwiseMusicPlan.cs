@@ -49,7 +49,44 @@ internal sealed class WwisePlaylistPlan
     /// <summary>Source Fade-out のカーブ（遷移先の記憶値）。</summary>
     public required RegionFadeCurveKind FadeOutCurve { get; init; }
 
+    /// <summary>
+    /// グループ（2 パート以上）時に作る State Group 計画。
+    /// 未グループの単一パート Playlist では null。
+    /// </summary>
+    public WwiseGroupStatePlan? GroupState { get; init; }
+
     public required IReadOnlyList<WwiseSegmentPlan> Segments { get; init; }
+}
+
+/// <summary>
+/// グループ化 Playlist 向け State Group。
+/// グループ名と同名の State Group に、メンバー数分の State（A, B, C…）を持つ。
+/// </summary>
+internal sealed class WwiseGroupStatePlan
+{
+    /// <summary>State Group 名（通常は Playlist／グループ名と同じ）。</summary>
+    public required string Name { get; init; }
+
+    /// <summary>State 名一覧（A, B, C…。メンバー Playlist 数と一致）。</summary>
+    public required IReadOnlyList<string> StateNames { get; init; }
+
+    /// <summary>
+    /// true なら全 State の Group Fade が同一。
+    /// Default Transition Time のみを使い、Custom TransitionList は書かない（既存があればクリア）。
+    /// </summary>
+    public required bool UseDefaultTransitionOnly { get; init; }
+
+    /// <summary>
+    /// <see cref="UseDefaultTransitionOnly"/> 時に Default Transition Time へ載せる秒数。
+    /// 個別 Custom 時は未使用（Wwise 既定の 1 秒のまま）。
+    /// </summary>
+    public required double DefaultTransitionSeconds { get; init; }
+
+    /// <summary>
+    /// State 名 → そのレイヤーの Group Fade 秒数。
+    /// Custom TransitionList の From→To では <b>To（遷移先 State）</b> の秒数を使う。
+    /// </summary>
+    public required IReadOnlyDictionary<string, double> TransitionSecondsByState { get; init; }
 }
 
 /// <summary>
@@ -105,6 +142,18 @@ internal sealed class WwiseTrackPlan
 
     /// <summary>元ファイル絶対サンプル（切り出し終了・排他、フェード照合用）。</summary>
     public required long AbsoluteEndSample { get; init; }
+
+    /// <summary>
+    /// グループ内レイヤーに対応する State 名（A, B, C…）。
+    /// 未グループ時は null。
+    /// </summary>
+    public string? LayerStateName { get; init; }
+
+    /// <summary>
+    /// グループ内レイヤー切替の Change Occurs At（StateGroupInfo/@MusicSyncType）。
+    /// 未グループ／単一トラック時は null。
+    /// </summary>
+    public PlaylistExitSourceMode? ChangeOccursAt { get; init; }
 }
 
 /// <summary>Custom Cue 1 つ。</summary>

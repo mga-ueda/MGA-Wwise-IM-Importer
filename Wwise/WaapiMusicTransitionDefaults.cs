@@ -83,7 +83,7 @@ internal static class WaapiMusicTransitionDefaults
             ["@EnableDestinationFadeIn"] = playlist.FadeInSeconds > 0 ? 1 : 0,
         };
 
-    /// <summary>Wwise ExitSourceAt 列挙値へ変換する。</summary>
+    /// <summary>Wwise ExitSourceAt / MusicSyncType（Change Occurs At）列挙値へ変換する。</summary>
     public static int ToWaapiExitSourceAt(PlaylistExitSourceMode mode) => mode switch
     {
         PlaylistExitSourceMode.Immediate => 0,
@@ -93,4 +93,11 @@ internal static class WaapiMusicTransitionDefaults
         PlaylistExitSourceMode.ExitCue => 7,
         _ => 2,
     };
+
+    /// <summary>
+    /// Music Track の StateGroupInfo/@MusicSyncType（UI: Change Occurs At）。
+    /// Exit Source At と同じ列挙値を使う。
+    /// </summary>
+    public static int ToWaapiMusicSyncType(PlaylistExitSourceMode mode) =>
+        ToWaapiExitSourceAt(mode);
 }

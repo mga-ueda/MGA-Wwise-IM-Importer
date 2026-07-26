@@ -27,13 +27,22 @@ partial class Form1
     private FlatOptionRadioButton fadeInThreeSecondsRadio;
     private FlatOptionRadioButton fadeInSixSecondsRadio;
     private FlatOptionRadioButton fadeInNineSecondsRadio;
-    private Label fadeInGroupDividerLabel;
+    private SectionHeaderLabel optionsHeaderLabel;
+    private FlowLayoutPanel optionsChoicesPanel;
+    private SectionHeaderLabel fadeInGroupDividerLabel;
     private FlowLayoutPanel fadeInGroupChoicesPanel;
     private FlatOptionRadioButton fadeInGroupNoneRadio;
     private FlatOptionRadioButton fadeInGroupOneSecondRadio;
     private FlatOptionRadioButton fadeInGroupThreeSecondsRadio;
     private FlatOptionRadioButton fadeInGroupSixSecondsRadio;
     private FlatOptionRadioButton fadeInGroupNineSecondsRadio;
+    private SectionHeaderLabel changeOccursAtHeaderLabel;
+    private FlowLayoutPanel changeOccursAtChoicesPanel;
+    private FlatOptionRadioButton changeOccursImmediateRadio;
+    private FlatOptionRadioButton changeOccursNextBarRadio;
+    private FlatOptionRadioButton changeOccursNextBeatRadio;
+    private FlatOptionRadioButton changeOccursNextCueRadio;
+    private FlatOptionRadioButton changeOccursExitCueRadio;
     private Panel fadeOutSectionPanel;
     private Panel fadeOutHeaderPanel;
     private SectionHeaderLabel transitionTimeHeaderLabel;
@@ -44,13 +53,6 @@ partial class Form1
     private FlatOptionRadioButton transitionTimeThreeSecondsRadio;
     private FlatOptionRadioButton transitionTimeSixSecondsRadio;
     private FlatOptionRadioButton transitionTimeNineSecondsRadio;
-    private Label fadeOutGroupDividerLabel;
-    private FlowLayoutPanel fadeOutGroupChoicesPanel;
-    private FlatOptionRadioButton fadeOutGroupNoneRadio;
-    private FlatOptionRadioButton fadeOutGroupOneSecondRadio;
-    private FlatOptionRadioButton fadeOutGroupThreeSecondsRadio;
-    private FlatOptionRadioButton fadeOutGroupSixSecondsRadio;
-    private FlatOptionRadioButton fadeOutGroupNineSecondsRadio;
     private Panel exitSourceAtSectionPanel;
     private SectionHeaderLabel exitSourceAtHeaderLabel;
     private FlowLayoutPanel exitSourceAtChoicesPanel;
@@ -134,13 +136,22 @@ partial class Form1
         fadeInThreeSecondsRadio = new FlatOptionRadioButton();
         fadeInSixSecondsRadio = new FlatOptionRadioButton();
         fadeInNineSecondsRadio = new FlatOptionRadioButton();
-        fadeInGroupDividerLabel = new Label();
+        optionsHeaderLabel = new SectionHeaderLabel();
+        optionsChoicesPanel = new FlowLayoutPanel();
+        fadeInGroupDividerLabel = new SectionHeaderLabel();
         fadeInGroupChoicesPanel = new FlowLayoutPanel();
         fadeInGroupNoneRadio = new FlatOptionRadioButton();
         fadeInGroupOneSecondRadio = new FlatOptionRadioButton();
         fadeInGroupThreeSecondsRadio = new FlatOptionRadioButton();
         fadeInGroupSixSecondsRadio = new FlatOptionRadioButton();
         fadeInGroupNineSecondsRadio = new FlatOptionRadioButton();
+        changeOccursAtHeaderLabel = new SectionHeaderLabel();
+        changeOccursAtChoicesPanel = new FlowLayoutPanel();
+        changeOccursImmediateRadio = new FlatOptionRadioButton();
+        changeOccursNextBarRadio = new FlatOptionRadioButton();
+        changeOccursNextBeatRadio = new FlatOptionRadioButton();
+        changeOccursNextCueRadio = new FlatOptionRadioButton();
+        changeOccursExitCueRadio = new FlatOptionRadioButton();
         fadeOutSectionPanel = new Panel();
         fadeOutHeaderPanel = new Panel();
         transitionTimeHeaderLabel = new SectionHeaderLabel();
@@ -151,13 +162,6 @@ partial class Form1
         transitionTimeThreeSecondsRadio = new FlatOptionRadioButton();
         transitionTimeSixSecondsRadio = new FlatOptionRadioButton();
         transitionTimeNineSecondsRadio = new FlatOptionRadioButton();
-        fadeOutGroupDividerLabel = new Label();
-        fadeOutGroupChoicesPanel = new FlowLayoutPanel();
-        fadeOutGroupNoneRadio = new FlatOptionRadioButton();
-        fadeOutGroupOneSecondRadio = new FlatOptionRadioButton();
-        fadeOutGroupThreeSecondsRadio = new FlatOptionRadioButton();
-        fadeOutGroupSixSecondsRadio = new FlatOptionRadioButton();
-        fadeOutGroupNineSecondsRadio = new FlatOptionRadioButton();
         exitSourceAtSectionPanel = new Panel();
         exitSourceAtHeaderLabel = new SectionHeaderLabel();
         exitSourceAtChoicesPanel = new FlowLayoutPanel();
@@ -208,12 +212,13 @@ partial class Form1
         fadeInHeaderPanel.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)fadeInCurveIcon).BeginInit();
         fadeInChoicesPanel.SuspendLayout();
+        optionsChoicesPanel.SuspendLayout();
         fadeInGroupChoicesPanel.SuspendLayout();
+        changeOccursAtChoicesPanel.SuspendLayout();
         fadeOutSectionPanel.SuspendLayout();
         fadeOutHeaderPanel.SuspendLayout();
         ((System.ComponentModel.ISupportInitialize)fadeOutCurveIcon).BeginInit();
         transitionTimeChoicesPanel.SuspendLayout();
-        fadeOutGroupChoicesPanel.SuspendLayout();
         exitSourceAtSectionPanel.SuspendLayout();
         exitSourceAtChoicesPanel.SuspendLayout();
         rightSidePanel.SuspendLayout();
@@ -230,7 +235,7 @@ partial class Form1
         projectBar.Dock = DockStyle.Top;
         projectBar.Height = 30;
         projectBar.Name = "projectBar";
-        // 上下マージンは対称にする（テキスト縦位置は AlignProjectBarText で実測合わせ）。
+        // ãº}[WÍÎÌÉ·éieLXgcÊuÍ AlignProjectBarText ÅÀªí¹jB
         projectBar.Padding = new Padding(8, 3, 8, 3);
         projectBar.TabIndex = 0;
         projectBar.Controls.Add(projectOutputPathTextBox);
@@ -279,8 +284,8 @@ partial class Form1
         projectOutputPathTextBox.Cursor = Cursors.Default;
         projectOutputPathTextBox.Dock = DockStyle.Fill;
         projectOutputPathTextBox.Font = new Font("Yu Gothic UI", 9F);
-        // 単一行 EDIT はテキストが上寄せ描画されるため、Multiline + EM_SETRECT で
-        // コンボボックスの文字と同じ縦位置に合わせる（AlignProjectBarText）。
+        // Pês EDIT ÍeLXgªãñ¹`æ³êé½ßAMultiline + EM_SETRECT Å
+        // R{{bNXÌ¶Æ¯¶cÊuÉí¹éiAlignProjectBarTextjB
         projectOutputPathTextBox.Multiline = true;
         projectOutputPathTextBox.WordWrap = false;
         projectOutputPathTextBox.Name = "projectOutputPathTextBox";
@@ -306,7 +311,7 @@ partial class Form1
         projectDeleteButton.TabIndex = 1;
         //
         // keepLastSessionCheckBox
-        // 
+        //
         keepLastSessionCheckBox.AutoSize = true;
         keepLastSessionCheckBox.Font = new Font("Yu Gothic UI", 9F);
         keepLastSessionCheckBox.Margin = new Padding(0, 3, 8, 0);
@@ -389,7 +394,7 @@ partial class Form1
         editorTextBox.BorderStyle = BorderStyle.None;
         editorTextBox.DetectUrls = false;
         editorTextBox.Dock = DockStyle.Fill;
-        editorTextBox.Font = AppFonts.CreateLogFont(8F);
+        editorTextBox.Font = AppFonts.CreateLogFont(7F);
         editorTextBox.ForeColor = UiColors.LogDefault;
         editorTextBox.HideSelection = false;
         editorTextBox.Name = "editorTextBox";
@@ -456,7 +461,7 @@ partial class Form1
         logAreaPanel.Controls.Add(logEditorPanel);
         logAreaPanel.Controls.Add(rightSidePanel);
         //
-        // rightSidePanel（右端）。Playlist／遷移設定などを縦に積む。
+        // rightSidePaneliE[jBPlaylist^JÚÝèÈÇðcÉÏÞB
         //
         rightSidePanel.Dock = DockStyle.Right;
         rightSidePanel.Name = "rightSidePanel";
@@ -515,8 +520,8 @@ partial class Form1
         fadeInSectionPanel.Size = new Size(100, 380);
         fadeInSectionPanel.TabIndex = 0;
         // Dock Top は後から追加したものが上。下から順に積む。
-        fadeInSectionPanel.Controls.Add(fadeInGroupChoicesPanel);
-        fadeInSectionPanel.Controls.Add(fadeInGroupDividerLabel);
+        fadeInSectionPanel.Controls.Add(optionsChoicesPanel);
+        fadeInSectionPanel.Controls.Add(optionsHeaderLabel);
         fadeInSectionPanel.Controls.Add(fadeInChoicesPanel);
         fadeInSectionPanel.Controls.Add(fadeInHeaderPanel);
         //
@@ -631,6 +636,29 @@ partial class Form1
         fadeInNineSecondsRadio.Text = "9.0 Sec.";
         fadeInNineSecondsRadio.CheckedChanged += FadeInTimeRadio_CheckedChanged;
         //
+        // optionsHeaderLabel
+        //
+        optionsHeaderLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
+        optionsHeaderLabel.Dock = DockStyle.Top;
+        optionsHeaderLabel.Margin = new Padding(0);
+        optionsHeaderLabel.Name = "optionsHeaderLabel";
+        optionsHeaderLabel.Padding = new Padding(10, 0, 4, 0);
+        optionsHeaderLabel.Size = new Size(100, 26);
+        optionsHeaderLabel.TabIndex = 2;
+        optionsHeaderLabel.Text = "Options";
+        optionsHeaderLabel.TextAlign = ContentAlignment.MiddleLeft;
+        //
+        // optionsChoicesPanel
+        //
+        optionsChoicesPanel.Dock = DockStyle.Top;
+        optionsChoicesPanel.FlowDirection = FlowDirection.TopDown;
+        optionsChoicesPanel.Margin = new Padding(0);
+        optionsChoicesPanel.Name = "optionsChoicesPanel";
+        optionsChoicesPanel.Padding = new Padding(9, 0, 4, 4);
+        optionsChoicesPanel.Size = new Size(100, 164);
+        optionsChoicesPanel.TabIndex = 3;
+        optionsChoicesPanel.WrapContents = false;
+        //
         // fadeInGroupDividerLabel
         //
         fadeInGroupDividerLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
@@ -670,7 +698,7 @@ partial class Form1
         fadeInGroupNoneRadio.TabIndex = 0;
         fadeInGroupNoneRadio.Tag = 0D;
         fadeInGroupNoneRadio.Text = "None";
-        fadeInGroupNoneRadio.CheckedChanged += FadeInGroupTimeRadio_CheckedChanged;
+        fadeInGroupNoneRadio.CheckedChanged += GroupFadeTimeRadio_CheckedChanged;
         //
         // fadeInGroupOneSecondRadio
         //
@@ -682,7 +710,7 @@ partial class Form1
         fadeInGroupOneSecondRadio.TabIndex = 1;
         fadeInGroupOneSecondRadio.Tag = 1D;
         fadeInGroupOneSecondRadio.Text = "1.0 Sec.";
-        fadeInGroupOneSecondRadio.CheckedChanged += FadeInGroupTimeRadio_CheckedChanged;
+        fadeInGroupOneSecondRadio.CheckedChanged += GroupFadeTimeRadio_CheckedChanged;
         //
         // fadeInGroupThreeSecondsRadio
         //
@@ -694,7 +722,7 @@ partial class Form1
         fadeInGroupThreeSecondsRadio.TabIndex = 2;
         fadeInGroupThreeSecondsRadio.Tag = 3D;
         fadeInGroupThreeSecondsRadio.Text = "3.0 Sec.";
-        fadeInGroupThreeSecondsRadio.CheckedChanged += FadeInGroupTimeRadio_CheckedChanged;
+        fadeInGroupThreeSecondsRadio.CheckedChanged += GroupFadeTimeRadio_CheckedChanged;
         //
         // fadeInGroupSixSecondsRadio
         //
@@ -706,7 +734,7 @@ partial class Form1
         fadeInGroupSixSecondsRadio.TabIndex = 3;
         fadeInGroupSixSecondsRadio.Tag = 6D;
         fadeInGroupSixSecondsRadio.Text = "6.0 Sec.";
-        fadeInGroupSixSecondsRadio.CheckedChanged += FadeInGroupTimeRadio_CheckedChanged;
+        fadeInGroupSixSecondsRadio.CheckedChanged += GroupFadeTimeRadio_CheckedChanged;
         //
         // fadeInGroupNineSecondsRadio
         //
@@ -718,7 +746,96 @@ partial class Form1
         fadeInGroupNineSecondsRadio.TabIndex = 4;
         fadeInGroupNineSecondsRadio.Tag = 9D;
         fadeInGroupNineSecondsRadio.Text = "9.0 Sec.";
-        fadeInGroupNineSecondsRadio.CheckedChanged += FadeInGroupTimeRadio_CheckedChanged;
+        fadeInGroupNineSecondsRadio.CheckedChanged += GroupFadeTimeRadio_CheckedChanged;
+        //
+        // changeOccursAtHeaderLabel
+        //
+        changeOccursAtHeaderLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
+        changeOccursAtHeaderLabel.Dock = DockStyle.Top;
+        changeOccursAtHeaderLabel.Margin = new Padding(0);
+        changeOccursAtHeaderLabel.Name = "changeOccursAtHeaderLabel";
+        changeOccursAtHeaderLabel.Padding = new Padding(10, 0, 4, 0);
+        changeOccursAtHeaderLabel.Size = new Size(100, 26);
+        changeOccursAtHeaderLabel.TabIndex = 2;
+        changeOccursAtHeaderLabel.Text = "Chg Occ At";
+        changeOccursAtHeaderLabel.TextAlign = ContentAlignment.MiddleLeft;
+        //
+        // changeOccursAtChoicesPanel
+        //
+        changeOccursAtChoicesPanel.Dock = DockStyle.Top;
+        changeOccursAtChoicesPanel.FlowDirection = FlowDirection.TopDown;
+        changeOccursAtChoicesPanel.Margin = new Padding(0);
+        changeOccursAtChoicesPanel.Name = "changeOccursAtChoicesPanel";
+        changeOccursAtChoicesPanel.Padding = new Padding(9, 0, 4, 4);
+        changeOccursAtChoicesPanel.Size = new Size(100, 164);
+        changeOccursAtChoicesPanel.TabIndex = 3;
+        changeOccursAtChoicesPanel.WrapContents = false;
+        changeOccursAtChoicesPanel.Controls.Add(changeOccursImmediateRadio);
+        changeOccursAtChoicesPanel.Controls.Add(changeOccursNextBarRadio);
+        changeOccursAtChoicesPanel.Controls.Add(changeOccursNextBeatRadio);
+        changeOccursAtChoicesPanel.Controls.Add(changeOccursNextCueRadio);
+        changeOccursAtChoicesPanel.Controls.Add(changeOccursExitCueRadio);
+        //
+        // changeOccursImmediateRadio
+        //
+        changeOccursImmediateRadio.AutoSize = false;
+        changeOccursImmediateRadio.Height = 30;
+        changeOccursImmediateRadio.Checked = true;
+        changeOccursImmediateRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        changeOccursImmediateRadio.Margin = new Padding(3, 1, 3, 1);
+        changeOccursImmediateRadio.Name = "changeOccursImmediateRadio";
+        changeOccursImmediateRadio.TabIndex = 0;
+        changeOccursImmediateRadio.Tag = PlaylistExitSourceMode.Immediate;
+        changeOccursImmediateRadio.Text = "Immediate";
+        changeOccursImmediateRadio.CheckedChanged += ChangeOccursAtRadio_CheckedChanged;
+        //
+        // changeOccursNextBarRadio
+        //
+        changeOccursNextBarRadio.AutoSize = false;
+        changeOccursNextBarRadio.Height = 30;
+        changeOccursNextBarRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        changeOccursNextBarRadio.Margin = new Padding(3, 1, 3, 1);
+        changeOccursNextBarRadio.Name = "changeOccursNextBarRadio";
+        changeOccursNextBarRadio.TabIndex = 1;
+        changeOccursNextBarRadio.Tag = PlaylistExitSourceMode.NextBar;
+        changeOccursNextBarRadio.Text = "Next Bar";
+        changeOccursNextBarRadio.CheckedChanged += ChangeOccursAtRadio_CheckedChanged;
+        //
+        // changeOccursNextBeatRadio
+        //
+        changeOccursNextBeatRadio.AutoSize = false;
+        changeOccursNextBeatRadio.Height = 30;
+        changeOccursNextBeatRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        changeOccursNextBeatRadio.Margin = new Padding(3, 1, 3, 1);
+        changeOccursNextBeatRadio.Name = "changeOccursNextBeatRadio";
+        changeOccursNextBeatRadio.TabIndex = 2;
+        changeOccursNextBeatRadio.Tag = PlaylistExitSourceMode.NextBeat;
+        changeOccursNextBeatRadio.Text = "Next Beat";
+        changeOccursNextBeatRadio.CheckedChanged += ChangeOccursAtRadio_CheckedChanged;
+        //
+        // changeOccursNextCueRadio
+        //
+        changeOccursNextCueRadio.AutoSize = false;
+        changeOccursNextCueRadio.Height = 30;
+        changeOccursNextCueRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        changeOccursNextCueRadio.Margin = new Padding(3, 1, 3, 1);
+        changeOccursNextCueRadio.Name = "changeOccursNextCueRadio";
+        changeOccursNextCueRadio.TabIndex = 3;
+        changeOccursNextCueRadio.Tag = PlaylistExitSourceMode.NextCue;
+        changeOccursNextCueRadio.Text = "Next Cue";
+        changeOccursNextCueRadio.CheckedChanged += ChangeOccursAtRadio_CheckedChanged;
+        //
+        // changeOccursExitCueRadio
+        //
+        changeOccursExitCueRadio.AutoSize = false;
+        changeOccursExitCueRadio.Height = 30;
+        changeOccursExitCueRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        changeOccursExitCueRadio.Margin = new Padding(3, 1, 3, 1);
+        changeOccursExitCueRadio.Name = "changeOccursExitCueRadio";
+        changeOccursExitCueRadio.TabIndex = 4;
+        changeOccursExitCueRadio.Tag = PlaylistExitSourceMode.ExitCue;
+        changeOccursExitCueRadio.Text = "Exit Cue";
+        changeOccursExitCueRadio.CheckedChanged += ChangeOccursAtRadio_CheckedChanged;
         //
         // fadeOutSectionPanel
         //
@@ -726,8 +843,9 @@ partial class Form1
         fadeOutSectionPanel.Name = "fadeOutSectionPanel";
         fadeOutSectionPanel.Size = new Size(100, 380);
         fadeOutSectionPanel.TabIndex = 1;
-        fadeOutSectionPanel.Controls.Add(fadeOutGroupChoicesPanel);
-        fadeOutSectionPanel.Controls.Add(fadeOutGroupDividerLabel);
+        // Dock Top: 下から Group → Fade Out 選択肢 → Fade Out 見出し
+        fadeOutSectionPanel.Controls.Add(fadeInGroupChoicesPanel);
+        fadeOutSectionPanel.Controls.Add(fadeInGroupDividerLabel);
         fadeOutSectionPanel.Controls.Add(transitionTimeChoicesPanel);
         fadeOutSectionPanel.Controls.Add(fadeOutHeaderPanel);
         //
@@ -842,101 +960,15 @@ partial class Form1
         transitionTimeNineSecondsRadio.Text = "9.0 Sec.";
         transitionTimeNineSecondsRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
         //
-        // fadeOutGroupDividerLabel
-        //
-        fadeOutGroupDividerLabel.Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold);
-        fadeOutGroupDividerLabel.Dock = DockStyle.Top;
-        fadeOutGroupDividerLabel.Margin = new Padding(0);
-        fadeOutGroupDividerLabel.Name = "fadeOutGroupDividerLabel";
-        fadeOutGroupDividerLabel.Padding = new Padding(10, 0, 4, 0);
-        fadeOutGroupDividerLabel.Size = new Size(100, 26);
-        fadeOutGroupDividerLabel.TabIndex = 2;
-        fadeOutGroupDividerLabel.Text = "Group";
-        fadeOutGroupDividerLabel.TextAlign = ContentAlignment.MiddleLeft;
-        //
-        // fadeOutGroupChoicesPanel
-        //
-        fadeOutGroupChoicesPanel.Dock = DockStyle.Top;
-        fadeOutGroupChoicesPanel.FlowDirection = FlowDirection.TopDown;
-        fadeOutGroupChoicesPanel.Margin = new Padding(0);
-        fadeOutGroupChoicesPanel.Name = "fadeOutGroupChoicesPanel";
-        fadeOutGroupChoicesPanel.Padding = new Padding(9, 0, 4, 4);
-        fadeOutGroupChoicesPanel.Size = new Size(100, 164);
-        fadeOutGroupChoicesPanel.TabIndex = 3;
-        fadeOutGroupChoicesPanel.WrapContents = false;
-        fadeOutGroupChoicesPanel.Controls.Add(fadeOutGroupNoneRadio);
-        fadeOutGroupChoicesPanel.Controls.Add(fadeOutGroupOneSecondRadio);
-        fadeOutGroupChoicesPanel.Controls.Add(fadeOutGroupThreeSecondsRadio);
-        fadeOutGroupChoicesPanel.Controls.Add(fadeOutGroupSixSecondsRadio);
-        fadeOutGroupChoicesPanel.Controls.Add(fadeOutGroupNineSecondsRadio);
-        //
-        // fadeOutGroupNoneRadio
-        //
-        fadeOutGroupNoneRadio.AutoSize = false;
-        fadeOutGroupNoneRadio.Height = 30;
-        fadeOutGroupNoneRadio.Checked = true;
-        fadeOutGroupNoneRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        fadeOutGroupNoneRadio.Margin = new Padding(3, 1, 3, 1);
-        fadeOutGroupNoneRadio.Name = "fadeOutGroupNoneRadio";
-        fadeOutGroupNoneRadio.TabIndex = 0;
-        fadeOutGroupNoneRadio.Tag = 0D;
-        fadeOutGroupNoneRadio.Text = "None";
-        fadeOutGroupNoneRadio.CheckedChanged += FadeOutGroupTimeRadio_CheckedChanged;
-        //
-        // fadeOutGroupOneSecondRadio
-        //
-        fadeOutGroupOneSecondRadio.AutoSize = false;
-        fadeOutGroupOneSecondRadio.Height = 30;
-        fadeOutGroupOneSecondRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        fadeOutGroupOneSecondRadio.Margin = new Padding(3, 1, 3, 1);
-        fadeOutGroupOneSecondRadio.Name = "fadeOutGroupOneSecondRadio";
-        fadeOutGroupOneSecondRadio.TabIndex = 1;
-        fadeOutGroupOneSecondRadio.Tag = 1D;
-        fadeOutGroupOneSecondRadio.Text = "1.0 Sec.";
-        fadeOutGroupOneSecondRadio.CheckedChanged += FadeOutGroupTimeRadio_CheckedChanged;
-        //
-        // fadeOutGroupThreeSecondsRadio
-        //
-        fadeOutGroupThreeSecondsRadio.AutoSize = false;
-        fadeOutGroupThreeSecondsRadio.Height = 30;
-        fadeOutGroupThreeSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        fadeOutGroupThreeSecondsRadio.Margin = new Padding(3, 1, 3, 1);
-        fadeOutGroupThreeSecondsRadio.Name = "fadeOutGroupThreeSecondsRadio";
-        fadeOutGroupThreeSecondsRadio.TabIndex = 2;
-        fadeOutGroupThreeSecondsRadio.Tag = 3D;
-        fadeOutGroupThreeSecondsRadio.Text = "3.0 Sec.";
-        fadeOutGroupThreeSecondsRadio.CheckedChanged += FadeOutGroupTimeRadio_CheckedChanged;
-        //
-        // fadeOutGroupSixSecondsRadio
-        //
-        fadeOutGroupSixSecondsRadio.AutoSize = false;
-        fadeOutGroupSixSecondsRadio.Height = 30;
-        fadeOutGroupSixSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        fadeOutGroupSixSecondsRadio.Margin = new Padding(3, 1, 3, 1);
-        fadeOutGroupSixSecondsRadio.Name = "fadeOutGroupSixSecondsRadio";
-        fadeOutGroupSixSecondsRadio.TabIndex = 3;
-        fadeOutGroupSixSecondsRadio.Tag = 6D;
-        fadeOutGroupSixSecondsRadio.Text = "6.0 Sec.";
-        fadeOutGroupSixSecondsRadio.CheckedChanged += FadeOutGroupTimeRadio_CheckedChanged;
-        //
-        // fadeOutGroupNineSecondsRadio
-        //
-        fadeOutGroupNineSecondsRadio.AutoSize = false;
-        fadeOutGroupNineSecondsRadio.Height = 30;
-        fadeOutGroupNineSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        fadeOutGroupNineSecondsRadio.Margin = new Padding(3, 1, 3, 1);
-        fadeOutGroupNineSecondsRadio.Name = "fadeOutGroupNineSecondsRadio";
-        fadeOutGroupNineSecondsRadio.TabIndex = 4;
-        fadeOutGroupNineSecondsRadio.Tag = 9D;
-        fadeOutGroupNineSecondsRadio.Text = "9.0 Sec.";
-        fadeOutGroupNineSecondsRadio.CheckedChanged += FadeOutGroupTimeRadio_CheckedChanged;
-        //
         // exitSourceAtSectionPanel
         //
         exitSourceAtSectionPanel.Margin = new Padding(0);
         exitSourceAtSectionPanel.Name = "exitSourceAtSectionPanel";
-        exitSourceAtSectionPanel.Size = new Size(100, 190);
+        exitSourceAtSectionPanel.Size = new Size(100, 380);
         exitSourceAtSectionPanel.TabIndex = 2;
+        // Dock Top: 下から Chg Occ At → Exit Source 選択肢 → Exit Source 見出し
+        exitSourceAtSectionPanel.Controls.Add(changeOccursAtChoicesPanel);
+        exitSourceAtSectionPanel.Controls.Add(changeOccursAtHeaderLabel);
         exitSourceAtSectionPanel.Controls.Add(exitSourceAtChoicesPanel);
         exitSourceAtSectionPanel.Controls.Add(exitSourceAtHeaderLabel);
         //
@@ -954,7 +986,7 @@ partial class Form1
         //
         // exitSourceAtChoicesPanel
         //
-        exitSourceAtChoicesPanel.Dock = DockStyle.Fill;
+        exitSourceAtChoicesPanel.Dock = DockStyle.Top;
         exitSourceAtChoicesPanel.FlowDirection = FlowDirection.TopDown;
         exitSourceAtChoicesPanel.Margin = new Padding(0);
         exitSourceAtChoicesPanel.Name = "exitSourceAtChoicesPanel";
@@ -1069,7 +1101,7 @@ partial class Form1
         playlistScrollPanel.AllowDrop = true;
         playlistScrollPanel.Dock = DockStyle.Fill;
         playlistScrollPanel.Name = "playlistScrollPanel";
-        // Fade In / Fade Out 間（Margin 0）と同じく、直前列と隙間なく接する。
+        // Fade In / Fade Out ÔiMargin 0jÆ¯¶­A¼OñÆÔÈ­Ú·éB
         playlistScrollPanel.Padding = new Padding(0, 0, 8, 8);
         playlistScrollPanel.TabIndex = 1;
         playlistScrollPanel.Controls.Add(playlistListLayout);
@@ -1093,7 +1125,7 @@ partial class Form1
         playlistListLayout.DragEnter += EditorTextBox_DragEnter;
         playlistListLayout.DragDrop += EditorTextBox_DragDrop;
         //
-        // actionBar（下部）。クリア／リロード／EXPORT など。
+        // actionBariºjBNA^[h^EXPORT ÈÇB
         //
         actionBar.Dock = DockStyle.Bottom;
         actionBar.Height = 44;
@@ -1116,8 +1148,8 @@ partial class Form1
         //
         // copyrightLinkLabel
         //
-        // ロゴ（bottom=38）と権利表記2行のボトムラインを揃える。
-        // 幅は LayoutActionBarCopyright で右側コントロールと重ならないよう調整する。
+        // Sibottom=38jÆ \L2sÌ{gCðµ¦éB
+        // Í LayoutActionBarCopyright ÅE¤Rg[ÆdÈçÈ¢æ¤²®·éB
         copyrightLinkLabel.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
         copyrightLinkLabel.AutoEllipsis = true;
         copyrightLinkLabel.BackColor = Color.Transparent;
@@ -1129,10 +1161,10 @@ partial class Form1
         copyrightLinkLabel.TabIndex = 0;
         copyrightLinkLabel.TabStop = false;
         copyrightLinkLabel.Text =
-            "© 2026 MIYABI GAME AUDIO INC.  GitHub"
-            + "\nWwise® and Audiokinetic® are trademarks of Audiokinetic Inc.";
+            "c 2026 MIYABI GAME AUDIO INC.  GitHub"
+            + "\nWwiseR and AudiokineticR are trademarks of Audiokinetic Inc.";
         copyrightLinkLabel.TextAlign = ContentAlignment.BottomLeft;
-        // "GitHub" は1行目の31文字目から（商標行の追加で変わらない）。
+        // "GitHub" Í1sÚÌ31¶Ú©çi¤WsÌÇÁÅÏíçÈ¢jB
         copyrightLinkLabel.LinkArea = new LinkArea(31, 6);
         copyrightLinkLabel.LinkClicked += CopyrightLinkLabel_LinkClicked;
         //
@@ -1169,8 +1201,8 @@ partial class Form1
         compactFileNumbersCheckBox.AutoSize = false;
         compactFileNumbersCheckBox.Checked = false;
         compactFileNumbersCheckBox.CheckState = CheckState.Checked;
-        // Music Playlist 一覧（スクロール領域）の外、パネル下端の固定エリアに配置。
-        // 左 Padding は AlignCompactFileNumbersCheckBox がグループ枠と揃うよう再計算する。
+        // Music Playlist êiXN[ÌæjÌOAplº[ÌÅèGAÉzuB
+        // ¶ Padding Í AlignCompactFileNumbersCheckBox ªO[vgÆµ¤æ¤ÄvZ·éB
         compactFileNumbersCheckBox.Dock = DockStyle.Bottom;
         compactFileNumbersCheckBox.Font = new Font("Yu Gothic UI", 9F);
         compactFileNumbersCheckBox.Height = 28;
@@ -1185,7 +1217,7 @@ partial class Form1
         //
         topMostCheckBox.AutoSize = true;
         topMostCheckBox.Font = new Font("Yu Gothic UI", 9F);
-        // projectActionPanel 内の 24px ボタンと文字ベースラインを揃えるための上マージン。
+        // projectActionPanel àÌ 24px {^Æ¶x[XCðµ¦é½ßÌã}[WB
         topMostCheckBox.Margin = new Padding(0, 3, 8, 0);
         topMostCheckBox.Name = "topMostCheckBox";
         topMostCheckBox.TabIndex = 4;
@@ -1236,7 +1268,7 @@ partial class Form1
         AutoScaleMode = AutoScaleMode.Font;
         BackColor = UiColors.WindowBack;
         ClientSize = new Size(960, 640);
-        // Dock: Fill / Bottom / Top。後から Add した Top ほど上端に寄る。
+        // Dock: Fill / Bottom / TopBã©ç Add µ½ Top ÙÇã[ÉñéB
         Controls.Add(logAreaPanel);
         Controls.Add(actionBar);
         Controls.Add(waapiStatusBar);
@@ -1263,15 +1295,16 @@ partial class Form1
         exitSourceAtChoicesPanel.ResumeLayout(false);
         exitSourceAtChoicesPanel.PerformLayout();
         exitSourceAtSectionPanel.ResumeLayout(false);
-        fadeOutGroupChoicesPanel.ResumeLayout(false);
-        fadeOutGroupChoicesPanel.PerformLayout();
         transitionTimeChoicesPanel.ResumeLayout(false);
         transitionTimeChoicesPanel.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)fadeOutCurveIcon).EndInit();
         fadeOutHeaderPanel.ResumeLayout(false);
         fadeOutSectionPanel.ResumeLayout(false);
+        changeOccursAtChoicesPanel.ResumeLayout(false);
+        changeOccursAtChoicesPanel.PerformLayout();
         fadeInGroupChoicesPanel.ResumeLayout(false);
         fadeInGroupChoicesPanel.PerformLayout();
+        optionsChoicesPanel.ResumeLayout(false);
         fadeInChoicesPanel.ResumeLayout(false);
         fadeInChoicesPanel.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)fadeInCurveIcon).EndInit();

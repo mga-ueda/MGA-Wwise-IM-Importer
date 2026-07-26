@@ -158,17 +158,23 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>パート番号 → Fade Out カーブ。</summary>
     private readonly Dictionary<int, RegionFadeCurveKind> _playlistFadeOutCurveByPart = new();
 
-    /// <summary>パート番号 → 同一グループ内遷移用 Fade In 秒数。</summary>
-    private readonly Dictionary<int, double> _playlistGroupFadeInSecondsByPart = new();
+    /// <summary>パート番号 → 同一グループ内遷移用 Group Fade 秒数（In／Out 共通）。</summary>
+    private readonly Dictionary<int, double> _playlistGroupFadeSecondsByPart = new();
 
-    /// <summary>パート番号 → 同一グループ内遷移用 Fade Out 秒数。</summary>
-    private readonly Dictionary<int, double> _playlistGroupFadeOutSecondsByPart = new();
+    /// <summary>プロジェクト既定の Group Fade（パート未設定時。In／Out 共通）。</summary>
+    private double _playlistGroupFadeSeconds;
 
-    /// <summary>プロジェクト既定のグループ内 Fade In（パート未設定時）。</summary>
-    private double _playlistGroupFadeInSeconds;
+    /// <summary>パート番号 → Change Occurs At（グループ内レイヤー切替タイミング。パート単位）。</summary>
+    private readonly Dictionary<int, PlaylistExitSourceMode> _playlistChangeOccursAtByPart = new();
 
-    /// <summary>プロジェクト既定のグループ内 Fade Out（パート未設定時）。</summary>
-    private double _playlistGroupFadeOutSeconds;
+    /// <summary>プロジェクト既定の Change Occurs At（パート未設定時）。</summary>
+    private PlaylistExitSourceMode _playlistChangeOccursAtMode = PlaylistExitSourceMode.Immediate;
+
+    /// <summary>Alt 上乗せ／停止を Change Occurs At 境界まで遅延する予約。</summary>
+    private int? _pendingOverlayPartNumber;
+    private bool _pendingOverlayFadeOut;
+    private long _pendingOverlayAtSample;
+
     /// <summary>トランジション設定ラジオの編集対象パート（直近クリックした Playlist）。</summary>
     private int? _transitionSettingsEditPartNumber;
     private ContextMenuStrip? _playlistFadeCurveMenu;
@@ -371,6 +377,7 @@ public partial class Form1 : Form, IMessageFilter
         ApplyPlaylistSelectorColors();
         waapiStatusBar.ApplyColors();
         waapiStatusBar.KeepTargetChanged += WaapiStatusBar_KeepTargetChanged;
+        waapiStatusBar.AutoActiveChanged += WaapiStatusBar_AutoActiveChanged;
         waapiStatusBar.ProjectNameClick += async (_, _) => await OpenOrFocusKeptWwiseProjectAsync();
         KeyPreview = true;
         _developerSettings = DeveloperSettings.Load();
@@ -483,7 +490,27 @@ public partial class Form1 : Form, IMessageFilter
         editorTextBox.HandleCreated += (_, _) => ApplyDarkEditorChrome();
         playlistScrollPanel.HandleCreated += (_, _) => ApplyDarkScrollChrome(playlistScrollPanel);
         transportBar.HandleCreated += (_, _) => ApplyDarkScrollChrome(transportBar);
-        Resize += (_, _) => SyncBusyGlassOverlayBounds();
+        Resize += (_, _) =>
+        {
+            SyncBusyGlassOverlayBounds();
+            RestoreTopMostAfterMinimizeIfNeeded();
+        };
+    }
+
+    /// <summary>
+    /// Auto Active で最小化時に外した TopMost を、タスクバーから復帰したときに戻す。
+    /// </summary>
+    private void RestoreTopMostAfterMinimizeIfNeeded()
+    {
+        if (IsDisposed
+            || WindowState == FormWindowState.Minimized
+            || !topMostCheckBox.Checked
+            || TopMost)
+        {
+            return;
+        }
+
+        TopMost = true;
     }
 
     /// <summary>すりガラス表示中にリサイズへカバー範囲を合わせる（移動は子コントロールのため自動）。</summary>
@@ -2512,8 +2539,7 @@ public partial class Form1 : Form, IMessageFilter
                 profile.FadeOutCurve,
                 _appSettings.DefaultPlaylistFadeOutCurve);
             _playlistExitSourceMode = profile.ExitSourceAt;
-            _playlistGroupFadeInSeconds = 0d;
-            _playlistGroupFadeOutSeconds = 0d;
+            _playlistGroupFadeSeconds = 0d;
             // パート別記憶を捨て、プロジェクト既定をラジオへ出す。
             ClearPlaylistTransitionSettingsState();
 
@@ -2524,6 +2550,9 @@ public partial class Form1 : Form, IMessageFilter
             keepLastSessionCheckBox.CheckedChanged -= KeepLastSessionCheckBox_CheckedChanged;
             keepLastSessionCheckBox.Checked = profile.KeepLastSession;
             keepLastSessionCheckBox.CheckedChanged += KeepLastSessionCheckBox_CheckedChanged;
+
+            waapiStatusBar.AutoActiveChecked = profile.AutoActive;
+
             _lastWavePath = profile.LastWavePath?.Trim() ?? string.Empty;
             _lastWavePaths = ResolveStoredLastWavePaths(profile.LastWavePath, profile.LastWavePaths);
 
@@ -2609,6 +2638,24 @@ public partial class Form1 : Form, IMessageFilter
         match.CheckedChanged += ExitSourceAtRadio_CheckedChanged;
     }
 
+    private void SelectChangeOccursAtRadio(PlaylistExitSourceMode mode)
+    {
+        FlatOptionRadioButton? match = null;
+        foreach (var radio in EnumerateChangeOccursAtRadios())
+        {
+            if (radio.Tag is PlaylistExitSourceMode tag && tag == mode)
+            {
+                match = radio;
+                break;
+            }
+        }
+
+        match ??= changeOccursImmediateRadio;
+        match.CheckedChanged -= ChangeOccursAtRadio_CheckedChanged;
+        match.Checked = true;
+        match.CheckedChanged += ChangeOccursAtRadio_CheckedChanged;
+    }
+
     private IEnumerable<FlatOptionRadioButton> EnumerateExitSourceRadios()
     {
         yield return exitSourceImmediateRadio;
@@ -2628,6 +2675,21 @@ public partial class Form1 : Form, IMessageFilter
         else
         {
             mode = _playlistExitSourceMode;
+        }
+
+        return NormalizeExitSourceModeForCurrentWave(mode);
+    }
+
+    private PlaylistExitSourceMode ResolveChangeOccursAtMode(int partNumber)
+    {
+        PlaylistExitSourceMode mode;
+        if (_playlistChangeOccursAtByPart.TryGetValue(partNumber, out var stored))
+        {
+            mode = stored;
+        }
+        else
+        {
+            mode = _playlistChangeOccursAtMode;
         }
 
         return NormalizeExitSourceModeForCurrentWave(mode);
@@ -2654,12 +2716,8 @@ public partial class Form1 : Form, IMessageFilter
         exitSourceNextBarRadio.Enabled = !waveOnly;
         exitSourceNextBeatRadio.Enabled = !waveOnly;
 
-        if (!waveOnly)
-        {
-            return;
-        }
-
-        if (exitSourceNextBarRadio.Checked || exitSourceNextBeatRadio.Checked)
+        if (waveOnly
+            && (exitSourceNextBarRadio.Checked || exitSourceNextBeatRadio.Checked))
         {
             SelectExitSourceRadio(PlaylistExitSourceMode.Immediate);
             if (_transitionSettingsEditPartNumber is int partNumber)
@@ -2671,6 +2729,25 @@ public partial class Form1 : Form, IMessageFilter
                 _playlistExitSourceMode = PlaylistExitSourceMode.Immediate;
             }
         }
+
+        // Change Occurs At の wave-only 制約は Group 有効状態と合わせて更新する。
+        UpdateGroupFadeRadioEnabled();
+    }
+
+    private void ApplyWaveOnlyToChangeOccursAtRadios(bool waveOnly)
+    {
+        // Group 無効でラジオ自体が Disabled のときは触らない。
+        if (!changeOccursImmediateRadio.Enabled
+            && !changeOccursNextBarRadio.Enabled
+            && !changeOccursNextBeatRadio.Enabled)
+        {
+            return;
+        }
+
+        changeOccursNextBarRadio.Enabled = !waveOnly && changeOccursImmediateRadio.Enabled;
+        changeOccursNextBeatRadio.Enabled = !waveOnly && changeOccursImmediateRadio.Enabled;
+        RefreshFlatOptionControl(changeOccursNextBarRadio);
+        RefreshFlatOptionControl(changeOccursNextBeatRadio);
     }
 
     private double ResolveFadeInSeconds(int partNumber)
@@ -2713,24 +2790,14 @@ public partial class Form1 : Form, IMessageFilter
         return _playlistFadeOutCurve;
     }
 
-    private double ResolveGroupFadeInSeconds(int partNumber)
+    private double ResolveGroupFadeSeconds(int partNumber)
     {
-        if (_playlistGroupFadeInSecondsByPart.TryGetValue(partNumber, out var seconds))
+        if (_playlistGroupFadeSecondsByPart.TryGetValue(partNumber, out var seconds))
         {
             return seconds;
         }
 
-        return _playlistGroupFadeInSeconds;
-    }
-
-    private double ResolveGroupFadeOutSeconds(int partNumber)
-    {
-        if (_playlistGroupFadeOutSecondsByPart.TryGetValue(partNumber, out var seconds))
-        {
-            return seconds;
-        }
-
-        return _playlistGroupFadeOutSeconds;
+        return _playlistGroupFadeSeconds;
     }
 
     /// <summary>
@@ -2744,9 +2811,8 @@ public partial class Form1 : Form, IMessageFilter
     {
         if (destinationSyncMode == PlaylistDestinationSyncMode.SameTime)
         {
-            return (
-                ResolveGroupFadeInSeconds(targetPartNumber),
-                ResolveGroupFadeOutSeconds(targetPartNumber));
+            var groupFade = ResolveGroupFadeSeconds(targetPartNumber);
+            return (groupFade, groupFade);
         }
 
         return (
@@ -2755,8 +2821,9 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// Exit Source / Fade In・Out / Group Fade の適用範囲。
+    /// Exit Source / Fade In・Out の適用範囲。
     /// 同一グループ ID のメンバーだけ共通。未グループ／別 ID は各パート独立。
+    /// Group Fade は常にパート単位（このスコープの対象外）。
     /// </summary>
     private IEnumerable<int> EnumerateTransitionSettingsScope(int partNumber)
     {
@@ -2929,8 +2996,8 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// Fade In/Out 列だけ Exit Source At より 1 文字分狭くする。
-    /// 帯は列いっぱい（右インセット無し）なので、帯と帯の隙間は他見出しと同じ。
+    /// Fade In／Fade Out 列は Exit Source At より 1 文字分狭くし、同じ幅にする。
+    /// Options（Fade In 下）・Group（Fade Out 下）も同幅。Chg Occ At は Exit Source At 列内。
     /// 減った幅は <see cref="UpdatePlaylistSelectorWidth"/> 経由で Music Playlist 側が吸収する。
     /// </summary>
     private void ApplyFadeInOutSectionNarrowWidth()
@@ -3003,20 +3070,17 @@ public partial class Form1 : Form, IMessageFilter
         playlistToolTip.SetToolTip(fadeOutCurveIcon, UiStrings.LabelRegionFadeCurve(fadeOut));
     }
 
-    private void StoreGroupFadeInSeconds(int partNumber, double seconds)
+    private void StoreGroupFadeSeconds(int partNumber, double seconds)
     {
-        foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
-        {
-            _playlistGroupFadeInSecondsByPart[scoped] = seconds;
-        }
+        // Group Fade はグループ内でもパート単位で独立させる。
+        _playlistGroupFadeSecondsByPart[partNumber] = seconds;
     }
 
-    private void StoreGroupFadeOutSeconds(int partNumber, double seconds)
+    private void StoreChangeOccursAtMode(int partNumber, PlaylistExitSourceMode mode)
     {
-        foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
-        {
-            _playlistGroupFadeOutSecondsByPart[scoped] = seconds;
-        }
+        // Change Occurs At も Group Fade と同様、パート単位で独立させる。
+        mode = NormalizeExitSourceModeForCurrentWave(mode);
+        _playlistChangeOccursAtByPart[partNumber] = mode;
     }
 
     private void ShowTransitionSettingsForPart(int partNumber)
@@ -3038,13 +3102,10 @@ public partial class Form1 : Form, IMessageFilter
             TransitionTimeRadio_CheckedChanged);
         SelectFadeRadio(
             fadeInGroupChoicesPanel,
-            ResolveGroupFadeInSeconds(partNumber),
-            FadeInGroupTimeRadio_CheckedChanged);
-        SelectFadeRadio(
-            fadeOutGroupChoicesPanel,
-            ResolveGroupFadeOutSeconds(partNumber),
-            FadeOutGroupTimeRadio_CheckedChanged);
+            ResolveGroupFadeSeconds(partNumber),
+            GroupFadeTimeRadio_CheckedChanged);
         SelectExitSourceRadio(ResolveExitSourceMode(partNumber));
+        SelectChangeOccursAtRadio(ResolveChangeOccursAtMode(partNumber));
         UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
     }
@@ -3056,27 +3117,25 @@ public partial class Form1 : Form, IMessageFilter
         _playlistFadeOutSecondsByPart.Clear();
         _playlistFadeInCurveByPart.Clear();
         _playlistFadeOutCurveByPart.Clear();
-        _playlistGroupFadeInSecondsByPart.Clear();
-        _playlistGroupFadeOutSecondsByPart.Clear();
+        _playlistGroupFadeSecondsByPart.Clear();
+        _playlistChangeOccursAtByPart.Clear();
         _transitionSettingsEditPartNumber = null;
         SelectFadeRadio(fadeInChoicesPanel, _playlistFadeInSeconds, FadeInTimeRadio_CheckedChanged);
         SelectFadeRadio(transitionTimeChoicesPanel, _playlistFadeSeconds, TransitionTimeRadio_CheckedChanged);
         SelectFadeRadio(
             fadeInGroupChoicesPanel,
-            _playlistGroupFadeInSeconds,
-            FadeInGroupTimeRadio_CheckedChanged);
-        SelectFadeRadio(
-            fadeOutGroupChoicesPanel,
-            _playlistGroupFadeOutSeconds,
-            FadeOutGroupTimeRadio_CheckedChanged);
+            _playlistGroupFadeSeconds,
+            GroupFadeTimeRadio_CheckedChanged);
         SelectExitSourceRadio(_playlistExitSourceMode);
+        SelectChangeOccursAtRadio(_playlistChangeOccursAtMode);
         UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
         UpdateGroupFadeRadioEnabled();
     }
 
     /// <summary>
-    /// Group Fade はグループ Playlist の再生中のみ有効。それ以外は操作できない。
+    /// Group Fade / Change Occurs At はグループ Playlist の再生中のみ有効。
+    /// Wave 単体時は Next Bar / Next Beat をさらに無効化する。
     /// </summary>
     private void UpdateGroupFadeRadioEnabled()
     {
@@ -3089,6 +3148,7 @@ public partial class Form1 : Form, IMessageFilter
         var enabled = playingParts.Any(part =>
             _playlistPartGroupIds.ContainsKey(part)
             && !_disabledPlaylistPartNumbers.Contains(part));
+        var waveOnly = _previewSession?.AllowsSessionMarkerEdit == true;
 
         foreach (var radio in EnumerateGroupFadeRadios())
         {
@@ -3100,6 +3160,41 @@ public partial class Form1 : Form, IMessageFilter
             radio.Enabled = enabled;
             RefreshFlatOptionControl(radio);
         }
+
+        foreach (var radio in EnumerateChangeOccursAtRadios())
+        {
+            var radioEnabled = enabled;
+            if (radioEnabled
+                && waveOnly
+                && radio.Tag is PlaylistExitSourceMode mode
+                && mode is PlaylistExitSourceMode.NextBar or PlaylistExitSourceMode.NextBeat)
+            {
+                radioEnabled = false;
+            }
+
+            if (radio.Enabled == radioEnabled)
+            {
+                continue;
+            }
+
+            radio.Enabled = radioEnabled;
+            RefreshFlatOptionControl(radio);
+        }
+
+        if (enabled
+            && waveOnly
+            && (changeOccursNextBarRadio.Checked || changeOccursNextBeatRadio.Checked))
+        {
+            SelectChangeOccursAtRadio(PlaylistExitSourceMode.Immediate);
+            if (_transitionSettingsEditPartNumber is int partNumber)
+            {
+                StoreChangeOccursAtMode(partNumber, PlaylistExitSourceMode.Immediate);
+            }
+            else
+            {
+                _playlistChangeOccursAtMode = PlaylistExitSourceMode.Immediate;
+            }
+        }
     }
 
     private IEnumerable<FlatOptionRadioButton> EnumerateGroupFadeRadios()
@@ -3109,11 +3204,15 @@ public partial class Form1 : Form, IMessageFilter
         yield return fadeInGroupThreeSecondsRadio;
         yield return fadeInGroupSixSecondsRadio;
         yield return fadeInGroupNineSecondsRadio;
-        yield return fadeOutGroupNoneRadio;
-        yield return fadeOutGroupOneSecondRadio;
-        yield return fadeOutGroupThreeSecondsRadio;
-        yield return fadeOutGroupSixSecondsRadio;
-        yield return fadeOutGroupNineSecondsRadio;
+    }
+
+    private IEnumerable<FlatOptionRadioButton> EnumerateChangeOccursAtRadios()
+    {
+        yield return changeOccursImmediateRadio;
+        yield return changeOccursNextBarRadio;
+        yield return changeOccursNextBeatRadio;
+        yield return changeOccursNextCueRadio;
+        yield return changeOccursExitCueRadio;
     }
 
     private ProjectProfile CaptureCurrentProfile(string name)
@@ -3137,6 +3236,7 @@ public partial class Form1 : Form, IMessageFilter
         profile.AutoVolumeTarget = markerOptionsPanel.AutoVolumeTarget;
         profile.MoreOptionsExpanded = markerOptionsPanel.MoreOptionsExpanded;
         profile.KeepLastSession = keepLastSessionCheckBox.Checked;
+        profile.AutoActive = waapiStatusBar.AutoActiveChecked;
         profile.LastWavePath = _lastWavePath?.Trim() ?? string.Empty;
         profile.LastWavePaths = _lastWavePaths.Count > 1
             ? LastWaveSessionState.JoinWavePathsForIni(_lastWavePaths)
@@ -3572,29 +3672,42 @@ public partial class Form1 : Form, IMessageFilter
             fadeInSectionPanel,
             fadeInHeaderLabel,
             fadeInChoicesPanel,
-            fadeInGroupDividerLabel,
-            fadeInGroupChoicesPanel);
+            optionsHeaderLabel,
+            optionsChoicesPanel,
+            reserveEmptySecondaryHeight: true);
         AdjustFadeSectionHeight(
             fadeOutSectionPanel,
             transitionTimeHeaderLabel,
             transitionTimeChoicesPanel,
-            fadeOutGroupDividerLabel,
-            fadeOutGroupChoicesPanel);
-        AdjustTransitionSectionHeight(exitSourceAtSectionPanel, exitSourceAtHeaderLabel, exitSourceAtChoicesPanel);
+            fadeInGroupDividerLabel,
+            fadeInGroupChoicesPanel);
+        AdjustFadeSectionHeight(
+            exitSourceAtSectionPanel,
+            exitSourceAtHeaderLabel,
+            exitSourceAtChoicesPanel,
+            changeOccursAtHeaderLabel,
+            changeOccursAtChoicesPanel);
     }
 
     private static void AdjustFadeSectionHeight(
         Panel section,
         Label header,
         FlowLayoutPanel normalChoices,
-        Label groupDivider,
-        FlowLayoutPanel groupChoices)
+        Label secondaryHeader,
+        FlowLayoutPanel secondaryChoices,
+        bool reserveEmptySecondaryHeight = false)
     {
         var normalHeight = MeasureChoicesHeight(normalChoices);
-        var groupHeight = MeasureChoicesHeight(groupChoices);
+        var secondaryHeight = MeasureChoicesHeight(secondaryChoices);
+        if (reserveEmptySecondaryHeight && secondaryChoices.Controls.Count == 0)
+        {
+            // Options など空プレースホルダは、通常候補と同じ高さを確保して列下端を揃える。
+            secondaryHeight = Math.Max(secondaryHeight, normalHeight);
+        }
+
         normalChoices.Height = normalHeight;
-        groupChoices.Height = groupHeight;
-        section.Height = header.Height + normalHeight + groupDivider.Height + groupHeight;
+        secondaryChoices.Height = secondaryHeight;
+        section.Height = header.Height + normalHeight + secondaryHeader.Height + secondaryHeight;
     }
 
     private static int MeasureChoicesHeight(FlowLayoutPanel choices)
@@ -3606,15 +3719,6 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         return contentHeight;
-    }
-
-    private static void AdjustTransitionSectionHeight(
-        Panel section,
-        Label header,
-        FlowLayoutPanel choices)
-    {
-        choices.Height = MeasureChoicesHeight(choices);
-        section.Height = header.Height + choices.Height;
     }
 
     // Coalesce hover recolors so fast mouse moves do not flood the UI thread.
@@ -3672,10 +3776,16 @@ public partial class Form1 : Form, IMessageFilter
         UpdatePlaylistFadeCurveIcons();
         fadeInGroupChoicesPanel.BackColor = back;
         fadeInGroupDividerLabel.BackColor = back;
+        fadeInGroupDividerLabel.BarColor = headerBack;
         fadeInGroupDividerLabel.ForeColor = UiColors.PlaylistDefaultFore;
-        fadeOutGroupChoicesPanel.BackColor = back;
-        fadeOutGroupDividerLabel.BackColor = back;
-        fadeOutGroupDividerLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        optionsChoicesPanel.BackColor = back;
+        optionsHeaderLabel.BackColor = back;
+        optionsHeaderLabel.BarColor = headerBack;
+        optionsHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        changeOccursAtChoicesPanel.BackColor = back;
+        changeOccursAtHeaderLabel.BackColor = back;
+        changeOccursAtHeaderLabel.BarColor = headerBack;
+        changeOccursAtHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
         exitSourceAtSectionPanel.BackColor = back;
         exitSourceAtChoicesPanel.BackColor = back;
         exitSourceAtHeaderLabel.BackColor = back;
@@ -3700,16 +3810,16 @@ public partial class Form1 : Form, IMessageFilter
             transitionTimeThreeSecondsRadio,
             transitionTimeSixSecondsRadio,
             transitionTimeNineSecondsRadio,
-            fadeOutGroupNoneRadio,
-            fadeOutGroupOneSecondRadio,
-            fadeOutGroupThreeSecondsRadio,
-            fadeOutGroupSixSecondsRadio,
-            fadeOutGroupNineSecondsRadio,
             exitSourceImmediateRadio,
             exitSourceNextBarRadio,
             exitSourceNextBeatRadio,
             exitSourceNextCueRadio,
             exitSourceExitCueRadio,
+            changeOccursImmediateRadio,
+            changeOccursNextBarRadio,
+            changeOccursNextBeatRadio,
+            changeOccursNextCueRadio,
+            changeOccursExitCueRadio,
         })
         {
             radio.BackColor = back;
@@ -3755,7 +3865,7 @@ public partial class Form1 : Form, IMessageFilter
             }
             else if (TryGetPlaylistHighlightFadeLevel(part.Number, out var highlightFadeLevel))
             {
-                // Alt+上乗せ／停止: Group Fade In/Out と同じ秒数で自動再生色を濃く／薄くする。
+                // Alt+上乗せ／停止: Group Fade と同じ秒数で自動再生色を濃く／薄くする。
                 button.BackColor = BlendColor(
                     back,
                     UiColors.ForControlBack(UiColors.PlaylistAutoBack),
@@ -4052,38 +4162,7 @@ public partial class Form1 : Form, IMessageFilter
             });
     }
 
-    private void FadeInGroupTimeRadio_CheckedChanged(object? sender, EventArgs e)
-    {
-        if (sender is not RadioButton { Checked: true, Tag: double fadeInSeconds })
-        {
-            return;
-        }
-
-        if (_transitionSettingsEditPartNumber is int partNumber)
-        {
-            StoreGroupFadeInSeconds(partNumber, fadeInSeconds);
-            PersistLastWaveSessionIfPossible();
-        }
-        else
-        {
-            _playlistGroupFadeInSeconds = fadeInSeconds;
-        }
-
-        ApplyPlaylistSelectorColors();
-        ReleaseFocusToWaveform();
-        WritePlaybackDiagnostic(
-            "playlist.fade-in-group-preset-changed",
-            new
-            {
-                fadeIn = PlaylistUiNames.ToFadeUiName(fadeInSeconds, isFadeIn: true),
-                fadeInSeconds,
-                part = _transitionSettingsEditPartNumber,
-                stored = _transitionSettingsEditPartNumber is not null,
-                appliesFromNextRequest = _pendingPlaylistTransitionGeneration != 0,
-            });
-    }
-
-    private void FadeOutGroupTimeRadio_CheckedChanged(object? sender, EventArgs e)
+    private void GroupFadeTimeRadio_CheckedChanged(object? sender, EventArgs e)
     {
         if (sender is not RadioButton { Checked: true, Tag: double fadeSeconds })
         {
@@ -4092,22 +4171,56 @@ public partial class Form1 : Form, IMessageFilter
 
         if (_transitionSettingsEditPartNumber is int partNumber)
         {
-            StoreGroupFadeOutSeconds(partNumber, fadeSeconds);
+            StoreGroupFadeSeconds(partNumber, fadeSeconds);
             PersistLastWaveSessionIfPossible();
         }
         else
         {
-            _playlistGroupFadeOutSeconds = fadeSeconds;
+            _playlistGroupFadeSeconds = fadeSeconds;
         }
 
         ApplyPlaylistSelectorColors();
         ReleaseFocusToWaveform();
         WritePlaybackDiagnostic(
-            "playlist.fade-out-group-preset-changed",
+            "playlist.group-fade-preset-changed",
             new
             {
-                fadeOut = PlaylistUiNames.ToFadeUiName(fadeSeconds, isFadeIn: false),
-                fadeOutSeconds = fadeSeconds,
+                groupFade = PlaylistUiNames.ToFadeUiName(fadeSeconds, isFadeIn: true),
+                fadeSeconds,
+                part = _transitionSettingsEditPartNumber,
+                stored = _transitionSettingsEditPartNumber is not null,
+                appliesFromNextRequest = _pendingPlaylistTransitionGeneration != 0,
+            });
+    }
+
+    private void ChangeOccursAtRadio_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (sender is not RadioButton
+            {
+                Checked: true,
+                Tag: PlaylistExitSourceMode mode,
+            })
+        {
+            return;
+        }
+
+        if (_transitionSettingsEditPartNumber is int partNumber)
+        {
+            StoreChangeOccursAtMode(partNumber, mode);
+            PersistLastWaveSessionIfPossible();
+        }
+        else
+        {
+            _playlistChangeOccursAtMode = NormalizeExitSourceModeForCurrentWave(mode);
+        }
+
+        ApplyPlaylistSelectorColors();
+        ReleaseFocusToWaveform();
+        WritePlaybackDiagnostic(
+            "playlist.change-occurs-at-changed",
+            new
+            {
+                mode = mode.ToUiName(),
                 part = _transitionSettingsEditPartNumber,
                 stored = _transitionSettingsEditPartNumber is not null,
                 appliesFromNextRequest = _pendingPlaylistTransitionGeneration != 0,
@@ -4562,6 +4675,7 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>上乗せ再生状態と追加シークバー表示をクリアする。</summary>
     private void ClearPlaylistOverlayState()
     {
+        ClearPendingOverlay();
         _playingPlaylistPartNumbers.Clear();
         _audioPlayer.ClearOverlayPlaylistVoices();
         _overlayPlayheadProgresses.Clear();
@@ -4570,6 +4684,13 @@ public partial class Form1 : Form, IMessageFilter
         waveformView.SetOverlayPlayheads([]);
         waveformView.SetOverlayExitPlayheads([]);
         waveformView.SetOverlayFadeOutPlayheads([]);
+    }
+
+    private void ClearPendingOverlay()
+    {
+        _pendingOverlayPartNumber = null;
+        _pendingOverlayFadeOut = false;
+        _pendingOverlayAtSample = 0;
     }
 
     private void AddPlaylistStatusLabel(string message)
@@ -4863,6 +4984,11 @@ public partial class Form1 : Form, IMessageFilter
 
     private void CancelPlaybackForDisabledPart(int partNumber)
     {
+        if (_pendingOverlayPartNumber == partNumber)
+        {
+            ClearPendingOverlay();
+        }
+
         if (_requestedPlaylistPartNumber == partNumber)
         {
             _audioPlayer.CancelPlaylistTransition();
@@ -4968,6 +5094,7 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>
     /// 同一グループのトランジション設定をリーダー（最小 part 番号）基準で全メンバーへ揃える。
+    /// Group Fade はパート単位のため同期しない。
     /// </summary>
     private void SyncTransitionSettingsForGroup(int groupId)
     {
@@ -4987,8 +5114,6 @@ public partial class Form1 : Form, IMessageFilter
         var fadeOut = ResolveFadeOutSeconds(leader);
         var fadeInCurve = ResolveFadeInCurve(leader);
         var fadeOutCurve = ResolveFadeOutCurve(leader);
-        var groupFadeIn = ResolveGroupFadeInSeconds(leader);
-        var groupFadeOut = ResolveGroupFadeOutSeconds(leader);
         foreach (var member in members)
         {
             _playlistExitSourceModes[member] = exit;
@@ -4996,8 +5121,6 @@ public partial class Form1 : Form, IMessageFilter
             _playlistFadeOutSecondsByPart[member] = fadeOut;
             _playlistFadeInCurveByPart[member] = fadeInCurve;
             _playlistFadeOutCurveByPart[member] = fadeOutCurve;
-            _playlistGroupFadeInSecondsByPart[member] = groupFadeIn;
-            _playlistGroupFadeOutSecondsByPart[member] = groupFadeOut;
         }
     }
 
@@ -5143,7 +5266,8 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>
     /// グループ内 Alt+クリック: 再生中があれば上乗せ／再クリックで個別停止。
     /// 同一グループで既に再生中のときだけ上乗せ可能。
-    /// 上乗せは Same Time 相対で Group Fade In を適用する。
+    /// 上乗せは Same Time 相対で Group Fade を適用する。
+    /// Change Occurs At が Immediate 以外なら境界まで予約する。
     /// 通常クリック遷移は <see cref="RequestPlaylistPlayback"/> を使う。
     /// </summary>
     private void RequestPlaylistOverlayToggle(WaveformOutputPart target)
@@ -5181,7 +5305,157 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        var fadeInSeconds = ResolveGroupFadeInSeconds(target.Number);
+        var changeOccursMode = ResolveChangeOccursAtMode(target.Number);
+        if (changeOccursMode != PlaylistExitSourceMode.Immediate
+            && TrySchedulePendingOverlay(target.Number, fadeOut: false, clockPartNumber, changeOccursMode))
+        {
+            return;
+        }
+
+        CommitPlaylistOverlayAdd(target, clockPartNumber);
+    }
+
+    /// <summary>Alt+クリックで指定 Playlist ボイスだけ Group Fade Out する。</summary>
+    private void RequestPlaylistOverlayFadeOut(WaveformOutputPart target)
+    {
+        var changeOccursMode = ResolveChangeOccursAtMode(target.Number);
+        if (changeOccursMode != PlaylistExitSourceMode.Immediate
+            && _playlistPartGroupIds.TryGetValue(target.Number, out var targetGroupId)
+            && TryEnsureOverlayClockContext(targetGroupId, out var clockPartNumber)
+            && TrySchedulePendingOverlay(target.Number, fadeOut: true, clockPartNumber, changeOccursMode))
+        {
+            return;
+        }
+
+        CommitPlaylistOverlayFadeOut(target);
+    }
+
+    /// <summary>
+    /// Change Occurs At 境界まで Alt 上乗せ／停止を予約する。
+    /// 境界はクロックパート基準。成功時 true。
+    /// </summary>
+    private bool TrySchedulePendingOverlay(
+        int targetPartNumber,
+        bool fadeOut,
+        int clockPartNumber,
+        PlaylistExitSourceMode changeOccursMode)
+    {
+        if (_loadedPreview is not { } preview
+            || preview.WavInfo.FrameCount <= 0
+            || TryGetOutputPart(clockPartNumber) is not { } clockPart)
+        {
+            return false;
+        }
+
+        var frameCount = preview.WavInfo.FrameCount;
+        var currentSample = Math.Clamp(
+            (long)Math.Floor(_smoothProgress * frameCount),
+            0L,
+            Math.Max(0L, frameCount - 1));
+        var markers = _previewSession?.EffectiveMarkers ?? preview.Markers;
+        var regions = GetEffectiveRegions();
+        var transitionLimit = clockPart.EndSampleOffset;
+        var hasActiveLoop = _audioPlayer.TryGetActiveLoopProgress(
+            out _,
+            out var loopEndProgress);
+        if (hasActiveLoop)
+        {
+            var loopEnd = (long)Math.Round(loopEndProgress * frameCount);
+            if (loopEnd > currentSample)
+            {
+                transitionLimit = Math.Min(transitionLimit, loopEnd);
+            }
+        }
+
+        var boundaries = GetPlaylistExitBoundaries(
+            preview,
+            markers,
+            regions,
+            changeOccursMode,
+            currentSample,
+            clockPart.StartSampleOffset,
+            clockPart.EndSampleOffset,
+            transitionLimit,
+            hasActiveLoop);
+        if (boundaries.Count == 0)
+        {
+            WritePlaybackDiagnostic(
+                "playlist.overlay-pending-no-boundary",
+                new
+                {
+                    target = targetPartNumber,
+                    clock = clockPartNumber,
+                    fadeOut,
+                    mode = changeOccursMode.ToUiName(),
+                    currentSample,
+                });
+            return false;
+        }
+
+        _pendingOverlayPartNumber = targetPartNumber;
+        _pendingOverlayFadeOut = fadeOut;
+        _pendingOverlayAtSample = boundaries[0];
+        WritePlaybackDiagnostic(
+            "playlist.overlay-pending-scheduled",
+            new
+            {
+                target = targetPartNumber,
+                clock = clockPartNumber,
+                fadeOut,
+                mode = changeOccursMode.ToUiName(),
+                atSample = _pendingOverlayAtSample,
+                currentSample,
+            });
+        return true;
+    }
+
+    /// <summary>予約した Alt 上乗せ／停止を境界到達時に実行する。</summary>
+    private void TryCommitPendingOverlay()
+    {
+        if (_pendingOverlayPartNumber is not int partNumber
+            || _loadedPreview is not { } preview
+            || preview.WavInfo.FrameCount <= 0)
+        {
+            return;
+        }
+
+        var frameCount = preview.WavInfo.FrameCount;
+        var currentSample = Math.Clamp(
+            (long)Math.Floor(_smoothProgress * frameCount),
+            0L,
+            Math.Max(0L, frameCount - 1));
+        if (currentSample < _pendingOverlayAtSample)
+        {
+            return;
+        }
+
+        var fadeOut = _pendingOverlayFadeOut;
+        ClearPendingOverlay();
+        if (TryGetOutputPart(partNumber) is not { } target)
+        {
+            return;
+        }
+
+        if (fadeOut)
+        {
+            CommitPlaylistOverlayFadeOut(target);
+            return;
+        }
+
+        if (!_playlistPartGroupIds.TryGetValue(target.Number, out var targetGroupId)
+            || !TryEnsureOverlayClockContext(targetGroupId, out var clockPartNumber)
+            || clockPartNumber == target.Number)
+        {
+            return;
+        }
+
+        CommitPlaylistOverlayAdd(target, clockPartNumber);
+    }
+
+    private void CommitPlaylistOverlayAdd(WaveformOutputPart target, int clockPartNumber)
+    {
+        ClearPendingOverlay();
+        var fadeInSeconds = ResolveGroupFadeSeconds(target.Number);
         if (!_audioPlayer.TryAddOverlayPlaylistVoice(
                 target.Number,
                 target.StartSampleOffset,
@@ -5218,10 +5492,10 @@ public partial class Form1 : Form, IMessageFilter
             new { target = target.Number, clock = clockPartNumber, fadeInSeconds });
     }
 
-    /// <summary>Alt+クリックで指定 Playlist ボイスだけ Group Fade Out する。</summary>
-    private void RequestPlaylistOverlayFadeOut(WaveformOutputPart target)
+    private void CommitPlaylistOverlayFadeOut(WaveformOutputPart target)
     {
-        var fadeOutSeconds = ResolveGroupFadeOutSeconds(target.Number);
+        ClearPendingOverlay();
+        var fadeOutSeconds = ResolveGroupFadeSeconds(target.Number);
         if (_audioPlayer.HasClockPlaylistRange
             && _audioPlayer.GetClockPlaylistVoiceId() == target.Number)
         {
@@ -5276,7 +5550,7 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// Alt+上乗せ／停止時、プレイリスト着色を Group Fade In/Out 秒数で濃く／薄くする。
+    /// Alt+上乗せ／停止時、プレイリスト着色を Group Fade 秒数で濃く／薄くする。
     /// </summary>
     private void StartPlaylistHighlightFade(int partNumber, double seconds, bool fadeIn)
     {
@@ -5698,7 +5972,9 @@ public partial class Form1 : Form, IMessageFilter
             destinationSyncMode == PlaylistDestinationSyncMode.EntryCue
                 ? GetLeadingAnacrusisFrameCount(regions, target)
                 : 0L;
-        var exitSourceMode = ResolveExitSourceMode(target.Number);
+        var exitSourceMode = destinationSyncMode == PlaylistDestinationSyncMode.SameTime
+            ? ResolveChangeOccursAtMode(target.Number)
+            : ResolveExitSourceMode(target.Number);
         var boundaries = GetPlaylistExitBoundaries(
             preview,
             markers,
@@ -6205,6 +6481,7 @@ public partial class Form1 : Form, IMessageFilter
         _pendingSourceLoopStart = null;
         _pendingSourceLoopEnd = null;
         _requestedPlaylistPartNumber = null;
+        ClearPendingOverlay();
         _pendingPlaylistBlinkLevel = 0d;
         _playlistBlinkTimer.Stop();
         waveformView.SetAnacrusisPlayhead(null);
@@ -6452,8 +6729,9 @@ public partial class Form1 : Form, IMessageFilter
 
         fadeInHeaderLabel.Text = UiStrings.LabelFadeIn;
         transitionTimeHeaderLabel.Text = UiStrings.LabelFadeOut;
+        optionsHeaderLabel.Text = UiStrings.LabelOptions;
         fadeInGroupDividerLabel.Text = UiStrings.LabelGroup;
-        fadeOutGroupDividerLabel.Text = UiStrings.LabelGroup;
+        changeOccursAtHeaderLabel.Text = UiStrings.LabelChangeOccursAt;
         exitSourceAtHeaderLabel.Text = UiStrings.LabelExitSourceAt;
         playlistHeaderLabel.Text = UiStrings.LabelMusicPlaylist;
 
@@ -6474,11 +6752,6 @@ public partial class Form1 : Form, IMessageFilter
             fadeInGroupThreeSecondsRadio,
             fadeInGroupSixSecondsRadio,
             fadeInGroupNineSecondsRadio,
-            fadeOutGroupNoneRadio,
-            fadeOutGroupOneSecondRadio,
-            fadeOutGroupThreeSecondsRadio,
-            fadeOutGroupSixSecondsRadio,
-            fadeOutGroupNineSecondsRadio,
         ];
         foreach (var radio in fadeRadios)
         {
@@ -6495,6 +6768,11 @@ public partial class Form1 : Form, IMessageFilter
             exitSourceNextBeatRadio,
             exitSourceNextCueRadio,
             exitSourceExitCueRadio,
+            changeOccursImmediateRadio,
+            changeOccursNextBarRadio,
+            changeOccursNextBeatRadio,
+            changeOccursNextCueRadio,
+            changeOccursExitCueRadio,
         ];
         foreach (var radio in exitSourceRadios)
         {
@@ -6653,7 +6931,8 @@ public partial class Form1 : Form, IMessageFilter
         playlistToolTip.SetToolTip(transitionTimeHeaderLabel, UiStrings.TipFadeOutHeader);
         playlistToolTip.SetToolTip(exitSourceAtHeaderLabel, UiStrings.TipExitSourceHeader);
         playlistToolTip.SetToolTip(fadeInGroupDividerLabel, UiStrings.TipGroupFadeHeader);
-        playlistToolTip.SetToolTip(fadeOutGroupDividerLabel, UiStrings.TipGroupFadeHeader);
+        playlistToolTip.SetToolTip(optionsHeaderLabel, UiStrings.TipOptionsHeader);
+        playlistToolTip.SetToolTip(changeOccursAtHeaderLabel, UiStrings.TipChangeOccursAtHeader);
         UpdatePlaylistFadeCurveIcons();
 
         FlatOptionRadioButton[] fadeRadios =
@@ -6673,11 +6952,6 @@ public partial class Form1 : Form, IMessageFilter
             fadeInGroupThreeSecondsRadio,
             fadeInGroupSixSecondsRadio,
             fadeInGroupNineSecondsRadio,
-            fadeOutGroupNoneRadio,
-            fadeOutGroupOneSecondRadio,
-            fadeOutGroupThreeSecondsRadio,
-            fadeOutGroupSixSecondsRadio,
-            fadeOutGroupNineSecondsRadio,
         ];
 
         foreach (var radio in fadeRadios)
@@ -6690,6 +6964,11 @@ public partial class Form1 : Form, IMessageFilter
         playlistToolTip.SetToolTip(exitSourceNextBeatRadio, UiStrings.TipExitNextBeat);
         playlistToolTip.SetToolTip(exitSourceNextCueRadio, UiStrings.TipExitNextCue);
         playlistToolTip.SetToolTip(exitSourceExitCueRadio, UiStrings.TipExitExitCue);
+        playlistToolTip.SetToolTip(changeOccursImmediateRadio, UiStrings.TipExitImmediate);
+        playlistToolTip.SetToolTip(changeOccursNextBarRadio, UiStrings.TipExitNextBar);
+        playlistToolTip.SetToolTip(changeOccursNextBeatRadio, UiStrings.TipExitNextBeat);
+        playlistToolTip.SetToolTip(changeOccursNextCueRadio, UiStrings.TipExitNextCue);
+        playlistToolTip.SetToolTip(changeOccursExitCueRadio, UiStrings.TipExitExitCue);
     }
 
     private void ApplyFadeRadioTip(RadioButton radio)
@@ -6831,11 +7110,20 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        PersistKeepLastSessionToProject();
+        AutosaveCurrentProject();
         ReleaseFocusToWaveform();
     }
 
-    private void PersistKeepLastSessionToProject() => AutosaveCurrentProject();
+    private void WaapiStatusBar_AutoActiveChanged(object? sender, EventArgs e)
+    {
+        if (_suppressProjectUiEvents)
+        {
+            return;
+        }
+
+        AutosaveCurrentProject();
+        ReleaseFocusToWaveform();
+    }
 
     private void PersistLastWavePathToProject() => AutosaveCurrentProject();
 
@@ -7015,10 +7303,12 @@ public partial class Form1 : Form, IMessageFilter
             filteredMarkers,
             BuildPlaylistNameOverrides(parts),
             BuildExportExitSourceModes(enabledNumbers),
+            BuildExportChangeOccursAtModes(enabledNumbers),
             BuildExportFadeSeconds(enabledNumbers, ResolveFadeInSeconds),
             BuildExportFadeSeconds(enabledNumbers, ResolveFadeOutSeconds),
             BuildExportFadeCurves(enabledNumbers, ResolveFadeInCurve),
-            BuildExportFadeCurves(enabledNumbers, ResolveFadeOutCurve));
+            BuildExportFadeCurves(enabledNumbers, ResolveFadeOutCurve),
+            BuildExportFadeSeconds(enabledNumbers, ResolveGroupFadeSeconds));
     }
 
     private IReadOnlyDictionary<int, PlaylistExitSourceMode> BuildExportExitSourceModes(
@@ -7028,6 +7318,18 @@ public partial class Form1 : Form, IMessageFilter
         foreach (var partNumber in enabledNumbers)
         {
             result[partNumber] = ResolveExitSourceMode(partNumber);
+        }
+
+        return result;
+    }
+
+    private IReadOnlyDictionary<int, PlaylistExitSourceMode> BuildExportChangeOccursAtModes(
+        IReadOnlySet<int> enabledNumbers)
+    {
+        var result = new Dictionary<int, PlaylistExitSourceMode>();
+        foreach (var partNumber in enabledNumbers)
+        {
+            result[partNumber] = ResolveChangeOccursAtMode(partNumber);
         }
 
         return result;
@@ -7065,10 +7367,12 @@ public partial class Form1 : Form, IMessageFilter
         IReadOnlyList<WaveformMarkerMark> Markers,
         IReadOnlyDictionary<int, string> PlaylistNameOverrides,
         IReadOnlyDictionary<int, PlaylistExitSourceMode> PartExitSourceModes,
+        IReadOnlyDictionary<int, PlaylistExitSourceMode> PartChangeOccursAtModes,
         IReadOnlyDictionary<int, double> PartFadeInSeconds,
         IReadOnlyDictionary<int, double> PartFadeOutSeconds,
         IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeInCurves,
-        IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeOutCurves);
+        IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeOutCurves,
+        IReadOnlyDictionary<int, double> PartGroupFadeSeconds);
 
     private void CopyrightLinkLabel_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
     {
@@ -7514,8 +7818,7 @@ public partial class Form1 : Form, IMessageFilter
             _regionEdgeFadeHistory.Clear();
             _exportBusy = false;
             // パート未設定時のグループ内フェード仮値は波形を跨いで残さない。
-            _playlistGroupFadeInSeconds = 0d;
-            _playlistGroupFadeOutSeconds = 0d;
+            _playlistGroupFadeSeconds = 0d;
             UpdateTransportPosition();
             ClearPendingPlaylistUiTransition();
             ClearPlaylistChoices(UiStrings.PlaylistLoading);
@@ -7747,11 +8050,11 @@ public partial class Form1 : Form, IMessageFilter
         if (!state.TryGetPartGroupIds(out var savedGroups)
             || !state.TryGetGroupColorIndexes(out var savedColors)
             || !state.TryGetPartExitSourceModes(out var savedExitSources)
+            || !state.TryGetPartChangeOccursAtModes(out var savedChangeOccursAt)
             || !state.TryGetPartFadeSeconds(
                 out var savedFadeIns,
                 out var savedFadeOuts,
-                out var savedGroupFadeIns,
-                out var savedGroupFadeOuts)
+                out var savedGroupFades)
             || !state.TryGetPartFadeCurves(out var savedFadeInCurves, out var savedFadeOutCurves))
         {
             AppendReport(
@@ -7769,12 +8072,12 @@ public partial class Form1 : Form, IMessageFilter
             || state.UserMarkerSampleOffsets.Count > 0
             || state.WaveOnlySessionMarkers is not null
             || savedExitSources.Count > 0
+            || savedChangeOccursAt.Count > 0
             || savedFadeIns.Count > 0
             || savedFadeOuts.Count > 0
             || savedFadeInCurves.Count > 0
             || savedFadeOutCurves.Count > 0
-            || savedGroupFadeIns.Count > 0
-            || savedGroupFadeOuts.Count > 0
+            || savedGroupFades.Count > 0
             || state.RegionEdgeFades.Count > 0;
         if (!hasAny)
         {
@@ -8018,6 +8321,22 @@ public partial class Form1 : Form, IMessageFilter
             exitApplied++;
         }
 
+        foreach (var (savedPartNumber, mode) in savedChangeOccursAt)
+        {
+            var partNumber = MapPartNumber(savedPartNumber);
+            if (!loadedByNumber.ContainsKey(partNumber))
+            {
+                continue;
+            }
+
+            if (state.Parts.Count > 0 && !matchingNumbers.Contains(partNumber))
+            {
+                continue;
+            }
+
+            _playlistChangeOccursAtByPart[partNumber] = mode;
+        }
+
         var fadeInApplied = 0;
         foreach (var (savedPartNumber, seconds) in savedFadeIns)
         {
@@ -8090,8 +8409,8 @@ public partial class Form1 : Form, IMessageFilter
             fadeOutCurveApplied++;
         }
 
-        var groupFadeInApplied = 0;
-        foreach (var (savedPartNumber, seconds) in savedGroupFadeIns)
+        var groupFadeApplied = 0;
+        foreach (var (savedPartNumber, seconds) in savedGroupFades)
         {
             var partNumber = MapPartNumber(savedPartNumber);
             if (!loadedByNumber.ContainsKey(partNumber))
@@ -8104,35 +8423,17 @@ public partial class Form1 : Form, IMessageFilter
                 continue;
             }
 
-            _playlistGroupFadeInSecondsByPart[partNumber] = seconds;
-            groupFadeInApplied++;
-        }
-
-        var groupFadeOutApplied = 0;
-        foreach (var (savedPartNumber, seconds) in savedGroupFadeOuts)
-        {
-            var partNumber = MapPartNumber(savedPartNumber);
-            if (!loadedByNumber.ContainsKey(partNumber))
-            {
-                continue;
-            }
-
-            if (state.Parts.Count > 0 && !matchingNumbers.Contains(partNumber))
-            {
-                continue;
-            }
-
-            _playlistGroupFadeOutSecondsByPart[partNumber] = seconds;
-            groupFadeOutApplied++;
+            _playlistGroupFadeSecondsByPart[partNumber] = seconds;
+            groupFadeApplied++;
         }
 
         UpdatePlaylistFadeCurveIcons();
 
         var settingsPart = _playlistExitSourceModes.Keys
+            .Concat(_playlistChangeOccursAtByPart.Keys)
             .Concat(_playlistFadeInSecondsByPart.Keys)
             .Concat(_playlistFadeOutSecondsByPart.Keys)
-            .Concat(_playlistGroupFadeInSecondsByPart.Keys)
-            .Concat(_playlistGroupFadeOutSecondsByPart.Keys)
+            .Concat(_playlistGroupFadeSecondsByPart.Keys)
             .Where(loadedByNumber.ContainsKey)
             .OrderBy(number => number)
             .Cast<int?>()
@@ -8164,10 +8465,8 @@ public partial class Form1 : Form, IMessageFilter
                 savedFadeIns.Count,
                 fadeOutApplied,
                 savedFadeOuts.Count,
-                groupFadeInApplied,
-                savedGroupFadeIns.Count,
-                groupFadeOutApplied,
-                savedGroupFadeOuts.Count)
+                groupFadeApplied,
+                savedGroupFades.Count)
             + Environment.NewLine
             + Environment.NewLine);
     }
@@ -8199,12 +8498,12 @@ public partial class Form1 : Form, IMessageFilter
             session.GetUserMarkerSampleOffsets(),
             _disabledPlaylistPartNumbers,
             _playlistExitSourceModes,
+            _playlistChangeOccursAtByPart,
             _playlistFadeInSecondsByPart,
             _playlistFadeOutSecondsByPart,
             _playlistFadeInCurveByPart,
             _playlistFadeOutCurveByPart,
-            _playlistGroupFadeInSecondsByPart,
-            _playlistGroupFadeOutSecondsByPart,
+            _playlistGroupFadeSecondsByPart,
             session.GetWaveOnlySessionMarkers(),
             session.RegionEdgeFades,
             _lastWavePaths.Count > 0 ? _lastWavePaths : LastWaveSessionState.GetLoadedWavePaths(preview));
@@ -8339,9 +8638,10 @@ public partial class Form1 : Form, IMessageFilter
         SetUiInteractionLocked(UiInteractionLock.Export, locked: true, UiStrings.OverlayExporting);
         UpdateExportButtonState();
 
+        var exportSucceeded = false;
         try
         {
-            await RunWwiseImportAsync(
+            exportSucceeded = await RunWwiseImportAsync(
                 preview,
                 wwiseSnapshot,
                 exportGeneration,
@@ -8357,6 +8657,68 @@ public partial class Form1 : Form, IMessageFilter
                 UpdateExportButtonState();
                 ReleaseFocusToWaveform();
             }
+        }
+
+        if (!IsDisposed && exportSucceeded && waapiStatusBar.AutoActiveChecked)
+        {
+            try
+            {
+                await ApplyAutoActiveAfterExportAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                // async void の Export クリック経路へ例外を漏らすとプロセスが落ちる。
+                if (!IsDisposed)
+                {
+                    AppendReport(
+                        $"{UiStrings.LogWwiseBringToFrontFailed(ex.Message)}{Environment.NewLine}");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// EXPORT 成功後: Wwise を前面化。Always on Top なら、前面化のあとにこのアプリを最小化する。
+    /// </summary>
+    private async Task ApplyAutoActiveAfterExportAsync()
+    {
+        // フェード中のすりガラスと最小化が重なると描画経路で例外になり得るため、先に消す。
+        _exportOverlay?.HideOverlay();
+
+        var shouldMinimize = topMostCheckBox.Checked || TopMost;
+
+        // 先に Wwise を前面化し、その後で最小化（Minimize → WAAPI の順序を避ける）。
+        var (_, message) = await WwiseProjectActivator.BringToForegroundAsync(_waapiSettings)
+            .ConfigureAwait(true);
+
+        if (IsDisposed)
+        {
+            return;
+        }
+
+        if (message.Length > 0)
+        {
+            try
+            {
+                AppendReport(message + Environment.NewLine);
+            }
+            catch
+            {
+                // 最小化直後などで描画できない場合は無視する。
+            }
+        }
+
+        if (!shouldMinimize || IsDisposed)
+        {
+            return;
+        }
+
+        // TopMost のまま Minimize すると前面固定の影響で挙動が不安定なことがある。
+        // 復帰時は RestoreTopMostAfterMinimizeIfNeeded で戻す。
+        TopMost = false;
+        if (WindowState != FormWindowState.Minimized)
+        {
+            WindowState = FormWindowState.Minimized;
         }
     }
 
@@ -8389,7 +8751,7 @@ public partial class Form1 : Form, IMessageFilter
     /// エクスポート済み WAV を Wwise の選択位置へ Music 構造として流し込む。
     /// キャンセル時はログを残してスキップする。作成先は EXPORT 開始時に固定したパスを使う。
     /// </summary>
-    private async Task RunWwiseImportAsync(
+    private async Task<bool> RunWwiseImportAsync(
         WaveformPreviewData preview,
         PlaylistExportSnapshot snapshot,
         int exportGeneration,
@@ -8412,7 +8774,7 @@ public partial class Form1 : Form, IMessageFilter
                 + UiStrings.LogImportSkippedNoSelection
                 + Environment.NewLine
                 + Environment.NewLine);
-            return;
+            return false;
         }
 
         var importSettings = WwiseImportSettings.Load()
@@ -8448,6 +8810,10 @@ public partial class Form1 : Form, IMessageFilter
                 snapshot.PartFadeOutCurves,
                 _playlistFadeInCurve,
                 _playlistFadeOutCurve,
+                snapshot.PartGroupFadeSeconds,
+                _playlistGroupFadeSeconds,
+                snapshot.PartChangeOccursAtModes,
+                _playlistChangeOccursAtMode,
                 containerNameOverride);
             ReportProgress(UiStrings.LogPlanReady(plan.Playlists.Count));
             AppendReport(WaapiMusicImporter.FormatPlanSummary(plan) + Environment.NewLine);
@@ -8462,7 +8828,7 @@ public partial class Form1 : Form, IMessageFilter
                 + UiStrings.LogImportPlanFailed(ex.Message)
                 + Environment.NewLine
                 + Environment.NewLine);
-            return;
+            return false;
         }
 
         var updateExistingStateGroup = false;
@@ -8486,12 +8852,12 @@ public partial class Form1 : Form, IMessageFilter
                     + UiStrings.LogStateGroupCheckFailed(ex.Message)
                     + Environment.NewLine
                     + Environment.NewLine);
-                return;
+                return false;
             }
 
             if (IsDisposed || exportGeneration != _exportGeneration)
             {
-                return;
+                return false;
             }
 
             // 既存 State Group は削除せず、object.set の merge で同一オブジェクトを更新する。
@@ -8500,7 +8866,7 @@ public partial class Form1 : Form, IMessageFilter
 
         if (exportGeneration != _exportGeneration)
         {
-            return;
+            return false;
         }
 
         try
@@ -8526,6 +8892,7 @@ public partial class Form1 : Form, IMessageFilter
                 updateExistingStateGroup,
                 _previewSession?.RegionEdgeFades,
                 progress));
+            return !IsDisposed && exportGeneration == _exportGeneration;
         }
         catch (Exception ex)
         {
@@ -8536,6 +8903,8 @@ public partial class Form1 : Form, IMessageFilter
                     + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
                     + $"{UiStrings.KeyMessage} {ex.Message}{Environment.NewLine}{Environment.NewLine}");
             }
+
+            return false;
         }
     }
 
@@ -9696,6 +10065,8 @@ public partial class Form1 : Form, IMessageFilter
 
                 _smoothProgress = Math.Clamp(progress, 0d, 1d);
             }
+
+            TryCommitPendingOverlay();
 
             if (!_automaticPlaylistPlayback)
             {

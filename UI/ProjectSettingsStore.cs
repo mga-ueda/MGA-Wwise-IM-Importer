@@ -47,6 +47,9 @@ internal sealed class ProjectProfile
     /// <summary>Music Track のストリーミング有効（既定オン）。</summary>
     public bool StreamEnabled { get; set; } = true;
 
+    /// <summary>EXPORT 完了時に Wwise を前面化するか（既定オン）。</summary>
+    public bool AutoActive { get; set; } = true;
+
     /// <summary>2 番目以降のセグメントの Look-ahead time（ms）。</summary>
     public int LookAheadMs { get; set; } = 500;
 
@@ -112,6 +115,7 @@ internal sealed class ProjectProfile
         CompactFileNumbers = CompactFileNumbers,
         OutputDirectory = OutputDirectory,
         StreamEnabled = StreamEnabled,
+        AutoActive = AutoActive,
         LookAheadMs = LookAheadMs,
         PrefetchLengthMs = PrefetchLengthMs,
         LoudnessNormalizeEnabled = LoudnessNormalizeEnabled,
@@ -198,6 +202,7 @@ internal sealed class ProjectSettingsStore
         CompactFileNumbers = false,
         OutputDirectory = string.Empty,
         StreamEnabled = true,
+        AutoActive = true,
         LookAheadMs = 500,
         PrefetchLengthMs = 500,
         LoudnessNormalizeEnabled = false,
@@ -564,6 +569,7 @@ internal sealed class ProjectSettingsStore
             ["CompactFileNumbers"] = profile.CompactFileNumbers ? "1" : "0",
             ["OutputDirectory"] = profile.OutputDirectory,
             ["StreamEnabled"] = profile.StreamEnabled ? "1" : "0",
+            ["AutoActive"] = profile.AutoActive ? "1" : "0",
             ["LookAheadMs"] = Math.Clamp(profile.LookAheadMs, 0, 9999)
                 .ToString(CultureInfo.InvariantCulture),
             ["PrefetchLengthMs"] = Math.Clamp(profile.PrefetchLengthMs, 0, 9999)
@@ -667,6 +673,7 @@ internal sealed class ProjectSettingsStore
         }
 
         profile.StreamEnabled = ReadBool(values, "StreamEnabled", defaultValue: true);
+        profile.AutoActive = ReadBool(values, "AutoActive", defaultValue: true);
 
         if (values.TryGetValue("LookAheadMs", out var lookAheadText)
             && int.TryParse(lookAheadText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lookAheadMs))

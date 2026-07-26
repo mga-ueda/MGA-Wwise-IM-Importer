@@ -20,7 +20,7 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 | + New Project | 波形・セッション・ログをすべて卸し、アプリ既定設定の `New Project`（既存なら `New Project 2` …）を即時 INI 保存して切り替える。ログには作成メッセージだけを残す |
 | 書き出しパス／フォルダ | 分割 WAV の書き出し先（接続中 Wwise プロジェクトの Originals 配下）。フォルダボタンで選択 |
 | 削除 | 選択中プロジェクトを削除（DEL） |
-| Keep Last Session | 既定オン。起動時およびこのプロジェクトへ戻ったときに、最後の作業セッションを復元（`[Project.*] KeepLastSession` / `LastWavePath`）。波形に加え、同プロジェクトのサイドカー JSON のグループ／無効化／追加マーカー／Fade In・Out（通常／Group）／Exit Source At（パート別）を復元 |
+| Keep Last Session | 既定オン。起動時およびこのプロジェクトへ戻ったときに、最後の作業セッションを復元（`[Project.*] KeepLastSession` / `LastWavePath`）。波形に加え、同プロジェクトのサイドカー JSON のグループ／無効化／追加マーカー／Fade In・Out／Group Fade／Exit Source At（パート別）を復元 |
 | Always on Top | 既定オフ。ウィンドウを最前面に固定（`[App] AlwaysOnTop`） |
 | JP／EN | 表示言語切替。ラベル・ボタン・ツールチップ・ダイアログ・ログ・アクセシビリティ名を含むすべての表示テキスト（`[App] UiLanguage`。既定 `ja`） |
 | 歯車 | 設定ダイアログ（音声出力・波形／Playlist 遷移のフェードイン・アウト既定カーブ。`[App] Default*Fade*Curve`） |
@@ -96,11 +96,14 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 |------|------|
 | ログ右下アイコン | クリア → コピー → 保存（ログ表示の消去／クリップボード／UTF-8 の `.log`／`.txt`。各機能名はツールチップ） |
 | Fade In | 左のラジオから `None / 1.0 / 3.0 / 6.0 / 9.0 Sec.`（既定 None）。見出し右のカーブアイコンで MusicFade カーブを選択（ツールチップに名前、クリックで選択メニュー）。Playlist を選んでから変更するとパート（グループ）単位で記憶。再生中の Playlist 遷移だけに適用。遷移先が `-A` なら先行再生開始からフェードイン。待機中の遷移には影響せず、次の予約から適用。EXPORT 時は遷移先ルールの Destination Fade-in Time／Curve へ書く（下記「フェードと Wwise トランジション」） |
-| Fade Out | 同様の秒数候補（既定 None）と見出し右のカーブアイコン。待機中の遷移には影響せず、次の予約から適用。EXPORT 時は遷移先ルールの Source Fade-out Time／Offset／Curve へ書く |
-| Exit Source At | Fade Out 右（既定 Immediate）。Playlist ごとに Fade In／Fade Out／Group Fade／Exit Source At を記憶。Fade In／Out 内は通常候補の下に `Group` 見出しでグループ用を区分。同一グループ ID で共通同期。同一グループ内遷移は Group Fade のみ（通常 Fade は無効）。グループ外からの遷移は通常の Fade In/Out。サイドカーへオートセーブ／復元。Wwise へは Exit Source At と通常 Fade In／Out を渡し、Group Fade は未使用 |
+| Options | Fade In の下（列幅は Fade In と同じ）。**プレースホルダ**（現在は空。後日項目を追加） |
+| Fade Out | 通常 Fade In と同様の秒数候補（既定 None）と見出し右のカーブアイコン。待機中の遷移には影響せず、次の予約から適用。EXPORT 時は遷移先ルールの Source Fade-out Time／Offset／Curve へ書く |
+| Group Fade | Fade Out の通常候補の下、帯付き `Group` 見出し内の秒数ラジオ（`None / 1.0 / 3.0 / 6.0 / 9.0 Sec.`。既定 None）。**In／Out 共通の 1 系統**（UI・記憶・再生とも同一秒数）。**グループ化していても Playlist ごとに個別**（通常の Fade In／Out／Exit Source At とは異なり、同一グループ ID では同期しない）。ローカル再生では同一グループ内の上乗せ／停止・グループ内遷移にだけ使う。通常 Fade はグループ内では無効。グループ外からの遷移は通常の Fade In／Out。サイドカー `PartGroupFadeSeconds` へパート別にオートセーブ／復元（旧 `PartGroupFadeInSeconds`／`PartGroupFadeOutSeconds` は読み込み時に Max で移行）。EXPORT 時の Wwise 側への載せ方は下記「グループ化 Playlist と State Group」 |
+| Exit Source At | Fade Out 右（既定 Immediate）。候補は `Immediate / Next Bar / Next Beat / Next Cue / Exit Cue`。Playlist ごとに Fade In／Fade Out／Group Fade／Exit Source At を記憶。通常の Fade In／Out／Exit Source At は同一グループ ID で共通同期。サイドカーへオートセーブ／復元。Wwise へは Exit Source At・通常 Fade In／Out を Switch トランジションへ、Group Fade はグループ State Group（全員同一なら Default のみ、異なれば Custom）へ渡す（詳細は下記）。**Wwise の全候補は載せず、アプリ内で再現しにくい項目（`Next Grid`／`Custom Cue` など）は割愛**（Change Occurs At も同様） |
+| Change Occurs At | Exit Source At の下（UI 見出しは **Chg Occ At**）。`Immediate / Next Bar / Next Beat / Next Cue / Exit Cue`（**既定 Immediate**）。**グループ内レイヤー切替のタイミング**（Alt 上乗せ／停止、および同一グループ内 `Same Time` 遷移）。Group Fade と同様 **Playlist ごとに個別**（グループ ID では同期しない）。グループ Playlist 再生中のみ有効。サイドカー `PartChangeOccursAtModes` へパート別にオートセーブ／復元。EXPORT 時はグループ各 Music Track の `StateGroupInfo/@MusicSyncType` へ渡す（States タブの Change Occurs At）。Wwise 側には他にも `Next Grid`／`Custom Cue`／`Never` などがあるが、**アプリ内プレビューでの再現が難しいため本アプリでは割愛**（Exit Source At も同様） |
 | 遷移先同期（自動） | 同一グループ内は `Same Time`、それ以外は `Entry Cue`。`Same Time` は実際の退出時点の相対時間を引き継ぐ。遷移先の長さ以上なら予約しない |
-| Music Playlist 一覧 | 遷移先を選択。一覧幅はファイル名が改行されない必要幅へ自動可変（超える場合だけ省略）。停止／一時停止中は対象の頭から即再生、再生中は `Exit Source At` で遷移。同一グループ内の `Same Time` では相対位置から開始、それ以外の `Entry Cue` で遷移先冒頭が `-A` ならその長さだけ先行重ね。Next Bar／Next Beat では境界に `-A` 終端を揃え、Next Cue／Exit Cue までの時間が足りない場合は `-A` を即開始して退出だけを指定 Cue に揃える。Immediate では旧曲フェードと `-A` を同時に即開始。先行再生は緑、フェードアウトは白、`-E` 到達後は赤。通常時は枠なし、再生中は背景塗り、遷移完了時は枠をフェード発光。遷移待機中は予約先の枠がテンポ／拍子に同期して点滅。**グループ外へ通常遷移するときは、そのグループで再生中のボイスをすべて停止**（Group Fade Out の場合あり）してから遷移する |
-| Alt＋Playlist 項目を左クリック | **グループ化された Playlist のみ**。同一グループ内で何かが再生中のとき、その Playlist を上乗せ再生（Same Time・Group Fade In）。再生中のものへ再クリックで個別停止（Group Fade Out）。合計最大 8 本。再生中の各 Playlist 絶対位置に、通常と同じシアンのシークバーを描画。停止中や未グループ／別グループでは無視 |
+| Music Playlist 一覧 | 遷移先を選択。一覧幅はファイル名が改行されない必要幅へ自動可変（超える場合だけ省略）。停止／一時停止中は対象の頭から即再生、再生中は `Exit Source At` で遷移。同一グループ内の `Same Time` では相対位置から開始、それ以外の `Entry Cue` で遷移先冒頭が `-A` ならその長さだけ先行重ね。Next Bar／Next Beat では境界に `-A` 終端を揃え、Next Cue／Exit Cue までの時間が足りない場合は `-A` を即開始して退出だけを指定 Cue に揃える。Immediate では旧曲フェードと `-A` を同時に即開始。先行再生は緑、フェードアウトは白、`-E` 到達後は赤。通常時は枠なし、再生中は背景塗り、遷移完了時は枠をフェード発光。遷移待機中は予約先の枠がテンポ／拍子に同期して点滅。**グループ外へ通常遷移するときは、そのグループで再生中のボイスをすべて停止**（Group Fade の場合あり）してから遷移する |
+| Alt＋Playlist 項目を左クリック | **グループ化された Playlist のみ**。同一グループ内で何かが再生中のとき、その Playlist を上乗せ再生（Same Time・Group Fade）。再生中のものへ再クリックで個別停止（同じ Group Fade）。合計最大 8 本。再生中の各 Playlist 絶対位置に、通常と同じシアンのシークバーを描画。停止中や未グループ／別グループでは無視 |
 | Shift＋Playlist 項目を左クリック／ドラッグ | グループ化（縦レイヤー）。既存グループも新しい ID で上書き可。最若番号 Playlist のマーカーへ同期。`Reset Per Part` 無効時の全体連番も基準 Playlist 側だけを対象 |
 | Ctrl＋Playlist 項目を左クリック／ドラッグ | グループ解除。各 Playlist 固有の元マーカー情報へ戻る |
 | Ctrl＋Shift＋Playlist 項目を左クリック／ドラッグ | 書き出し対象外／再有効化。一覧は `Excluded Region n` の赤文字、波形〜上下レーンは約 25% 表示。再生・遷移・グループ化・マーカー編集・WAV 書き出し・Wwise インポートの対象外 |
@@ -119,9 +122,10 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 | 操作 | 内容 |
 |------|------|
 | CLEAR | 波形・セッション・ログをクリアし、選択中プロジェクトの設定をアプリ既定へ戻して保存する。**書き出し先フォルダ・WAAPI Keep Target・`Always on Top`（アプリ設定）は変わらない**。プロジェクト自体は削除しない |
-| RELOAD | 最後にドロップまたは自動読み込みした WAV／XML を元ファイルから再読み込みする。ログは消去。サイドカー JSON があればグループ／無効化／追加マーカー／Fade・Exit Source At を復元。再生は一時コピー経由のため、読み込み中も外部アプリは元 WAV を上書き可能 |
+| RELOAD | 最後にドロップまたは自動読み込みした WAV／XML を元ファイルから再読み込みする。ログは消去。サイドカー JSON があればグループ／無効化／追加マーカー／Fade In・Out／Group Fade・Exit Source At を復元。再生は一時コピー経由のため、読み込み中も外部アプリは元 WAV を上書き可能 |
 | EXPORT | プロジェクト書き出し先へ分割 WAV を書き出し、続けて Wwise へ登録（**Ctrl+Shift+E**）。Wwise 未接続／作成先未選択／書き出し先が未指定・不存在・Originals 外のときは無効 |
-| Keep Target | ステータスバー末尾の鍵アイコン。表示は `Wwise v… - プロジェクト名 - 作成先パス`＋鍵＋`- Keep Target -`／`- Not Keep Target -`（省略なし）。クリックで作成先を**選択中プロジェクト**に固定／解除。固定中は黄色の施錠、未固定は白の開錠。プロジェクト名リンク（または **Ctrl+Shift+W**）でその Wwise プロジェクトを開く／前面化。未接続時は赤字のエラー表示（固定は外さない）。再接続できたら記憶パスを有効化。起動時／EXPORT 前は可能なら Wwise 上でも同パスを再選択（`[Project.*] KeepTarget`／`KeptTargetPath`。既定オフ） |
+| Keep Target | ステータスバー末尾付近の鍵アイコン。表示は `Wwise v… - プロジェクト名 - 作成先パス`＋鍵＋`- Keep Target -`／`- Not Keep Target -`（省略なし）。クリックで作成先を**選択中プロジェクト**に固定／解除。固定中は黄色の施錠、未固定は白の開錠。プロジェクト名リンク（または **Ctrl+Shift+W**）でその Wwise プロジェクトを開く／前面化。未接続時は赤字のエラー表示（固定は外さない）。再接続できたら記憶パスを有効化。起動時／EXPORT 前は可能なら Wwise 上でも同パスを再選択（`[Project.*] KeepTarget`／`KeptTargetPath`。既定オフ） |
+| Auto Active | ステータスバー右端（既定オン）。EXPORT 完了時に Wwise を前面化。Always on Top がオンのときはこのアプリを最小化してから前面化（`[Project.*] AutoActive`） |
 
 ### プレビュー表示
 
@@ -167,10 +171,18 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 書き出し完了後、EXPORT 開始時に固定した**選択オブジェクトの下**へ、確認ダイアログを表示せず Music 構造を自動生成します。利用条件・商標については [商標・ライセンス](#商標ライセンス) を参照してください。
 
 - グループ化されていない出力パート 1 つ、またはグループ 1 つを Music Playlist Container 1 つとして扱う
-- 2 パート以上のグループは、1 つの Music Segment 内へ複数 Music Track を置く縦レイヤーとして生成する。Playlist／Segment 名はグループ化後の連番へ詰める
-- 最終 Playlist が 2 つ以上なら Music Switch Container（元ファイル名）の下に配置する。あわせて State Group（同名）を `\States\Default Work Unit` に作成し、各 State を同名 Playlist に割当。既存 State Group があるときは削除・再作成せず、同一オブジェクトの State 一覧を現在の Playlist 構成へ更新する
+- 最終 Playlist が 2 つ以上なら Music Switch Container（元ファイル名）の下に配置する。あわせて **Music Switch 用 State Group**（同名）を `\States\Default Work Unit` に作成し、各 State を同名 Playlist に割当。既存 State Group があるときは削除・再作成せず、同一オブジェクトの State 一覧を現在の Playlist 構成へ更新する
+- **グループ化 Playlist と State Group** … 2 パート以上のグループは、1 つの Music Segment 内へ複数 Music Track を置く縦レイヤーとして生成する。Playlist／Segment 名はグループ化後の連番へ詰める。あわせて次を行う:
+  - **グループ名の State Group**を `\States\Default Work Unit` に作成し、グループ内 Playlist 数ぶんの State（`A` `B` `C` …）を置く
+  - 各 Music Track の States へその State Group を割当し、**Track Volume** をレイヤー対応で設定する（1 番目 Track は A=0 dB／他 State=-108 dB、2 番目は B=0 dB／他=-108 dB …）
+  - **Group Fade** … メンバー全員の秒数が同一なら **Default Transition Time のみ**（Custom TransitionList は書かない／既存はクリア）。秒数が分かれる場合のみ **Custom Transition Time**（総当たり。From→To の Time は遷移先 To）を書き、このときの Default Transition Time は Wwise 既定（1 秒）のまま（フォールバック最大値にはしない）
+  - Switch 側の Any → Object ルールには、グループ代表パート（最小番号）の通常 Fade In／Out／Exit Source At を載せる（Group Fade 自体は Switch ルールへは書かない）
+- **Authoring プレビュー用の現在 State** … インポート完了後（WWU パッチ〜プロジェクト再オープンの後）に `ak.soundengine.setState` で次を設定する。失敗してもインポートは続行し、ログに残す:
+  - 各**グループ State Group** → **A**
+  - **Music Switch 用 State Group**（Playlist が 2 つ以上のとき）→ **先頭 Playlist** 名
+- **転送後の選択** … 続けて Project Explorer で転送オブジェクトを選択する。Music Switch を作った場合は、先に先頭 Playlist を Find してツリーを展開してからその Switch を選択。Playlist のみの場合はその Playlist（失敗してもインポートは続行）
 - **Switch トランジション** … 先頭に既定の **Any → Any**（名前 `Transition`）を明示作成する。Wwise が用意する既定は Exit Source At = Exit Cue だが、本アプリでは **Immediate** に書き換える。続けて各 Playlist 向けの Any → Object ルールを載せる（ルール名も `Transition`。Exit Source At／Fade In／Fade Out／カーブは遷移先 Playlist の記憶値。グループ時は代表パート＝最小番号）。MusicFade の Time／Curve は WAAPI 非対応のため、プロジェクトを一時クローズして WWU 直編集で書く（Source Fade-out の Offset は Time と同じ秒数、Destination Fade-in の Offset は 0）
-- **フェードと Wwise トランジション** … 本アプリの Fade In／Fade Out はローカル再生では「遷移先 Playlist に記憶した秒数」でクロスフェードする。EXPORT 時も同じ記憶値を、遷移先向け Any → Object ルールへ載せる。**Fade Out → Source Fade-out**（秒数 0＝OFF）、**Fade In → Destination Fade-in**（秒数 0＝OFF）。Group Fade は Wwise へ渡さない。Any → Any の Exit Source At は常に Immediate（上記）
+- **フェードと Wwise トランジション** … 本アプリの通常 Fade In／Fade Out はローカル再生では「遷移先 Playlist に記憶した秒数」でクロスフェードする。EXPORT 時も同じ記憶値を、遷移先向け Any → Object ルールへ載せる。**Fade Out → Source Fade-out**（秒数 0＝OFF）、**Fade In → Destination Fade-in**（秒数 0＝OFF）。**Group Fade** は全員同一なら Default Transition Time のみ、異なれば Custom Transition Time（総当たり）。Any → Any の Exit Source At は常に Immediate（上記）。**Exit Source At／Change Occurs At** の候補はアプリ上 `Immediate`／`Next Bar`／`Next Beat`／`Next Cue`／`Exit Cue` のみ（既定はいずれも Immediate）。Wwise にある `Next Grid`／`Custom Cue`／Music Track 向け `Never` などは、アプリ内プレビューでの再現が難しいため割愛する
 - **リージョン端フェード → MusicClip** … 波形上の白三角フェードは、EXPORT 時に対象クリップ（固まり先頭 Music Segment＝Fade In、末尾＝Fade Out。`-A`／`-E` 束ね込み）へ MusicClip の非破壊 Fade として書き込む。分割 WAV へは焼き込まない。WAAPI の Duration 上限（3.6 秒）を超える場合は、短い尺を WAAPI で付けたあと WWU 直編集で本値を設定する。Playlist 遷移用の MusicFade 作成とは別経路
 - リージョン 1 つ = Music Segment 1 つ。1 Playlist 内で Segment が 1 件だけなら名前の `_a` を省略し、複数なら `_a` `_b` … の連番。ただし:
   - `-A`（アウフタクト）は次のリージョンと同一セグメントにし、Entry Cue より前として扱う
@@ -258,7 +270,7 @@ exe と同じフォルダに置きます（無ければ起動時に既定値で�
 | ファイル | 主な内容 |
 |----------|----------|
 | `MgaWwiseIMImporter.ini` | プロジェクト一覧／各プロジェクト設定（Marker Grid・Comment 含む）／アプリ設定／ウィンドウ位置 など |
-| `MgaWwiseIMImporter.lastwave.<プロジェクト名>.json` | 追加マーカー位置、Playlist グループ／無効化、パート別 Fade・Exit Source At など |
+| `MgaWwiseIMImporter.lastwave.<プロジェクト名>.json` | 追加マーカー位置、Playlist グループ／無効化、パート別 Fade In／Out／Group Fade・Exit Source At など |
 
 フォルダごと上書き・削除して入れ替えると、これらのデータも消えます。更新時は exe だけ差し替えるか、上記ファイルを退避してから入れ替えてください。Nuendo／Cubase XML 由来のマーカーはアプリに保存せず、読み込み時に同名 `.xml` から取り込みます。
 
@@ -283,7 +295,7 @@ exe と同じフォルダに置きます（無ければ起動時に既定値で�
 
 #### `[Project.*]`
 
-サイドカー JSON（`MgaWwiseIMImporter.lastwave.<プロジェクト名>.json`）はプロジェクト単位で、グループ／無効化／追加マーカー／Fade・Exit Source At を保持します。キーは UI に近い順です。
+サイドカー JSON（`MgaWwiseIMImporter.lastwave.<プロジェクト名>.json`）はプロジェクト単位で、グループ／無効化／追加マーカー／通常 Fade In／Out／**Group Fade**（`PartGroupFadeSeconds`）／Exit Source At を保持します。旧キー `PartGroupFadeInSeconds`／`PartGroupFadeOutSeconds` だけがある場合は、読み込み時に各パートの Max を `PartGroupFadeSeconds` へ移行します。INI のキーは UI に近い順です。
 
 | キー | 意味 | 既定 |
 |------|------|------|
@@ -299,6 +311,7 @@ exe と同じフォルダに置きます（無ければ起動時に既定値で�
 | `CompactFileNumbers` | 無効項目を除いた書き出し番号を詰める（`1`/`0`。Compact Num.） | `0` |
 | `MoreOptionsExpanded` | More Options パネルを開いた状態にする（`1`/`0`） | `1` |
 | `StreamEnabled` | Music Track のストリーミング有効（`1`/`0`。Stream） | `1` |
+| `AutoActive` | EXPORT 完了時に Wwise を前面化する（`1`/`0`。ステータスバー / Auto Active） | `1` |
 | `PrefetchLengthMs` | Playlist 先頭セグメント内全トラックの Prefetch Length（ms、0〜9999。Stream オン時。Zero latency と同じ範囲） | `500` |
 | `LookAheadMs` | 2 番目以降のセグメントの Look-ahead Time（ms、0〜9999。Stream オン時） | `500` |
 | `LoudnessNormalizeEnabled` | EXPORT 時に分割 WAV へラウドネス正規化（破壊編集）を行う（`1`/`0`。Normalize） | `0` |
