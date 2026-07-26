@@ -1,13 +1,14 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Xml;
 using MgaWwiseIMImporter.UI;
 
 namespace MgaWwiseIMImporter.Wwise;
 
 /// <summary>
 /// ロック中 Wwise プロジェクトを開く／既に開いていれば前面化する。
-/// WAAPI が使えるときは RPC、だめなときは .wproj のシェル実行にフォールバック。
+/// WAAPI が使えるときは RPC、だめなときは Wwise.exe を直接起動（なければ .wproj の関連付け）。
 /// </summary>
 internal static class WwiseProjectActivator
 {
@@ -93,14 +94,30 @@ internal static class WwiseProjectActivator
         }
         catch (Exception)
         {
-            return OpenViaShell(path);
+            return OpenViaAuthoringOrShell(path);
         }
     }
 
-    private static (bool Ok, string Message) OpenViaShell(string path)
+    /// <summary>
+    /// WAAPI 不通時: インストール済み Wwise.exe を .wproj の版に合わせて直接起動する。
+    /// （.wproj の既定関連付けは Wwise Launcher のため、シェル実行だけでは Authoring が開かないことがある。）
+    /// </summary>
+    private static (bool Ok, string Message) OpenViaAuthoringOrShell(string path)
     {
         try
         {
+            if (TryFindWwiseExecutable(path, out var wwiseExe))
+            {
+                var start = new ProcessStartInfo
+                {
+                    FileName = wwiseExe,
+                    UseShellExecute = false,
+                };
+                start.ArgumentList.Add(path);
+                Process.Start(start);
+                return (true, UiStrings.LogWwiseProjectShellOpen(Path.GetFileNameWithoutExtension(path)));
+            }
+
             Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
             return (true, UiStrings.LogWwiseProjectShellOpen(Path.GetFileNameWithoutExtension(path)));
         }
@@ -108,6 +125,113 @@ internal static class WwiseProjectActivator
         {
             return (false, UiStrings.LogWwiseProjectOpenFailed(ex.Message));
         }
+    }
+
+    private static bool TryFindWwiseExecutable(string projectFilePath, out string wwiseExe)
+    {
+        wwiseExe = string.Empty;
+        TryReadProjectVersion(projectFilePath, out var version, out var build);
+
+        var versionKey = version.Trim().TrimStart('v', 'V');
+        string? exact = null;
+        string? versionMatch = null;
+
+        foreach (var root in EnumerateAudiokineticRoots())
+        {
+            if (!Directory.Exists(root))
+            {
+                continue;
+            }
+
+            foreach (var dir in Directory.EnumerateDirectories(root, "Wwise*"))
+            {
+                var exe = Path.Combine(dir, "Authoring", "x64", "Release", "bin", "Wwise.exe");
+                if (!File.Exists(exe))
+                {
+                    continue;
+                }
+
+                var folder = Path.GetFileName(dir) ?? string.Empty;
+                if (versionKey.Length > 0
+                    && build.Length > 0
+                    && folder.Equals($"Wwise{versionKey}.{build}", StringComparison.OrdinalIgnoreCase))
+                {
+                    exact = exe;
+                    break;
+                }
+
+                if (versionMatch is null
+                    && versionKey.Length > 0
+                    && folder.StartsWith($"Wwise{versionKey}", StringComparison.OrdinalIgnoreCase))
+                {
+                    versionMatch = exe;
+                }
+            }
+
+            if (exact is not null)
+            {
+                break;
+            }
+        }
+
+        wwiseExe = exact ?? versionMatch ?? string.Empty;
+        return wwiseExe.Length > 0;
+    }
+
+    private static IEnumerable<string> EnumerateAudiokineticRoots()
+    {
+        yield return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            "Audiokinetic");
+        yield return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "Audiokinetic");
+    }
+
+    private static bool TryReadProjectVersion(
+        string projectFilePath,
+        out string version,
+        out string build)
+    {
+        version = string.Empty;
+        build = string.Empty;
+        try
+        {
+            using var reader = XmlReader.Create(
+                projectFilePath,
+                new XmlReaderSettings
+                {
+                    IgnoreComments = true,
+                    IgnoreWhitespace = true,
+                    DtdProcessing = DtdProcessing.Prohibit,
+                });
+            while (reader.Read())
+            {
+                if (reader.NodeType != XmlNodeType.Element)
+                {
+                    continue;
+                }
+
+                if (string.Equals(reader.Name, "WwiseDocument", StringComparison.Ordinal))
+                {
+                    version = reader.GetAttribute("WwiseVersion")?.Trim() ?? string.Empty;
+                    build = reader.GetAttribute("WwiseBuild")?.Trim() ?? string.Empty;
+                    return version.Length > 0 || build.Length > 0;
+                }
+
+                // ルート以外に進んだら諦める（巨大 .wproj を全部読まない）。
+                if (reader.Depth > 0)
+                {
+                    break;
+                }
+            }
+        }
+        catch
+        {
+            // 版が取れなくてもシェル関連付けへフォールバックできる。
+        }
+
+        return false;
     }
 
     private static bool PathsEqual(string a, string b)
