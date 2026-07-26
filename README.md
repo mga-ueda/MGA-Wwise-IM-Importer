@@ -2,6 +2,8 @@
 
 Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、分割 WAV の書き出し、WAAPI 経由の Wwise Music 構造インポートを行う Windows 向けツール（開発中）です。
 
+**音量・フェード・マーカー類は全面的に非破壊です。** ソース WAV も分割 WAV もゲインやフェードを焼き込まず、EXPORT 時は Wwise 側のプロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ設定します。書き出し WAV は範囲の切り出しだけです。
+
 ## 使い方
 
 `.wav` または同名ペアの `.xml` をドロップします（波形には `.wav` が必須）。同名 `.xml` があれば小節・テンポ・拍子・マーカー・リージョンを重ねます。Wave／XML をドロップするとアプリが前面アクティブになります。`Keep Last Session` がオンなら、起動時およびそのプロジェクトへ戻ったときに最後の作業セッションを自動復元します。マルチチャンネル（クアッド／5ch など Extensible 形式）の WAV にも対応し、プレビュー再生はステレオへダウンミックスされます。
@@ -110,7 +112,7 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 | Compact Num. | Music Playlist 一覧下端（既定オフ）。無効項目を除いた書き出し WAV・Playlist・Segment 名の番号を 1 から詰める。オフでは元番号を維持し欠番を残す |
 | More Options | 右パネル下部の折りたたみ（既定開き）。開閉は `[Project.*] MoreOptionsExpanded` に保存。開閉時はウィンドウ高さを調整し Music Playlist の高さは維持。Music Playlist（Compact Num. 含む）の下端は Fade In セクション下端に揃える |
 | Stream | More Options 上段左。`Stream`（既定オン）→ `Prefetch Length` → `Look-ahead Time`（いずれも ms、0〜9999、既定 500。エディタ右に `ms` 表示）。`[Project.*] StreamEnabled`／`PrefetchLengthMs`／`LookAheadMs`。オフ時は Prefetch／Look-ahead は無効で、Wwise へもストリーミングなしで作成 |
-| Layer Music Option | More Options 上段中央。`Keep Layer Balance`（既定オフ）。Wwise の Loudness Normalization 利用時にオン推奨。EXPORT 時にグループ内各パートの LKFS を計測し、最も大きいパートの **Make-Up Gain を 0 dB**、それ以外は相対差だけ下げて **Music Track** へ設定する。未グループには適用しない |
+| Layer Music Option | More Options 上段中央。`Keep Layer Balance`（既定オフ）。Wwise の Loudness Normalization 利用時にオン推奨。EXPORT 時にグループ内各パートの LKFS を計測し、最も大きいパートの **Make-Up Gain を 0 dB**、それ以外は相対差だけ下げて **Music Track** へ**非破壊で**設定する（WAV へは焼き込まない）。未グループには適用しない |
 | Marker Comment | More Options 下段左。`Digits`／`Zero Pad`／`Reset Per Part`／`Prefix`／`Suffix`／`Separator`。選択中プロジェクトの `[Project.*]` へ自動保存 |
 | Marker Grid | More Options 下段右。スナップ単位 `Bar`／`Beat`／`Timeline`（既定 `Bar`）。縦線の描画には影響しない。`Timeline` は表示中グリッドに合わせる（8 小節未満なら拍、それ以外は画面に出ている小節線） |
 
@@ -157,7 +159,7 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 - 条件未達の理由と対象パスはログの `=== Export Preflight ===` に出す（状態が変わったときだけ）
 - Ctrl+Shift で無効化した Playlist は書き出しと Wwise インポートから除外。`Compact Num.` がオンなら残った番号を 1 から詰め、オフなら元番号を維持
 - 中間のプレイリスト単位 WAV は作らず、Wwise が参照する Music Segment／Track 単位の最終 WAV だけをプロジェクト設定の書き出し先直下へ直接出力する
-- 書き出し WAV は音声の切り出しのみ。リージョン／マーカーは WAV へ埋め込まず、Wwise 登録時にインメモリ情報から設定する
+- **書き出し WAV は音声の切り出しのみ（非破壊）。** リージョン端フェード・レイヤーバランス用ゲイン・マーカー／Cue は WAV へ焼き込まず、続く Wwise 登録でインメモリ情報からプロパティへ設定する
 - サイクル名の接尾辞: `-R`＝除外、`-L`＝ループ範囲、`-E`＝Wwise の Exit Cue 以降。  
   `-R` / `-L` / `-E`（および内部生成の `-A`）が重なる配置はエラー
 - アプリ独自フォロー:
@@ -168,6 +170,8 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 ### Wwise インポート（WAAPI）
 
 書き出し完了後、EXPORT 開始時に固定した**選択オブジェクトの下**へ、確認ダイアログを表示せず Music 構造を自動生成します。利用条件・商標については [商標・ライセンス](#商標ライセンス) を参照してください。
+
+**Wwise への載せ方も非破壊です。** 分割 WAV は切り出し音声のまま取り込み、フェード・レイヤーバランス・Cue・トランジションは Authoring 側プロパティへ設定します（ソース／分割 WAV は書き換えない）。
 
 - グループ化されていない出力パート 1 つ、またはグループ 1 つを Music Playlist Container 1 つとして扱う
 - 最終 Playlist が 2 つ以上なら Music Switch Container（元ファイル名）の下に配置する。あわせて **Music Switch 用 State Group**（同名）を `\States\Default Work Unit` に作成し、各 State を同名 Playlist に割当。既存 State Group があるときは削除・再作成せず、同一オブジェクトの State 一覧を現在の Playlist 構成へ更新する
@@ -191,7 +195,7 @@ Nuendo／Cubase の tracklist XML と Wave を読み、波形プレビュー、�
 - トラックは `[Project.*] StreamEnabled`（既定オン）に従いストリーミングを設定。オン時は、各 Playlist の**先頭セグメント内の全トラック**（グループ化レイヤー含む）に Zero latency オン＋**Look-ahead 50ms**＋Prefetch Length（`[Project.*] PrefetchLengthMs`、既定 500）を設定。2 番目以降のセグメントは Look-ahead を `[Project.*] LookAheadMs`（既定 500）に設定。オフ時はストリーミング無効で作成し LookAhead／Prefetch／Zero latency は付けない
   - 先頭セグメントの Look-ahead を 0 ではなく **50ms** にするのは、State Volume などで極端に音量を下げたとき、減衰が追いつかず一瞬音が残ることがあるのを避けるため（Wwise 側で公式に話題にはなっていないが、実機で確認した挙動への対策）
 - 元 WAV から各 Music Segment／Track の範囲を直接切り出し、書き出し先直下の最終 WAV を取り込む
-- **Layer Music Option / Keep Layer Balance（任意・既定オフ）** … Wwise の Loudness Normalization 利用時にオン推奨。EXPORT 時にグループ（2 パート以上）内の Integrated Loudness（LKFS）を計測し、最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差だけ下げて **Music Track** の Make-Up Gain へ設定する。未グループには適用しない。WAV へは焼き込まない
+- **Layer Music Option / Keep Layer Balance（任意・既定オフ）** … Wwise の Loudness Normalization 利用時にオン推奨。EXPORT 時にグループ（2 パート以上）内の Integrated Loudness（LKFS）を計測し、最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差だけ下げて **Music Track** の Make-Up Gain へ**非破壊で**設定する。未グループには適用しない。WAV へは焼き込まない
 
 ---
 
@@ -315,7 +319,7 @@ exe と同じフォルダに置きます（無ければ起動時に既定値で�
 | `AutoActive` | EXPORT 完了時に Wwise を前面化する（`1`/`0`。ステータスバー / Auto Active） | `1` |
 | `PrefetchLengthMs` | Playlist 先頭セグメント内全トラックの Prefetch Length（ms、0〜9999。Stream オン時。Zero latency と同じ範囲） | `500` |
 | `LookAheadMs` | 2 番目以降のセグメントの Look-ahead Time（ms、0〜9999。Stream オン時）。先頭セグメントは UI 値ではなく固定 50ms | `500` |
-| `LoudnessPreserveGroupBalance` | Layer Music Option / Keep Layer Balance（`1`/`0`）。グループ内相対バランスを Music Track の Make-Up Gain で維持 | `0` |
+| `LoudnessPreserveGroupBalance` | Layer Music Option / Keep Layer Balance（`1`/`0`）。グループ内相対バランスを Music Track の Make-Up Gain で非破壊維持 | `0` |
 | `GridOverride` | マーカー付与のスナップ単位（`Bar`／`Beat`／`Default`＝UI の Timeline。Marker Grid） | `Bar` |
 | `CommentDigits` | マーカーコメント連番の桁数（0〜6。0 で連番なし） | `3` |
 | `CommentZeroPad` | 連番を桁数まで 0 埋めする（`1`/`0`） | `1` |

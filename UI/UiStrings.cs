@@ -498,22 +498,23 @@ internal static class UiStrings
     public static string TipLoudnessHeader => Get(
         "Layer Music Option。"
         + " Wwise の Loudness Normalization を利用しているときはオンを推奨します。"
-        + " グループ内の相対バランスを、Music Track の Make-Up Gain で維持します。",
+        + " グループ内の相対バランスを、Music Track の Make-Up Gain で非破壊維持します（WAV へは焼き込みません）。",
         "Layer Music Option."
         + " Recommended on when using Wwise Loudness Normalization."
-        + " Keeps relative balance within a group via Music Track Make-Up Gain.");
+        + " Keeps relative balance within a group nondestructively via Music Track Make-Up Gain"
+        + " (not baked into WAV).");
 
     public static string TipLoudnessGroupBalance => Get(
         "オンの場合、グループ内各パートの Integrated Loudness（LKFS）を計測し、"
         + "最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差だけ下げます（既定オフ）。"
         + " Wwise の Loudness Normalization 利用時にオンを推奨。"
-        + " 補正は Music Track の Make-Up Gain へ書き込みます。"
+        + " 補正は Music Track の Make-Up Gain へ非破壊で書き込み、WAV へは焼き込みません。"
         + " グループ（2 パート以上）が無いときは操作できません。",
         "When on, measures each grouped part’s Integrated Loudness (LKFS),"
         + " sets Make-Up Gain of the loudest part to 0 dB and lowers the others by the relative difference"
         + " (default off)."
         + " Recommended when using Wwise Loudness Normalization."
-        + " Writes Make-Up Gain on the Music Track."
+        + " Writes Make-Up Gain on the Music Track nondestructively (not baked into WAV)."
         + " Disabled when no group of 2+ parts exists.");
 
     public static string TipMoreOptionsHeader => Get(
