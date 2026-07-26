@@ -60,6 +60,9 @@ internal sealed class LastWaveSessionState
     /// <summary>パート番号 → 同一グループ内遷移用 Group Fade 秒数（In／Out 共通）。</summary>
     public Dictionary<string, double> PartGroupFadeSeconds { get; set; } = new(StringComparer.Ordinal);
 
+    /// <summary>パート番号 → Play -E（Wwise Play post-exit。同一グループで共有）。</summary>
+    public Dictionary<string, bool> PartPlayPostExit { get; set; } = new(StringComparer.Ordinal);
+
     /// <summary>連続リージョン固まりのイン／アウト端フェード（プレビュー用）。</summary>
     public List<LastWaveRegionEdgeFadeState> RegionEdgeFades { get; set; } = [];
 
@@ -114,6 +117,7 @@ internal sealed class LastWaveSessionState
         IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeInCurves,
         IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeOutCurves,
         IReadOnlyDictionary<int, double> partGroupFadeSeconds,
+        IReadOnlyDictionary<int, bool> partPlayPostExit,
         IReadOnlyList<WaveformMarkerMark>? waveOnlySessionMarkers = null,
         IReadOnlyList<RegionEdgeFade>? regionEdgeFades = null,
         IReadOnlyList<string>? wavePaths = null)
@@ -179,6 +183,10 @@ internal sealed class LastWaveSessionState
                 pair => pair.Value.ToString(),
                 StringComparer.Ordinal),
             PartGroupFadeSeconds = partGroupFadeSeconds.ToDictionary(
+                pair => pair.Key.ToString(),
+                pair => pair.Value,
+                StringComparer.Ordinal),
+            PartPlayPostExit = partPlayPostExit.ToDictionary(
                 pair => pair.Key.ToString(),
                 pair => pair.Value,
                 StringComparer.Ordinal),
@@ -415,6 +423,27 @@ internal sealed class LastWaveSessionState
         }
 
         return TryParseFadeMap(PartGroupFadeSeconds, partGroupFadeSeconds);
+    }
+
+    public bool TryGetPartPlayPostExit(out Dictionary<int, bool> partPlayPostExit)
+    {
+        partPlayPostExit = new Dictionary<int, bool>();
+        if (PartPlayPostExit is null || PartPlayPostExit.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var pair in PartPlayPostExit)
+        {
+            if (!int.TryParse(pair.Key, out var partNumber))
+            {
+                return false;
+            }
+
+            partPlayPostExit[partNumber] = pair.Value;
+        }
+
+        return true;
     }
 
     public bool TryGetPartFadeCurves(

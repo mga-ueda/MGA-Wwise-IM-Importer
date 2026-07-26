@@ -50,6 +50,12 @@ internal sealed class WwisePlaylistPlan
     public required RegionFadeCurveKind FadeOutCurve { get; init; }
 
     /// <summary>
+    /// Any → この Playlist ルールの Play post-exit（遷移先の記憶値。既定 true）。
+    /// WAAPI 非対応のため、EXPORT 後に WWU の <c>PlaySourcePostExit</c> へ直編集する。
+    /// </summary>
+    public required bool PlayPostExit { get; init; }
+
+    /// <summary>
     /// グループ（2 パート以上）時に作る State Group 計画。
     /// 未グループの単一パート Playlist では null。
     /// </summary>

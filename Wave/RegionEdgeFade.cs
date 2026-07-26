@@ -286,15 +286,6 @@ internal readonly record struct RegionEdgeFade(
         long FirstSegmentEndSample,
         long LastSegmentStartSample);
 
-    /// <summary>除外で区切られた連続リージョン固まりの (In, Out) 一覧。</summary>
-    public static IReadOnlyList<(long InSample, long OutSample)> CollectRunBounds(
-        IReadOnlyList<WaveformRegionMark> regions)
-    {
-        return CollectRunSegmentLimits(regions)
-            .Select(run => (run.InSample, run.OutSample))
-            .ToList();
-    }
-
     /// <summary>
     /// 固まり境界と、先頭／末尾 Music Segment 境界を返す。
     /// セグメント束ねは Wwise 取り込みと同じ（<c>-A</c> は次と、<c>-E</c> は直前と同グループ）。

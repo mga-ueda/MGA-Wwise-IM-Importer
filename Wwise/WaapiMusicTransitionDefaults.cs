@@ -12,8 +12,8 @@ namespace MgaWwiseIMImporter.Wwise;
 /// 続けて各 Playlist 向け Any → Object ルールを追加する（Exit Source At は遷移先の記憶値）。
 /// Destination Sync To = Entry Cue。
 /// Source Fade-out / Destination Fade-in の有効フラグは秒数に応じて立てる。
-/// MusicFade の Time / Offset / Curve は WAAPI では新規作成できないため、
-/// EXPORT 後に Work Unit XML 直編集で書く。
+/// MusicFade の Time / Offset / Curve と Play post-exit（PlaySourcePostExit）は
+/// WAAPI 非対応のため EXPORT 後の WWU 直編集で書く。
 /// </para>
 /// <para>
 /// WAAPI 上のプロパティ名は UI 表示名と異なる。

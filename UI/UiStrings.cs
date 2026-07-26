@@ -104,10 +104,6 @@ internal static class UiStrings
         "Toggle tooltips");
 
     // --- Audio settings dialog ---
-    public static string DialogAudioSettingsTitle => Get(
-        "Audio Output Settings",
-        "Audio Output Settings");
-
     public static string LabelAudioApi => Get(
         "Output API",
         "Output API");
@@ -409,8 +405,14 @@ internal static class UiStrings
         + " Even when grouped, each playlist can have its own value.");
 
     public static string TipOptionsHeader => Get(
-        "Options（今後追加予定）。現在は空です。",
-        "Options (placeholder for future settings). Currently empty.");
+        "Options。Playlist ごとの追加設定です（同一グループ ID では共有）。",
+        "Options. Extra per-playlist settings (shared within the same group ID).");
+
+    public static string TipPlayMinusE => Get(
+        "オンのとき、`-L` ループ折り返しで `-E` を二重再生します（Wwise の Play post-exit 相当）。"
+        + " EXPORT 時は遷移先向け Any→Object ルールの Play post-exit へ反映します。",
+        "When on, dual-plays -E on -L loop wrap (Wwise Play post-exit)."
+        + " EXPORT writes Play post-exit on Any→Object transition rules for the destination.");
 
     public static string TipAutoActive => Get(
         "オンのとき、EXPORT 完了後に Wwise を前面化します。"
@@ -1909,6 +1911,7 @@ internal static class UiStrings
     public static string LabelFadeIn => Get("Fade In", "Fade In");
     public static string LabelFadeOut => Get("Fade Out", "Fade Out");
     public static string LabelOptions => Get("Options", "Options");
+    public static string LabelPlayMinusE => Get("Play -E", "Play -E");
     public static string LabelAutoActive => Get("Auto Active", "Auto Active");
     public static string LabelGroup => Get("Group", "Group");
     public static string LabelChangeOccursAt => Get("Chg Occ At", "Chg Occ At");
@@ -2285,12 +2288,6 @@ internal static class UiStrings
         count,
         maxMs);
 
-    public static string LogMusicClipWorkUnitPatchStart(int playAtCount, int fadeCount) => Format(
-        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Fade Duration 超過={1} 件）。保存→クローズ→パッチ→再オープンを行います。",
-        "Message : Starting WWU patch (PlayAt={0}, Fade Duration over limit={1}). save → close → patch → reopen.",
-        playAtCount,
-        fadeCount);
-
     public static string LogWorkUnitPatchStart(
         int playAtCount,
         int clipFadeCount,
@@ -2318,12 +2315,6 @@ internal static class UiStrings
         "Message : Playlist 遷移 MusicFade WWU パッチ完了（{0} ルール）。",
         "Message : Playlist transition MusicFade WWU patch done ({0} rule(s)).",
         count);
-
-    public static string ErrMusicTransitionNotFound(string name, string containerPath) => Format(
-        "MusicTransition が見つかりませんでした（name={0} / under={1}）",
-        "MusicTransition not found (name={0} / under={1})",
-        name,
-        containerPath);
 
     public static string ErrMusicTransitionWorkUnitNotFound(string name) => Format(
         "MusicTransition の所属 WWU ファイルを特定できませんでした（{0}）",
@@ -2372,11 +2363,6 @@ internal static class UiStrings
         expected,
         actual is null ? "(なし)" : actual.Value.ToString("0.###") + "ms");
 
-    public static string LogPlayAtPatchStart(int count) => Format(
-        "Message : 負の PlayAt を {0} 件設定します（WAAPI 非対応のため、保存→WWU 直接編集→再オープンを行います）",
-        "Message : Applying {0} negative PlayAt value(s) via save → WWU patch → reopen (WAAPI cannot set them)",
-        count);
-
     public static string LogPlayAtPatchFile(string fileName, int count) => Format(
         "Message : WWU を直接更新しました → {0}（クリップ {1} 件）",
         "Message : Patched work unit → {0} ({1} clip(s))",
@@ -2387,11 +2373,6 @@ internal static class UiStrings
         "Message : プロジェクトを再オープンしています → {0}",
         "Message : Reopening project → {0}",
         projectName);
-
-    public static string LogPlayAtPatchDone(int count) => Format(
-        "Message : PlayAt 設定完了（{0} 件）。クリップはタイムライン 0 に配置されています。",
-        "Message : PlayAt applied ({0} clip(s)). Clips are aligned to timeline 0.",
-        count);
 
     public static string ErrPlayAtWorkUnitNotFound(string clipId) => Format(
         "MusicClip の所属 WWU ファイルを特定できませんでした（{0}）",

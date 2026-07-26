@@ -42,6 +42,8 @@ internal static class WwiseMusicPlanBuilder
         double defaultGroupFadeSeconds = 0,
         IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes = null,
         PlaylistExitSourceMode defaultChangeOccursAt = PlaylistExitSourceMode.Immediate,
+        IReadOnlyDictionary<int, bool>? partPlayPostExit = null,
+        bool defaultPlayPostExit = true,
         string? containerNameOverride = null)
     {
         if (sampleRate == 0)
@@ -98,6 +100,10 @@ internal static class WwiseMusicPlanBuilder
                 unit.Parts,
                 partFadeOutCurves,
                 defaultFadeOutCurve);
+            var playPostExit = ResolveUnitPlayPostExit(
+                unit.Parts,
+                partPlayPostExit,
+                defaultPlayPostExit);
             if (unit.Parts.Count == 1)
             {
                 playlists.Add(BuildSinglePartPlaylist(
@@ -113,7 +119,8 @@ internal static class WwiseMusicPlanBuilder
                     fadeInSeconds,
                     fadeOutSeconds,
                     fadeInCurve,
-                    fadeOutCurve));
+                    fadeOutCurve,
+                    playPostExit));
             }
             else
             {
@@ -130,6 +137,7 @@ internal static class WwiseMusicPlanBuilder
                     fadeOutSeconds,
                     fadeInCurve,
                     fadeOutCurve,
+                    playPostExit,
                     partGroupFadeSeconds,
                     defaultGroupFadeSeconds,
                     partChangeOccursAtModes,
@@ -163,6 +171,26 @@ internal static class WwiseMusicPlanBuilder
         }
 
         return defaultExitSourceAt;
+    }
+
+    private static bool ResolveUnitPlayPostExit(
+        IReadOnlyList<WaveformOutputPart> parts,
+        IReadOnlyDictionary<int, bool>? partPlayPostExit,
+        bool defaultPlayPostExit)
+    {
+        if (parts.Count == 0)
+        {
+            return defaultPlayPostExit;
+        }
+
+        var representativeNumber = parts.Min(part => part.Number);
+        if (partPlayPostExit is not null
+            && partPlayPostExit.TryGetValue(representativeNumber, out var enabled))
+        {
+            return enabled;
+        }
+
+        return defaultPlayPostExit;
     }
 
     private static PlaylistExitSourceMode ResolvePartChangeOccursAt(
@@ -423,7 +451,8 @@ internal static class WwiseMusicPlanBuilder
         double fadeInSeconds,
         double fadeOutSeconds,
         RegionFadeCurveKind fadeInCurve,
-        RegionFadeCurveKind fadeOutCurve)
+        RegionFadeCurveKind fadeOutCurve,
+        bool playPostExit)
     {
         var sourceWavPath = Path.Combine(directory, part.FileName);
         var partRegions = CollectPartRegions(part, regions);
@@ -451,6 +480,7 @@ internal static class WwiseMusicPlanBuilder
             FadeOutSeconds = fadeOutSeconds,
             FadeInCurve = fadeInCurve,
             FadeOutCurve = fadeOutCurve,
+            PlayPostExit = playPostExit,
             Segments = segments,
         };
     }
@@ -468,6 +498,7 @@ internal static class WwiseMusicPlanBuilder
         double fadeOutSeconds,
         RegionFadeCurveKind fadeInCurve,
         RegionFadeCurveKind fadeOutCurve,
+        bool playPostExit,
         IReadOnlyDictionary<int, double>? partGroupFadeSeconds,
         double defaultGroupFadeSeconds,
         IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes,
@@ -613,6 +644,7 @@ internal static class WwiseMusicPlanBuilder
             FadeOutSeconds = fadeOutSeconds,
             FadeInCurve = fadeInCurve,
             FadeOutCurve = fadeOutCurve,
+            PlayPostExit = playPostExit,
             GroupState = new WwiseGroupStatePlan
             {
                 Name = playlistName,

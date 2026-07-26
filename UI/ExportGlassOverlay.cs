@@ -311,7 +311,7 @@ internal sealed class ExportGlassOverlay : Control
             return;
         }
 
-        _logFont ??= AppFonts.CreateLogFont(8f);
+        _logFont ??= AppFonts.CreateLogFont(7f);
         const TextFormatFlags flags =
             TextFormatFlags.NoPadding
             | TextFormatFlags.NoPrefix

@@ -15,6 +15,7 @@ internal enum PlaylistDestinationSyncMode
 /// <c>-L</c> 連続区間は <see cref="SetLoopPlans"/> で登録し、
 /// <see cref="ArmLoopAtProgress"/> で有効化した区間だけ末尾→先頭へシームレス折り返す。
 /// 直後が <c>-E</c> のときは、ループ末端で頭へ戻る瞬間に Exit をワンショット二重再生する（Wwise 相当）。
+/// <see cref="PlayExitLayer"/> が false のときは -L ループのみ（-E は鳴らさない）。
 /// シークで区間外へ出るとループ／Exit とも直ちに解除される。
 /// </summary>
 internal sealed class WaveAudioPlayer : IDisposable
@@ -37,6 +38,8 @@ internal sealed class WaveAudioPlayer : IDisposable
     private bool _isPlaying;
     private bool _disposed;
     private bool _suppressPlaybackEnded;
+    /// <summary>ループ折り返し時に -E を二重再生するか（既定 true）。</summary>
+    private bool _playExitLayer = true;
     /// <summary>
     /// 次の Play 前に出力デバイスを作り直し、先読みバッファを破棄するか。
     /// Pause／Stop／一時停止中のシーク後はデバイス側に旧位置が残り得る（ASIO で顕著）。
@@ -183,6 +186,21 @@ internal sealed class WaveAudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         _provider?.SetExcludedRegions(regions);
+    }
+
+    /// <summary>
+    /// ループ折り返し時の -E 二重再生を行うか。
+    /// false にすると進行中の Exit／上乗せ Exit も直ちに止める。
+    /// </summary>
+    public bool PlayExitLayer
+    {
+        get => _playExitLayer;
+        set
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _playExitLayer = value;
+            _provider?.SetPlayExitLayer(value);
+        }
     }
 
     /// <summary>
@@ -536,7 +554,8 @@ internal sealed class WaveAudioPlayer : IDisposable
         Trace(
             $"playlist.overlay-add accepted={accepted} voice={voiceId}"
             + $" start={startSample} end={endSample}"
-            + $" fadeInSeconds={fadeInSeconds:R} reason={rejectReason ?? "ok"}");
+            + $" fadeInSeconds={fadeInSeconds:R}"
+            + $" reason={rejectReason ?? "ok"}");
         return accepted;
     }
 
@@ -732,6 +751,7 @@ internal sealed class WaveAudioPlayer : IDisposable
             _overlayExitReaders!,
             info,
             message => Trace(message));
+        _provider.SetPlayExitLayer(_playExitLayer);
         PushActivePlanToProvider();
         InitOutputDevice();
     }
@@ -1232,6 +1252,7 @@ internal sealed class WaveAudioPlayer : IDisposable
         private readonly object _gate = new();
         private readonly object _readGate = new();
         private LoopPlaybackPlan? _activePlan;
+        private bool _playExitLayer = true;
         private bool _exitPlaying;
         private long _exitStartSample;
         private long _exitEndSample;
@@ -1368,6 +1389,26 @@ internal sealed class WaveAudioPlayer : IDisposable
                 lock (_readGate)
                 {
                     return CurrentSample(_source);
+                }
+            }
+        }
+
+        public void SetPlayExitLayer(bool enabled)
+        {
+            lock (_gate)
+            {
+                _playExitLayer = enabled;
+                if (enabled)
+                {
+                    return;
+                }
+
+                _exitPlaying = false;
+                foreach (var voice in _overlayVoices)
+                {
+                    voice.ExitPlaying = false;
+                    voice.ExitStartSample = 0;
+                    voice.ExitEndSample = 0;
                 }
             }
         }
@@ -2150,7 +2191,7 @@ internal sealed class WaveAudioPlayer : IDisposable
         /// </summary>
         private void BeginExitOnLoopWrap(LoopPlaybackPlan loop)
         {
-            if (!loop.HasExit)
+            if (!_playExitLayer || !loop.HasExit)
             {
                 return;
             }
@@ -2600,12 +2641,12 @@ internal sealed class WaveAudioPlayer : IDisposable
                 var oldPlan = _activePlan;
                 continuedFromPreRoll = _playlistPreRollPlaying;
                 sourceExitWillBeMaintained = carryExitFade
-                    || oldPlan is { HasExit: true } sourcePlan
-                    && transition.FadeFrameCount
-                        > Math.Max(
-                            0L,
-                            sourcePlan.LoopEndSample
-                            - transition.SyncBoundarySample);
+                    || (oldPlan is { HasExit: true } sourcePlan
+                        && transition.FadeFrameCount
+                            > Math.Max(
+                                0L,
+                                sourcePlan.LoopEndSample
+                                - transition.SyncBoundarySample));
                 // 同時に保持できる旧フェードはこの1本だけ。再遷移時は上書きして先頭から開始。
                 // Fade Out=None（0フレーム）のときは旧ソースを重ねず即切り替え。
                 _playlistFadePlaying = transition.FadeFrameCount > 0;
@@ -3060,7 +3101,7 @@ internal sealed class WaveAudioPlayer : IDisposable
             OverlayPlaylistVoice voice,
             LoopPlaybackPlan loop)
         {
-            if (!loop.HasExit)
+            if (!_playExitLayer || !loop.HasExit)
             {
                 lock (_gate)
                 {

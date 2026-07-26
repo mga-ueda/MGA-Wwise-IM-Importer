@@ -146,6 +146,12 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>パート番号 → Exit Source At（Last Session へ永続化）。</summary>
     private readonly Dictionary<int, PlaylistExitSourceMode> _playlistExitSourceModes = new();
 
+    /// <summary>プロジェクト既定の Play -E（パート未設定時。既定オン）。</summary>
+    private bool _playlistPlayPostExit = true;
+
+    /// <summary>パート番号 → Play -E（同一グループ ID で共有。Last Session へ永続化）。</summary>
+    private readonly Dictionary<int, bool> _playlistPlayPostExitByPart = new();
+
     /// <summary>パート番号 → Fade In 秒数。</summary>
     private readonly Dictionary<int, double> _playlistFadeInSecondsByPart = new();
 
@@ -1797,7 +1803,8 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>
     /// 再生ボタン押下時の修飾キーをショートカット相当に変換する。
-    /// Alt → 直前開始位置から再生し直し、Ctrl → 3秒前から再生。
+    /// Alt → 直前開始位置から再生し直し、Ctrl → 3秒前から再生、
+    /// なし → 通常の再生／一時停止。
     /// </summary>
     private static Keys ResolveTogglePlaybackShortcut()
     {
@@ -2539,6 +2546,7 @@ public partial class Form1 : Form, IMessageFilter
                 profile.FadeOutCurve,
                 _appSettings.DefaultPlaylistFadeOutCurve);
             _playlistExitSourceMode = profile.ExitSourceAt;
+            _playlistPlayPostExit = profile.PlayPostExit;
             _playlistGroupFadeSeconds = 0d;
             // パート別記憶を捨て、プロジェクト既定をラジオへ出す。
             ClearPlaylistTransitionSettingsState();
@@ -2638,6 +2646,13 @@ public partial class Form1 : Form, IMessageFilter
         match.CheckedChanged += ExitSourceAtRadio_CheckedChanged;
     }
 
+    private void SelectPlayPostExitCheck(bool enabled)
+    {
+        playMinusECheckBox.CheckedChanged -= PlayMinusECheckBox_CheckedChanged;
+        playMinusECheckBox.Checked = enabled;
+        playMinusECheckBox.CheckedChanged += PlayMinusECheckBox_CheckedChanged;
+    }
+
     private void SelectChangeOccursAtRadio(PlaylistExitSourceMode mode)
     {
         FlatOptionRadioButton? match = null;
@@ -2693,6 +2708,16 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         return NormalizeExitSourceModeForCurrentWave(mode);
+    }
+
+    private bool ResolvePlayPostExit(int partNumber)
+    {
+        if (_playlistPlayPostExitByPart.TryGetValue(partNumber, out var enabled))
+        {
+            return enabled;
+        }
+
+        return _playlistPlayPostExit;
     }
 
     /// <summary>
@@ -2805,7 +2830,7 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// Exit Source / Fade In・Out の適用範囲。
+    /// Exit Source / Fade In・Out / Play -E の適用範囲。
     /// 同一グループ ID のメンバーだけ共通。未グループ／別 ID は各パート独立。
     /// Group Fade は常にパート単位（このスコープの対象外）。
     /// </summary>
@@ -2833,6 +2858,14 @@ public partial class Form1 : Form, IMessageFilter
         foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
         {
             _playlistExitSourceModes[scoped] = mode;
+        }
+    }
+
+    private void StorePlayPostExit(int partNumber, bool enabled)
+    {
+        foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
+        {
+            _playlistPlayPostExitByPart[scoped] = enabled;
         }
     }
 
@@ -3090,6 +3123,7 @@ public partial class Form1 : Form, IMessageFilter
             GroupFadeTimeRadio_CheckedChanged);
         SelectExitSourceRadio(ResolveExitSourceMode(partNumber));
         SelectChangeOccursAtRadio(ResolveChangeOccursAtMode(partNumber));
+        SelectPlayPostExitCheck(ResolvePlayPostExit(partNumber));
         UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
     }
@@ -3097,6 +3131,7 @@ public partial class Form1 : Form, IMessageFilter
     private void ClearPlaylistTransitionSettingsState()
     {
         _playlistExitSourceModes.Clear();
+        _playlistPlayPostExitByPart.Clear();
         _playlistFadeInSecondsByPart.Clear();
         _playlistFadeOutSecondsByPart.Clear();
         _playlistFadeInCurveByPart.Clear();
@@ -3112,6 +3147,7 @@ public partial class Form1 : Form, IMessageFilter
             GroupFadeTimeRadio_CheckedChanged);
         SelectExitSourceRadio(_playlistExitSourceMode);
         SelectChangeOccursAtRadio(_playlistChangeOccursAtMode);
+        SelectPlayPostExitCheck(_playlistPlayPostExit);
         UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
         UpdateGroupFadeRadioEnabled();
@@ -3207,6 +3243,7 @@ public partial class Form1 : Form, IMessageFilter
         profile.FadeInCurve = _playlistFadeInCurve.ToString();
         profile.FadeOutCurve = _playlistFadeOutCurve.ToString();
         profile.ExitSourceAt = _playlistExitSourceMode;
+        profile.PlayPostExit = _playlistPlayPostExit;
         profile.CopyMarkerFrom(_markerSettings);
         profile.CompactFileNumbers = compactFileNumbersCheckBox.Checked;
         profile.OutputDirectory = _projectOutputDirectory;
@@ -3657,8 +3694,7 @@ public partial class Form1 : Form, IMessageFilter
             fadeInHeaderLabel,
             fadeInChoicesPanel,
             optionsHeaderLabel,
-            optionsChoicesPanel,
-            reserveEmptySecondaryHeight: true);
+            optionsChoicesPanel);
         AdjustFadeSectionHeight(
             fadeOutSectionPanel,
             transitionTimeHeaderLabel,
@@ -3678,16 +3714,10 @@ public partial class Form1 : Form, IMessageFilter
         Label header,
         FlowLayoutPanel normalChoices,
         Label secondaryHeader,
-        FlowLayoutPanel secondaryChoices,
-        bool reserveEmptySecondaryHeight = false)
+        FlowLayoutPanel secondaryChoices)
     {
         var normalHeight = MeasureChoicesHeight(normalChoices);
         var secondaryHeight = MeasureChoicesHeight(secondaryChoices);
-        if (reserveEmptySecondaryHeight && secondaryChoices.Controls.Count == 0)
-        {
-            // Options など空プレースホルダは、通常候補と同じ高さを確保して列下端を揃える。
-            secondaryHeight = Math.Max(secondaryHeight, normalHeight);
-        }
 
         normalChoices.Height = normalHeight;
         secondaryChoices.Height = secondaryHeight;
@@ -3766,6 +3796,9 @@ public partial class Form1 : Form, IMessageFilter
         optionsHeaderLabel.BackColor = back;
         optionsHeaderLabel.BarColor = headerBack;
         optionsHeaderLabel.ForeColor = UiColors.PlaylistDefaultFore;
+        playMinusECheckBox.BackColor = back;
+        playMinusECheckBox.ForeColor = UiColors.PlaylistOptionFore;
+        RefreshFlatOptionControl(playMinusECheckBox);
         changeOccursAtChoicesPanel.BackColor = back;
         changeOccursAtHeaderLabel.BackColor = back;
         changeOccursAtHeaderLabel.BarColor = headerBack;
@@ -4245,6 +4278,50 @@ public partial class Form1 : Form, IMessageFilter
                 appliesFromNextRequest = _pendingPlaylistTransitionGeneration != 0,
             });
     }
+
+    private void PlayMinusECheckBox_CheckedChanged(object? sender, EventArgs e)
+    {
+        var enabled = playMinusECheckBox.Checked;
+        if (_transitionSettingsEditPartNumber is int partNumber)
+        {
+            StorePlayPostExit(partNumber, enabled);
+            PersistLastWaveSessionIfPossible();
+        }
+        else
+        {
+            _playlistPlayPostExit = enabled;
+            AutosaveCurrentProject();
+        }
+
+        ApplyPlayExitLayerForCurrentPlayback();
+        ReleaseFocusToWaveform();
+        WritePlaybackDiagnostic(
+            "playlist.play-post-exit-changed",
+            new
+            {
+                playPostExit = enabled,
+                part = _transitionSettingsEditPartNumber,
+                stored = _transitionSettingsEditPartNumber is not null,
+            });
+    }
+
+    /// <summary>
+    /// 現在再生中 Playlist の Play -E をエンジンへ反映する。
+    /// </summary>
+    private void ApplyPlayExitLayerForCurrentPlayback()
+    {
+        var part = ResolvePlayExitSettingsPartNumber();
+        _audioPlayer.PlayExitLayer = part is int number
+            ? ResolvePlayPostExit(number)
+            : _playlistPlayPostExit;
+    }
+
+    private int? ResolvePlayExitSettingsPartNumber() =>
+        ResolveClockPlaylistPart()?.Number
+        ?? TryGetOutputPartAtProgress(_smoothProgress)?.Number
+        ?? _transitionSettingsEditPartNumber
+        ?? _activeAutomaticPlaylistPartNumber
+        ?? _manualPlaylistPartNumber;
 
     private static Color BlendColor(Color from, Color to, double amount)
     {
@@ -5078,7 +5155,7 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>
     /// 同一グループのトランジション設定をリーダー（最小 part 番号）基準で全メンバーへ揃える。
-    /// Group Fade はパート単位のため同期しない。
+    /// Group Fade / Change Occurs At はパート単位のため同期しない。
     /// </summary>
     private void SyncTransitionSettingsForGroup(int groupId)
     {
@@ -5094,6 +5171,7 @@ public partial class Form1 : Form, IMessageFilter
 
         var leader = members[0];
         var exit = ResolveExitSourceMode(leader);
+        var playPostExit = ResolvePlayPostExit(leader);
         var fadeIn = ResolveFadeInSeconds(leader);
         var fadeOut = ResolveFadeOutSeconds(leader);
         var fadeInCurve = ResolveFadeInCurve(leader);
@@ -5101,6 +5179,7 @@ public partial class Form1 : Form, IMessageFilter
         foreach (var member in members)
         {
             _playlistExitSourceModes[member] = exit;
+            _playlistPlayPostExitByPart[member] = playPostExit;
             _playlistFadeInSecondsByPart[member] = fadeIn;
             _playlistFadeOutSecondsByPart[member] = fadeOut;
             _playlistFadeInCurveByPart[member] = fadeInCurve;
@@ -5843,6 +5922,7 @@ public partial class Form1 : Form, IMessageFilter
             ClearPendingPlaylistUiTransition();
             _audioPlayer.CancelPlaylistTransition();
             _audioPlayer.ClearOverlayPlaylistVoices();
+            _audioPlayer.PlayExitLayer = ResolvePlayPostExit(target.Number);
             if (!_audioPlayer.StartPlaylistRange(target.StartSampleOffset, target.EndSampleOffset, target.Number))
             {
                 WritePlaybackDiagnostic(
@@ -6410,6 +6490,7 @@ public partial class Form1 : Form, IMessageFilter
         {
             _playingPlaylistPartNumbers.Add(committedPartNumber);
             _audioPlayer.SetClockPlaylistVoiceId(committedPartNumber);
+            ApplyPlayExitLayerForCurrentPlayback();
         }
 
         _audioPlayer.ClearOverlayPlaylistVoices();
@@ -6718,6 +6799,7 @@ public partial class Form1 : Form, IMessageFilter
         changeOccursAtHeaderLabel.Text = UiStrings.LabelChangeOccursAt;
         exitSourceAtHeaderLabel.Text = UiStrings.LabelExitSourceAt;
         playlistHeaderLabel.Text = UiStrings.LabelMusicPlaylist;
+        playMinusECheckBox.Text = UiStrings.LabelPlayMinusE;
 
         FlatOptionRadioButton[] fadeRadios =
         [
@@ -6916,6 +6998,7 @@ public partial class Form1 : Form, IMessageFilter
         playlistToolTip.SetToolTip(exitSourceAtHeaderLabel, UiStrings.TipExitSourceHeader);
         playlistToolTip.SetToolTip(fadeInGroupDividerLabel, UiStrings.TipGroupFadeHeader);
         playlistToolTip.SetToolTip(optionsHeaderLabel, UiStrings.TipOptionsHeader);
+        playlistToolTip.SetToolTip(playMinusECheckBox, UiStrings.TipPlayMinusE);
         playlistToolTip.SetToolTip(changeOccursAtHeaderLabel, UiStrings.TipChangeOccursAtHeader);
         UpdatePlaylistFadeCurveIcons();
 
@@ -7292,7 +7375,20 @@ public partial class Form1 : Form, IMessageFilter
             BuildExportFadeSeconds(enabledNumbers, ResolveFadeOutSeconds),
             BuildExportFadeCurves(enabledNumbers, ResolveFadeInCurve),
             BuildExportFadeCurves(enabledNumbers, ResolveFadeOutCurve),
-            BuildExportFadeSeconds(enabledNumbers, ResolveGroupFadeSeconds));
+            BuildExportFadeSeconds(enabledNumbers, ResolveGroupFadeSeconds),
+            BuildExportPlayPostExit(enabledNumbers));
+    }
+
+    private IReadOnlyDictionary<int, bool> BuildExportPlayPostExit(
+        IReadOnlySet<int> enabledNumbers)
+    {
+        var result = new Dictionary<int, bool>();
+        foreach (var partNumber in enabledNumbers)
+        {
+            result[partNumber] = ResolvePlayPostExit(partNumber);
+        }
+
+        return result;
     }
 
     private IReadOnlyDictionary<int, PlaylistExitSourceMode> BuildExportExitSourceModes(
@@ -7356,7 +7452,8 @@ public partial class Form1 : Form, IMessageFilter
         IReadOnlyDictionary<int, double> PartFadeOutSeconds,
         IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeInCurves,
         IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeOutCurves,
-        IReadOnlyDictionary<int, double> PartGroupFadeSeconds);
+        IReadOnlyDictionary<int, double> PartGroupFadeSeconds,
+        IReadOnlyDictionary<int, bool> PartPlayPostExit);
 
     private void CopyrightLinkLabel_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
     {
@@ -8039,7 +8136,8 @@ public partial class Form1 : Form, IMessageFilter
                 out var savedFadeIns,
                 out var savedFadeOuts,
                 out var savedGroupFades)
-            || !state.TryGetPartFadeCurves(out var savedFadeInCurves, out var savedFadeOutCurves))
+            || !state.TryGetPartFadeCurves(out var savedFadeInCurves, out var savedFadeOutCurves)
+            || !state.TryGetPartPlayPostExit(out var savedPlayPostExit))
         {
             AppendReport(
                 $"{UiStrings.LogSessionHeader}{Environment.NewLine}"
@@ -8062,6 +8160,7 @@ public partial class Form1 : Form, IMessageFilter
             || savedFadeInCurves.Count > 0
             || savedFadeOutCurves.Count > 0
             || savedGroupFades.Count > 0
+            || savedPlayPostExit.Count > 0
             || state.RegionEdgeFades.Count > 0;
         if (!hasAny)
         {
@@ -8411,6 +8510,24 @@ public partial class Form1 : Form, IMessageFilter
             groupFadeApplied++;
         }
 
+        var playPostExitApplied = 0;
+        foreach (var (savedPartNumber, enabled) in savedPlayPostExit)
+        {
+            var partNumber = MapPartNumber(savedPartNumber);
+            if (!loadedByNumber.ContainsKey(partNumber))
+            {
+                continue;
+            }
+
+            if (state.Parts.Count > 0 && !matchingNumbers.Contains(partNumber))
+            {
+                continue;
+            }
+
+            _playlistPlayPostExitByPart[partNumber] = enabled;
+            playPostExitApplied++;
+        }
+
         UpdatePlaylistFadeCurveIcons();
 
         var settingsPart = _playlistExitSourceModes.Keys
@@ -8418,6 +8535,7 @@ public partial class Form1 : Form, IMessageFilter
             .Concat(_playlistFadeInSecondsByPart.Keys)
             .Concat(_playlistFadeOutSecondsByPart.Keys)
             .Concat(_playlistGroupFadeSecondsByPart.Keys)
+            .Concat(_playlistPlayPostExitByPart.Keys)
             .Where(loadedByNumber.ContainsKey)
             .OrderBy(number => number)
             .Cast<int?>()
@@ -8488,6 +8606,7 @@ public partial class Form1 : Form, IMessageFilter
             _playlistFadeInCurveByPart,
             _playlistFadeOutCurveByPart,
             _playlistGroupFadeSecondsByPart,
+            _playlistPlayPostExitByPart,
             session.GetWaveOnlySessionMarkers(),
             session.RegionEdgeFades,
             _lastWavePaths.Count > 0 ? _lastWavePaths : LastWaveSessionState.GetLoadedWavePaths(preview));
@@ -8798,6 +8917,8 @@ public partial class Form1 : Form, IMessageFilter
                 _playlistGroupFadeSeconds,
                 snapshot.PartChangeOccursAtModes,
                 _playlistChangeOccursAtMode,
+                snapshot.PartPlayPostExit,
+                _playlistPlayPostExit,
                 containerNameOverride);
             ReportProgress(UiStrings.LogPlanReady(plan.Playlists.Count));
             AppendReport(WaapiMusicImporter.FormatPlanSummary(plan) + Environment.NewLine);
@@ -8944,6 +9065,12 @@ public partial class Form1 : Form, IMessageFilter
             UpdatePlayhead();
         }
 
+        // 再生開始時のみ Play -E を反映（一時停止時は現状維持）
+        if (!wasPlaying)
+        {
+            ApplyPlayExitLayerForCurrentPlayback();
+        }
+
         _audioPlayer.Toggle();
         if (_audioPlayer.IsPlaying)
         {
@@ -8973,7 +9100,7 @@ public partial class Form1 : Form, IMessageFilter
         UpdateTransportPlaybackState();
         WritePlaybackDiagnostic(
             "transport.toggle-completed",
-            new { isPlaying = _audioPlayer.IsPlaying });
+            new { isPlaying = _audioPlayer.IsPlaying, playExitLayer = _audioPlayer.PlayExitLayer });
     }
 
     /// <summary>直近の再生開始位置へシークし、そこから再生し直す。</summary>
@@ -9027,6 +9154,7 @@ public partial class Form1 : Form, IMessageFilter
 
         SeekPlayback(clamped);
         _lastPlaybackStartProgress = clamped;
+        ApplyPlayExitLayerForCurrentPlayback();
 
         if (!wasPlaying)
         {

@@ -293,7 +293,8 @@ internal static class WaapiMusicImporter
                     p.FadeInSeconds,
                     p.FadeOutSeconds,
                     p.FadeInCurve,
-                    p.FadeOutCurve))
+                    p.FadeOutCurve,
+                    p.PlayPostExit))
                 .ToList()
             : [];
         await ApplyWorkUnitPatchesAsync(
@@ -2228,7 +2229,8 @@ internal static class WaapiMusicImporter
         double FadeInSeconds,
         double FadeOutSeconds,
         RegionFadeCurveKind FadeInCurve,
-        RegionFadeCurveKind FadeOutCurve);
+        RegionFadeCurveKind FadeOutCurve,
+        bool PlayPostExit);
 
     /// <summary>
     /// 負の PlayAt・WAAPI 上限超の Clip Fade Duration・Playlist 遷移 MusicFade・
@@ -3109,6 +3111,11 @@ internal static class WaapiMusicImporter
                 "EnableDestinationFadeIn",
                 patch.FadeInSeconds > 0,
                 patch.TransitionName);
+            VerifyBoolProperty(
+                transitionNode,
+                "PlaySourcePostExit",
+                patch.PlayPostExit,
+                patch.TransitionName);
 
             if (patch.FadeOutSeconds > 0)
             {
@@ -3230,6 +3237,8 @@ internal static class WaapiMusicImporter
 
             UpsertBoolProperty(doc, propertyList, "EnableSourceFadeOut", patch.FadeOutSeconds > 0);
             UpsertBoolProperty(doc, propertyList, "EnableDestinationFadeIn", patch.FadeInSeconds > 0);
+            // UI「Play post-exit」＝ WObjects の PlaySourcePostExit（@PlayPostExit は無効）。
+            UpsertBoolProperty(doc, propertyList, "PlaySourcePostExit", patch.PlayPostExit);
 
             var transitionInfo = EnsureChildElement(doc, transitionNode, "TransitionInfo", prepend: false);
             UpsertMusicFade(

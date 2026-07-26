@@ -29,6 +29,7 @@ partial class Form1
     private FlatOptionRadioButton fadeInNineSecondsRadio;
     private SectionHeaderLabel optionsHeaderLabel;
     private FlowLayoutPanel optionsChoicesPanel;
+    private FlatOptionCheckBox playMinusECheckBox;
     private SectionHeaderLabel fadeInGroupDividerLabel;
     private FlowLayoutPanel fadeInGroupChoicesPanel;
     private FlatOptionRadioButton fadeInGroupNoneRadio;
@@ -138,6 +139,7 @@ partial class Form1
         fadeInNineSecondsRadio = new FlatOptionRadioButton();
         optionsHeaderLabel = new SectionHeaderLabel();
         optionsChoicesPanel = new FlowLayoutPanel();
+        playMinusECheckBox = new FlatOptionCheckBox();
         fadeInGroupDividerLabel = new SectionHeaderLabel();
         fadeInGroupChoicesPanel = new FlowLayoutPanel();
         fadeInGroupNoneRadio = new FlatOptionRadioButton();
@@ -658,6 +660,20 @@ partial class Form1
         optionsChoicesPanel.Size = new Size(100, 164);
         optionsChoicesPanel.TabIndex = 3;
         optionsChoicesPanel.WrapContents = false;
+        optionsChoicesPanel.Controls.Add(playMinusECheckBox);
+        //
+        // playMinusECheckBox
+        //
+        playMinusECheckBox.AutoSize = true;
+        playMinusECheckBox.Checked = true;
+        playMinusECheckBox.CheckState = CheckState.Checked;
+        playMinusECheckBox.Font = new Font("Yu Gothic UI", 8.5F);
+        playMinusECheckBox.Margin = new Padding(3, 1, 3, 1);
+        playMinusECheckBox.Name = "playMinusECheckBox";
+        playMinusECheckBox.TabIndex = 0;
+        playMinusECheckBox.Text = "Play -E";
+        playMinusECheckBox.UseVisualStyleBackColor = true;
+        playMinusECheckBox.CheckedChanged += PlayMinusECheckBox_CheckedChanged;
         //
         // fadeInGroupDividerLabel
         //
@@ -1305,6 +1321,7 @@ partial class Form1
         fadeInGroupChoicesPanel.ResumeLayout(false);
         fadeInGroupChoicesPanel.PerformLayout();
         optionsChoicesPanel.ResumeLayout(false);
+        optionsChoicesPanel.PerformLayout();
         fadeInChoicesPanel.ResumeLayout(false);
         fadeInChoicesPanel.PerformLayout();
         ((System.ComponentModel.ISupportInitialize)fadeInCurveIcon).EndInit();

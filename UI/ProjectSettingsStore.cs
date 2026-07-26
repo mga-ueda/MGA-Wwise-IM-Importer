@@ -20,6 +20,9 @@ internal sealed class ProjectProfile
 
     public PlaylistExitSourceMode ExitSourceAt { get; set; } = PlaylistExitSourceMode.Immediate;
 
+    /// <summary>Play -E（Wwise Play post-exit。既定オン）。</summary>
+    public bool PlayPostExit { get; set; } = true;
+
     public MarkerGridOverrideMode GridOverride { get; set; } = MarkerGridOverrideMode.Bar;
 
     public int CommentDigits { get; set; } = 3;
@@ -102,6 +105,7 @@ internal sealed class ProjectProfile
         FadeInCurve = FadeInCurve,
         FadeOutCurve = FadeOutCurve,
         ExitSourceAt = ExitSourceAt,
+        PlayPostExit = PlayPostExit,
         GridOverride = GridOverride,
         CommentDigits = CommentDigits,
         CommentZeroPad = CommentZeroPad,
@@ -189,6 +193,7 @@ internal sealed class ProjectSettingsStore
         FadeInCurve = RegionEdgeFade.BuiltinPlaylistFadeInCurve.ToString(),
         FadeOutCurve = RegionEdgeFade.BuiltinPlaylistFadeOutCurve.ToString(),
         ExitSourceAt = PlaylistExitSourceMode.Immediate,
+        PlayPostExit = true,
         GridOverride = MarkerGridOverrideMode.Bar,
         CommentDigits = 3,
         CommentZeroPad = true,
@@ -552,6 +557,7 @@ internal sealed class ProjectSettingsStore
             ["FadeInCurve"] = profile.FadeInCurve,
             ["FadeOutCurve"] = profile.FadeOutCurve,
             ["ExitSourceAt"] = profile.ExitSourceAt.ToString(),
+            ["PlayPostExit"] = profile.PlayPostExit ? "1" : "0",
             ["GridOverride"] = profile.GridOverride.ToString(),
             ["CommentDigits"] = Math.Clamp(
                     profile.CommentDigits,
@@ -625,6 +631,8 @@ internal sealed class ProjectSettingsStore
         {
             profile.ExitSourceAt = exitMode;
         }
+
+        profile.PlayPostExit = ReadBool(values, "PlayPostExit", profile.PlayPostExit);
 
         if (values.TryGetValue("GridOverride", out var gridText)
             && Enum.TryParse<MarkerGridOverrideMode>(gridText, ignoreCase: true, out var gridMode))
