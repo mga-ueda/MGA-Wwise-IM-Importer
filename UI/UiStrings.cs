@@ -103,6 +103,23 @@ internal static class UiStrings
         "ツールチップ表示切替",
         "Toggle tooltips");
 
+    public static string TipManualHelp => Get(
+        "ユーザーマニュアル（GitHub Pages）をブラウザで開きます（表示言語に合わせて日本語／英語）。",
+        "Open the user manual on GitHub Pages in your browser (Japanese or English matching the UI language).");
+
+    public static string AccessibleManualHelpButton => Get(
+        "マニュアル",
+        "Manual");
+
+    public static string DialogManualTitle => Get(
+        "マニュアル",
+        "Manual");
+
+    public static string ErrManualOpenFailed(string detail) => Format(
+        "マニュアルを開けませんでした。\n{0}",
+        "Could not open the manual.\n{0}",
+        detail);
+
     // --- Audio settings dialog ---
     public static string LabelAudioApi => Get(
         "Output API",

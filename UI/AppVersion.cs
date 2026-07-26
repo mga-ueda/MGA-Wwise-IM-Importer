@@ -15,6 +15,12 @@ internal static class AppVersion
     public const string ReleasesApiUrl =
         "https://api.github.com/repos/" + GitHubOwner + "/" + GitHubRepo + "/releases";
 
+    /// <summary>GitHub Pages 上のユーザーマニュアル（docs/）。</summary>
+    public const string ManualSiteUrl =
+        "https://" + GitHubOwner + ".github.io/" + GitHubRepo + "/";
+    public const string ManualJaUrl = ManualSiteUrl + "manual.ja.html";
+    public const string ManualEnUrl = ManualSiteUrl + "manual.en.html";
+
     private static readonly Lazy<string> CurrentLazy = new(ReadCurrent);
 
     /// <summary>表示・比較・ログ共通の版（例: <c>1.0.7-beta</c>）。</summary>

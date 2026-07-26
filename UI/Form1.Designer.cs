@@ -77,6 +77,7 @@ partial class Form1
     private FlatOptionCheckBox detailedLogCheckBox;
     private LanguageFlagButton languageFlagButton;
     private SettingsGearButton settingsGearButton;
+    private ManualHelpButton manualHelpButton;
     private ToolTipToggleButton toolTipToggleButton;
     private FlatOptionCheckBox compactFileNumbersCheckBox;
     private FlatOptionCheckBox keepLastSessionCheckBox;
@@ -187,6 +188,7 @@ partial class Form1
         detailedLogCheckBox = new FlatOptionCheckBox();
         languageFlagButton = new LanguageFlagButton();
         settingsGearButton = new SettingsGearButton();
+        manualHelpButton = new ManualHelpButton();
         toolTipToggleButton = new ToolTipToggleButton();
         compactFileNumbersCheckBox = new FlatOptionCheckBox();
         keepLastSessionCheckBox = new FlatOptionCheckBox();
@@ -277,6 +279,7 @@ partial class Form1
         projectActionPanel.Controls.Add(topMostCheckBox);
         projectActionPanel.Controls.Add(languageFlagButton);
         projectActionPanel.Controls.Add(toolTipToggleButton);
+        projectActionPanel.Controls.Add(manualHelpButton);
         projectActionPanel.Controls.Add(settingsGearButton);
         projectActionPanel.Controls.Add(projectSpectrumView);
         //
@@ -336,11 +339,18 @@ partial class Form1
         toolTipToggleButton.TabIndex = 5;
         toolTipToggleButton.Click += ToolTipToggleButton_Click;
         //
+        // manualHelpButton
+        //
+        manualHelpButton.Margin = new Padding(0, 0, 4, 0);
+        manualHelpButton.Name = "manualHelpButton";
+        manualHelpButton.TabIndex = 6;
+        manualHelpButton.Click += ManualHelpButton_Click;
+        //
         // settingsGearButton
         //
         settingsGearButton.Margin = new Padding(0, 0, 4, 0);
         settingsGearButton.Name = "settingsGearButton";
-        settingsGearButton.TabIndex = 6;
+        settingsGearButton.TabIndex = 7;
         settingsGearButton.Click += SettingsGearButton_Click;
         //
         // projectSpectrumView

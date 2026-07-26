@@ -1,0 +1,305 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MGA Wwise IMImporter マニュアル</title>
+  <style>
+    :root {
+      --bg: #1a1c1e; --panel: #22262a; --text: #e8eaed; --muted: #9aa3ad;
+      --accent: #6cb6ff; --border: #3a424a; --code: #c9d1d9; --code-bg: #121416; --toc-w: 15.5rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; font-size: 15px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout { display: grid; grid-template-columns: var(--toc-w) minmax(0, 1fr); min-height: 100vh; }
+    nav.toc { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; padding: 1.25rem 1rem 2rem; background: var(--panel); border-right: 1px solid var(--border); }
+    nav.toc h1 { font-size: 0.95rem; margin: 0 0 0.75rem; font-weight: 600; }
+    nav.toc ol { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
+    nav.toc li { margin: 0.35rem 0; }
+    nav.toc a { color: var(--muted); }
+    nav.toc a:hover { color: var(--accent); }
+    main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
+    main > header h1 { margin: 0 0 0.35rem; font-size: 1.75rem; font-weight: 650; }
+    .lead { color: var(--muted); margin: 0 0 1rem; font-size: 1.02rem; }
+    .hero { background: linear-gradient(145deg, #243041 0%, #1e262e 100%); border: 1px solid #3d5678; border-radius: 10px; padding: 1.1rem 1.2rem; margin: 0 0 1.75rem; }
+    .hero p { margin: 0.45rem 0; }
+    .hero strong { color: #b3d4ff; }
+    h2 { margin: 2.25rem 0 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.35rem; }
+    h2:first-of-type { border-top: none; padding-top: 0; }
+    h3 { margin: 1.4rem 0 0.5rem; font-size: 1.08rem; color: #d7dde3; }
+    p { margin: 0.55rem 0; }
+    ul, ol { margin: 0.4rem 0 0.8rem; padding-left: 1.35rem; }
+    li { margin: 0.25rem 0; }
+    code, kbd { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 0.9em; background: var(--code-bg); color: var(--code); border-radius: 4px; padding: 0.08em 0.35em; }
+    kbd { border: 1px solid var(--border); padding: 0.05em 0.4em; }
+    table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.1rem; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #2a3036; color: #dce3ea; font-weight: 600; }
+    tr:nth-child(even) td { background: #1e2226; }
+    .ui { font-weight: 600; color: #f0f3f6; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 1.25rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="toc" aria-label="目次">
+      <h1>目次</h1>
+      <ol>
+        <li><a href="#about">このアプリについて</a></li>
+        <li><a href="#load">読み込みのパターン</a></li>
+        <li><a href="#wwise-prep">Wwise 側の準備と EXPORT</a></li>
+        <li><a href="#layout">画面の見方</a></li>
+        <li><a href="#project-bar">プロジェクトバー</a></li>
+        <li><a href="#waveform">波形プレビュー</a></li>
+        <li><a href="#transport">TRANSPORT</a></li>
+        <li><a href="#transition">ログ／遷移パネル</a></li>
+        <li><a href="#action-bar">操作バー／WAAPI ステータスバー</a></li>
+        <li><a href="#export">EXPORT と Wwise に作られるもの</a></li>
+        <li><a href="#suffixes">接尾辞と Cue</a></li>
+        <li><a href="#shortcuts">ショートカット一覧</a></li>
+        <li><a href="#trademarks">商標</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <header>
+        <h1>MGA Wwise IMImporter マニュアル</h1>
+        <p class="lead">Interactive Music を、手作業の積み上げから「聴いて決めて渡す」流れへ。</p>
+      </header>
+
+      <h2 id="about">1. このアプリについて</h2>
+      <div class="hero">
+        <p><strong>DAW で設計した音楽の構造を、そのまま Wwise の Interactive Music へ運ぶ</strong>ためのツールです。</p>
+        <p>Authoring 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、正確でも時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を <span class="ui">EXPORT</span> 一発で Wwise へ揃えられます。<strong>手作業での実装より大幅に時短</strong>できます。</p>
+        <p><strong>Nuendo／Cubase から tracklist XML を出せば</strong>、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように重ねられ、Entry／Exit／ループ設計を視覚的に進められます。</p>
+        <p><strong>それらの DAW を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やセット移動があり、<strong>波形エディタすら必須ではありません</strong>——これも大きな魅力の一つです。</p>
+        <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。</p>
+        <ul>
+          <li>Music Playlist の遷移プレビュー（Exit Source At／Fade In／Fade Out／Play -E）</li>
+          <li>グループ化による縦レイヤー（Alt 上乗せ、Group Fade、Change Occurs At）</li>
+          <li>ストリーミング（Prefetch Length／Look-ahead Time）や Keep Layer Balance（Make-Up Gain）</li>
+          <li>WAAPI 経由で Music 構造を自動生成</li>
+        </ul>
+      </div>
+
+      <h2 id="load">2. 読み込みのパターン</h2>
+      <p>ドロップするファイルの組み合わせでモードが決まります。ログ先頭の見出しで現在のモードを確認できます。</p>
+
+      <h3 id="load-single">2-1. Wave 単体（XML なし・WAV 1 本）</h3>
+      <p><strong>手順</strong></p>
+      <ol>
+        <li>同名の <code>.xml</code> が無い <code>.wav</code> を 1 本、アプリへドロップする</li>
+        <li>ログに <code>=== Wave 単体モード ===</code> と出ることを確認する</li>
+        <li>埋め込みマーカーがあれば読み込み、なければ全体を 1 パートとして扱う</li>
+        <li>必要ならアプリ上でマーカーを編集する（WAV には書き戻さない）</li>
+      </ol>
+      <p><strong>ポイント</strong></p>
+      <ul>
+        <li>小節線・テンポ・拍子は表示されません（<span class="ui">Exit Source At</span> の Next Bar／Next Beat も使えません）</li>
+        <li><span class="ui">More Options</span> の <span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> は無効です（Wave 単体は別のマーカー編集操作を使います）</li>
+        <li>埋め込みマーカーの読み込みに加え、アプリ上での付与・移動・セット移動が可能です（WAV には書き戻しません）。波形エディタでの事前分割が不要なケースが多いです</li>
+        <li>埋め込み／編集したマーカーはプレビューとリージョン分割に使い、<strong>Wwise Custom Cue には出しません</strong></li>
+        <li>書き出し名の目安: <code>基底名_1.wav</code> など（波形ファイル名のダブルクリックで基底名を編集可）</li>
+      </ul>
+
+      <h3 id="load-multi">2-2. 複数波形（XML なし・WAV 2 本以上）</h3>
+      <p><strong>手順</strong></p>
+      <ol>
+        <li><strong>2 本以上</strong>の <code>.wav</code> を同時にドロップする（どれにも同名 <code>.xml</code> が無いこと）</li>
+        <li>ログに <code>=== 複数波形モード（XML なし） ===</code> と出ることを確認する</li>
+        <li>仮想タイムラインへ連結され、<strong>1 ファイル＝1 Music Playlist</strong> として並ぶ</li>
+        <li>必要なら Shift でグループ化（縦レイヤー）する</li>
+      </ol>
+      <p><strong>ポイント</strong></p>
+      <ul>
+        <li>Sample Rate／チャンネル数／ビット深度などが一致している必要があります（不一致だと読み込み中止）</li>
+        <li>Wwise 側の親名は固定で <code>Multi_Wave</code>（編集不可）。Playlist 名はドロップ時のファイル名を維持します</li>
+        <li>書き出しでは可能な範囲で元 WAV を共用し、ファイル名をむやみに改変しません</li>
+        <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
+      </ul>
+
+      <h3 id="load-xml">2-3. WAV ＋ 同名 XML（Nuendo／Cubase tracklist）</h3>
+      <p><strong>手順</strong></p>
+      <ol>
+        <li>同じフォルダに、<strong>同じベース名</strong>の <code>.wav</code> と tracklist <code>.xml</code> を用意する（例: <code>Song.wav</code> と <code>Song.xml</code>）</li>
+        <li>どちらか一方、または両方をドロップする</li>
+        <li>ログに <code>=== Nuendo XML モード ===</code> と出ることを確認する</li>
+        <li>小節・テンポ・拍子・マーカー／サイクルが波形に重なる</li>
+      </ol>
+      <p><strong>ポイント</strong></p>
+      <ul>
+        <li>テンポ・小節・拍子を最大限に利用できます。マーカー／サイクルは波形上に塗り重ねるように表示され、構造設計がしやすくなります</li>
+        <li>XML 由来の単発マーカーは Wwise <strong>Custom Cue</strong> にも使われます</li>
+        <li><kbd>Shift</kbd>＋Marker レーン左ドラッグで追加マーカー（Custom Cue 用）。<kbd>Ctrl</kbd>＋ドラッグで追加分だけ消去（XML 由来は消しません）</li>
+        <li><span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> が有効です</li>
+        <li><code>.xml</code> だけのドロップはエラーです（波形表示には <code>.wav</code> が必須）</li>
+      </ul>
+
+      <h3>読み込み時の注意</h3>
+      <ul>
+        <li>複数のペアを一度にドロップした場合、処理は順に行いますが、<strong>画面に残るプレビューは最後に成功した 1 件</strong>です</li>
+        <li>手動ドロップではログがクリアされ、その読み込みは「やり直し」扱いです（Keep Last Session の自動復元はしません）</li>
+        <li><span class="ui">RELOAD</span> や Keep Last Session による再読み込みでは、グループ／フェード等を可能な範囲で復元します</li>
+      </ul>
+
+      <h2 id="wwise-prep">3. Wwise 側の準備と EXPORT</h2>
+      <ol>
+        <li><strong>Wwise Authoring</strong> を起動し、<strong>WAAPI（HTTP）</strong> を有効にする</li>
+        <li>Project Explorer で<strong>作成先オブジェクト</strong>を選択する</li>
+        <li>アプリの<strong>書き出しパス</strong>に、接続中プロジェクトの <code>Originals</code> 配下を指定する</li>
+        <li>上記のいずれかのパターンで波形を読み込む</li>
+        <li>遷移・フェード・グループ化などをプレビューで確認する</li>
+        <li><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）を実行する</li>
+      </ol>
+      <p><span class="ui">EXPORT</span> 有効条件: 有効パートあり／WAAPI 接続／作成先選択／書き出し先が存在し Originals 配下。未達理由はログの <code>=== Export Preflight ===</code> に出ます。</p>
+
+      <h2 id="layout">4. 画面の見方</h2>
+      <ol>
+        <li><strong>プロジェクトバー</strong></li>
+        <li><strong>波形プレビュー</strong></li>
+        <li><strong>TRANSPORT</strong></li>
+        <li><strong>ログ／遷移パネル</strong>（左: ログ、右: Fade／Exit／Music Playlist／More Options）</li>
+        <li><strong>操作バー</strong>（CLEAR／RELOAD／EXPORT）</li>
+        <li><strong>WAAPI ステータスバー</strong></li>
+      </ol>
+
+      <h2 id="project-bar">5. プロジェクトバー</h2>
+      <p>左から: プロジェクト名 → 書き出しパス → フォルダ／削除 → <span class="ui">Keep Last Session</span> → <span class="ui">Always on Top</span> → JP／EN → ツールチップ → <strong>マニュアル</strong> → 歯車 → スペクトラム。</p>
+      <table>
+        <thead><tr><th>UI</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">プロジェクト名</td><td>選択と名前編集。末尾 <code>+ New Project</code> で新規。変更は自動保存。</td></tr>
+          <tr><td class="ui">書き出しパス／フォルダ</td><td>分割 WAV の書き出し先（Originals 配下）。</td></tr>
+          <tr><td class="ui">Keep Last Session</td><td>既定オン。起動時／プロジェクト復帰時に最後のセッションを復元。</td></tr>
+          <tr><td class="ui">Always on Top</td><td>最前面固定（既定オフ）。</td></tr>
+          <tr><td class="ui">JP／EN</td><td>表示言語。マニュアルもこの設定に合わせて開きます。</td></tr>
+          <tr><td class="ui">マニュアル</td><td><code>?</code>。GitHub Pages 上のユーザーマニュアルをブラウザで開く（表示言語に合わせて日英）。</td></tr>
+          <tr><td class="ui">歯車</td><td>音声出力とフェードカーブ既定。</td></tr>
+          <tr><td class="ui">スペクトラム</td><td>再生出力の簡易表示。</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="waveform">6. 波形プレビュー</h2>
+      <p>Measure／Tempo／Signature／Marker レーン、波形、Music Segment Name／Music Playlist Name レーンで構成されます（XML 無しモードでは小節系レーンは使えません）。</p>
+      <ul>
+        <li>クリック／ドラッグで再生位置を移動</li>
+        <li>波形ファイル名をダブルクリックで基底名を編集（複数波形モードの親名 <code>Multi_Wave</code> は編集不可）</li>
+        <li>タイムラインをダブルクリックで直下 Music Playlist を拡大（交差が 1 件だけなら全体表示へ）</li>
+        <li><kbd>Z</kbd>／TRANSPORT の <span class="ui">SIZE</span> で波形高さ 1×→2×→3×</li>
+        <li>リージョン端の白三角フェードは非破壊。EXPORT 時に MusicClip の Fade へ設定</li>
+      </ul>
+
+      <h2 id="transport">7. TRANSPORT</h2>
+      <p>位置表示 → <span class="ui">TRANS</span>（再生／<kbd>G</kbd>）→ <span class="ui">NAV</span> → <span class="ui">TIME</span> → <span class="ui">AMP</span> → <span class="ui">SIZE</span>。</p>
+      <ul>
+        <li><kbd>Space</kbd> … 再生／一時停止。<code>-L</code> 区間は無限ループ</li>
+        <li><span class="ui">Play -E</span> オン時、<code>-L</code> 直後に <code>-E</code> があれば Exit をワンショット二重再生（Play post-exit のプレビュー）</li>
+        <li><kbd>G</kbd> … 小節ジャンプ（小節情報があるとき）</li>
+      </ul>
+
+      <h2 id="transition">8. ログ／遷移パネル</h2>
+      <h3>Fade In／Fade Out／Options</h3>
+      <table>
+        <thead><tr><th>UI</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">Fade In</td><td><code>None / 1.0 / 3.0 / 6.0 / 9.0 Sec.</code>（既定 None）。カーブアイコンで MusicFade カーブ選択。EXPORT 時は Destination Fade-in。</td></tr>
+          <tr><td class="ui">Fade Out</td><td>同様。EXPORT 時は Source Fade-out。</td></tr>
+          <tr><td class="ui">Options / Play -E</td><td>既定オン。EXPORT 時は Any → Object の Play post-exit。</td></tr>
+        </tbody>
+      </table>
+      <p>通常の Fade In／Fade Out／Exit Source At／Play -E は同一グループ ID で共有されます。</p>
+      <h3>Group Fade／Exit Source At／Chg Occ At</h3>
+      <table>
+        <thead><tr><th>UI</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">Group Fade</td><td>帯付き <span class="ui">Group</span>。In／Out 共通。<strong>Playlist ごとに個別</strong>。グループ内上乗せ／停止用。EXPORT 時は State Group の Transition Time へ。</td></tr>
+          <tr><td class="ui">Exit Source At</td><td><code>Immediate / Next Bar / Next Beat / Next Cue / Exit Cue</code>（既定 Immediate）。</td></tr>
+          <tr><td class="ui">Chg Occ At</td><td>Change Occurs At。同候補（既定 Immediate）。グループ内レイヤー切替。EXPORT 時は Music Track の States タブへ。</td></tr>
+        </tbody>
+      </table>
+      <h3>Music Playlist 一覧</h3>
+      <ul>
+        <li>クリックで遷移。再生中は Exit Source At に従う。同一グループ内は Same Time、以外は Entry Cue</li>
+        <li><kbd>Shift</kbd> … グループ化（縦レイヤー）／<kbd>Ctrl</kbd> … 解除／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> … 除外（<code>Excluded Region n</code>）</li>
+        <li><kbd>Alt</kbd> … グループ内上乗せ／停止（最大 8、Group Fade）</li>
+        <li><span class="ui">Compact Num.</span> … 書き出し番号を詰める（既定オフ）</li>
+      </ul>
+      <h3>More Options</h3>
+      <p>上段: <span class="ui">Stream</span>（左）｜<span class="ui">Layer Music Option</span>（右）。下段: <span class="ui">Marker Comment</span>（左）｜<span class="ui">Marker Grid</span>（右）。</p>
+      <ul>
+        <li><span class="ui">Stream</span> … Prefetch Length／Look-ahead Time（ms）。先頭 Music Segment の Look-ahead は固定 <strong>50 ms</strong>。2 番目以降は UI 値（既定 500）</li>
+        <li><span class="ui">Keep Layer Balance</span> … 既定オフ。Loudness Normalization 利用時に推奨。グループ相対バランスを Music Track の Make-Up Gain へ非破壊設定</li>
+      </ul>
+
+      <h2 id="action-bar">9. 操作バー／WAAPI ステータスバー</h2>
+      <table>
+        <thead><tr><th>UI</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">CLEAR</td><td>波形・セッション・ログをクリアし、プロジェクト設定をアプリ既定へ。書き出し先・Keep Target・Always on Top は維持。</td></tr>
+          <tr><td class="ui">RELOAD</td><td>最後の WAV／XML を再読み込み。セッション情報を可能な範囲で復元。</td></tr>
+          <tr><td class="ui">EXPORT</td><td>分割 WAV 書き出し＋Wwise 登録。</td></tr>
+          <tr><td class="ui">Keep Target</td><td>作成先固定。プロジェクト名リンクまたは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面化。</td></tr>
+          <tr><td class="ui">Auto Active</td><td>既定オン。EXPORT 後に Wwise を前面化。</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="export">10. EXPORT と Wwise に作られるもの</h2>
+      <p><strong>Wwise 上の Interactive Music 実装をマスターとして扱う</strong>想定です。ワンショットとループをあらかじめ別 WAV に分けず、マスター波形上の構造を非破壊で組み立てます。書き出し WAV は範囲の<strong>切り出しのみ</strong>で、フェード・レイヤーバランス・Cue は Wwise プロパティへ設定します（ソースへ焼き込みません）。</p>
+      <ul>
+        <li>パートまたはグループ 1 つ → Music Playlist Container 1 つ</li>
+        <li>Playlist が 2 つ以上 → Music Switch Container ＋ 同名 State Group</li>
+        <li>グループ（2 パート以上）→ 1 Music Segment 内の複数 Music Track ＋ グループ State Group（A／B／C…）</li>
+        <li>Any → Any（Exit Source At = Immediate）と各 Playlist 向け Any → Object（Fade／Exit Source At／Play post-exit）</li>
+        <li>リージョン端フェード → MusicClip Fade／Keep Layer Balance → Make-Up Gain</li>
+        <li>Nuendo XML モードの単発マーカー → Custom Cue。テンポ・拍子は Music Segment で Override</li>
+      </ul>
+
+      <h2 id="suffixes">11. 接尾辞と Cue</h2>
+      <table>
+        <thead><tr><th>接尾辞</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td><code>-R</code></td><td>除外</td></tr>
+          <tr><td><code>-L</code></td><td>ループ</td></tr>
+          <tr><td><code>-E</code></td><td>Exit Cue 以降（同一 Music Segment に束ねる）</td></tr>
+          <tr><td><code>-A</code></td><td>アウフタクト／Entry Cue 前（同一 Music Segment に束ねる。自動付与あり）</td></tr>
+        </tbody>
+      </table>
+      <p>重複配置はエラー。<code>-L</code> 連続の直後に接尾辞が無い場合、<code>-E</code> が自動付与されることがあります。</p>
+
+      <h2 id="shortcuts">12. ショートカット一覧</h2>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>再生／一時停止</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>約 3 秒前から再生</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>直前の再生開始位置から再生し直し</td></tr>
+          <tr><td><kbd>←</kbd>／<kbd>→</kbd></td><td>1 px シーク</td></tr>
+          <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>表示中画面の 0%〜90%</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>波形高さ循環</td></tr>
+          <tr><td><kbd>G</kbd></td><td>小節ジャンプ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>EXPORT</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Wwise を開く／前面化</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Y</kbd></td><td>Undo／Redo</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>終了確認</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="trademarks">13. 商標</h2>
+      <ul>
+        <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
+        <li><strong>Nuendo®</strong>／<strong>Cubase®</strong>／<strong>Steinberg®</strong> は Steinberg Media Technologies GmbH の商標です。本ツールは非公式です。</li>
+      </ul>
+
+      <footer>© MIYABI GAME AUDIO INC. — MGA Wwise IMImporter User Manual (ja)</footer>
+    </main>
+  </div>
+</body>
+</html>

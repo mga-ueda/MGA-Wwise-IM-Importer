@@ -1,0 +1,301 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MGA Wwise IMImporter Manual</title>
+  <style>
+    :root {
+      --bg: #1a1c1e; --panel: #22262a; --text: #e8eaed; --muted: #9aa3ad;
+      --accent: #6cb6ff; --border: #3a424a; --code: #c9d1d9; --code-bg: #121416; --toc-w: 15.5rem;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; font-family: "Segoe UI", "Yu Gothic UI", "Meiryo", sans-serif; background: var(--bg); color: var(--text); line-height: 1.65; font-size: 15px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .layout { display: grid; grid-template-columns: var(--toc-w) minmax(0, 1fr); min-height: 100vh; }
+    nav.toc { position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto; padding: 1.25rem 1rem 2rem; background: var(--panel); border-right: 1px solid var(--border); }
+    nav.toc h1 { font-size: 0.95rem; margin: 0 0 0.75rem; font-weight: 600; }
+    nav.toc ol { margin: 0; padding-left: 1.1rem; font-size: 0.86rem; }
+    nav.toc li { margin: 0.35rem 0; }
+    nav.toc a { color: var(--muted); }
+    nav.toc a:hover { color: var(--accent); }
+    main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
+    main > header h1 { margin: 0 0 0.35rem; font-size: 1.75rem; font-weight: 650; }
+    .lead { color: var(--muted); margin: 0 0 1rem; font-size: 1.02rem; }
+    .hero { background: linear-gradient(145deg, #243041 0%, #1e262e 100%); border: 1px solid #3d5678; border-radius: 10px; padding: 1.1rem 1.2rem; margin: 0 0 1.75rem; }
+    .hero p { margin: 0.45rem 0; }
+    .hero strong { color: #b3d4ff; }
+    h2 { margin: 2.25rem 0 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border); font-size: 1.35rem; }
+    h2:first-of-type { border-top: none; padding-top: 0; }
+    h3 { margin: 1.4rem 0 0.5rem; font-size: 1.08rem; color: #d7dde3; }
+    p { margin: 0.55rem 0; }
+    ul, ol { margin: 0.4rem 0 0.8rem; padding-left: 1.35rem; }
+    li { margin: 0.25rem 0; }
+    code, kbd { font-family: Consolas, "Cascadia Mono", "Courier New", monospace; font-size: 0.9em; background: var(--code-bg); color: var(--code); border-radius: 4px; padding: 0.08em 0.35em; }
+    kbd { border: 1px solid var(--border); padding: 0.05em 0.4em; }
+    table { width: 100%; border-collapse: collapse; margin: 0.75rem 0 1.1rem; font-size: 0.92rem; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #2a3036; color: #dce3ea; font-weight: 600; }
+    tr:nth-child(even) td { background: #1e2226; }
+    .ui { font-weight: 600; color: #f0f3f6; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+      main { padding: 1.25rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <h1>Contents</h1>
+      <ol>
+        <li><a href="#about">About this app</a></li>
+        <li><a href="#load">Loading patterns</a></li>
+        <li><a href="#wwise-prep">Wwise setup and EXPORT</a></li>
+        <li><a href="#layout">UI overview</a></li>
+        <li><a href="#project-bar">Project bar</a></li>
+        <li><a href="#waveform">Waveform preview</a></li>
+        <li><a href="#transport">TRANSPORT</a></li>
+        <li><a href="#transition">Log / transition panel</a></li>
+        <li><a href="#action-bar">Action bar / WAAPI status</a></li>
+        <li><a href="#export">What EXPORT creates in Wwise</a></li>
+        <li><a href="#suffixes">Suffixes and cues</a></li>
+        <li><a href="#shortcuts">Shortcuts</a></li>
+        <li><a href="#trademarks">Trademarks</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <header>
+        <h1>MGA Wwise IMImporter Manual</h1>
+        <p class="lead">Take Interactive Music from “hand-built Authoring” to “listen, decide, and deliver.”</p>
+      </header>
+
+      <h2 id="about">1. About this app</h2>
+      <div class="hero">
+        <p><strong>Carry the music structure you designed in the DAW straight into Wwise Interactive Music.</strong></p>
+        <p>Building Music Playlist Containers, Music Switch Containers, Music Segments, Music Tracks, State Groups, transitions, cues, and fades one by one in Authoring is accurate—but slow. Preview on the waveform, decide transitions and layers by ear, then push a consistent Wwise structure with a single <span class="ui">EXPORT</span>. <strong>Far faster than hand-building the same graph.</strong></p>
+        <p><strong>Export a tracklist XML from Nuendo / Cubase</strong> and you get the most out of tempo, bar, and time-signature data. Markers and cycles overlay the waveform like painted regions, so Entry / Exit / loop design stays visual.</p>
+        <p><strong>You do not need those DAWs.</strong> A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move marker sets itself—so <strong>a dedicated waveform editor is often unnecessary</strong>, which is another major benefit.</p>
+        <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
+        <ul>
+          <li>Music Playlist transition preview (Exit Source At / Fade In / Fade Out / Play -E)</li>
+          <li>Vertical layers via grouping (Alt layering, Group Fade, Change Occurs At)</li>
+          <li>Streaming (Prefetch Length / Look-ahead Time) and Keep Layer Balance (Make-Up Gain)</li>
+          <li>Automatic Music hierarchy creation over WAAPI</li>
+        </ul>
+      </div>
+
+      <h2 id="load">2. Loading patterns</h2>
+      <p>The drop combination selects the mode. Check the log banner at the top.</p>
+
+      <h3 id="load-single">2-1. Wave-only (no XML, one WAV)</h3>
+      <p><strong>Steps</strong></p>
+      <ol>
+        <li>Drop a single <code>.wav</code> that has no matching <code>.xml</code></li>
+        <li>Confirm the log shows <code>=== Wave-only mode ===</code></li>
+        <li>Embedded markers are loaded if present; otherwise the whole file is one part</li>
+        <li>Edit markers in the app if needed (nothing is written back to the WAV)</li>
+      </ol>
+      <p><strong>Notes</strong></p>
+      <ul>
+        <li>No bar / tempo / signature overlay (Next Bar / Next Beat in <span class="ui">Exit Source At</span> are unavailable)</li>
+        <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> in <span class="ui">More Options</span> are disabled (Wave-only uses its own marker editing)</li>
+        <li>Besides embedded markers, you can add, move, and set-move markers in the app (not written back to the WAV)—often without a separate waveform editor</li>
+        <li>Markers drive preview/region splitting and are <strong>not</strong> exported as Wwise Custom Cues</li>
+        <li>Export names look like <code>basename_1.wav</code> (double-click the waveform name to edit the base name)</li>
+      </ul>
+
+      <h3 id="load-multi">2-2. Multi-wave (no XML, two or more WAVs)</h3>
+      <p><strong>Steps</strong></p>
+      <ol>
+        <li>Drop <strong>two or more</strong> <code>.wav</code> files together (none may have a matching <code>.xml</code>)</li>
+        <li>Confirm the log shows <code>=== Multi-wave mode (no XML) ===</code></li>
+        <li>Files are concatenated on a virtual timeline: <strong>one file = one Music Playlist</strong></li>
+        <li>Optionally Shift-group them into vertical layers</li>
+      </ol>
+      <p><strong>Notes</strong></p>
+      <ul>
+        <li>Sample rate / channel count / bit depth / format must match (mismatch aborts load)</li>
+        <li>Wwise parent name is fixed to <code>Multi_Wave</code> (not editable). Playlist names keep the dropped file names</li>
+        <li>Export keeps original file names where possible and may reuse source WAVs</li>
+        <li>If any file has a matching XML, this mode is not used—pair processing applies instead</li>
+      </ul>
+
+      <h3 id="load-xml">2-3. WAV + matching XML (Nuendo / Cubase tracklist)</h3>
+      <p><strong>Steps</strong></p>
+      <ol>
+        <li>Place a <code>.wav</code> and tracklist <code>.xml</code> with the <strong>same base name</strong> in the same folder (e.g. <code>Song.wav</code> + <code>Song.xml</code>)</li>
+        <li>Drop either or both</li>
+        <li>Confirm the log shows <code>=== Nuendo XML mode ===</code></li>
+        <li>Bars, tempo, signature, markers, and cycles overlay the waveform</li>
+      </ol>
+      <p><strong>Notes</strong></p>
+      <ul>
+        <li>Makes the most of tempo, bar, and time-signature data. Markers/cycles overlay the waveform like painted regions for clearer structure work</li>
+        <li>XML single markers are also used as Wwise <strong>Custom Cues</strong></li>
+        <li><kbd>Shift</kbd>+drag on the Marker lane adds session markers; <kbd>Ctrl</kbd>+drag removes only those additions (XML markers stay)</li>
+        <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> are enabled</li>
+        <li>Dropping <code>.xml</code> alone errors—a <code>.wav</code> is required</li>
+      </ul>
+
+      <h3>Loading caveats</h3>
+      <ul>
+        <li>If multiple pairs are dropped, they are processed in order, but <strong>only the last successful preview stays on screen</strong></li>
+        <li>A manual drop clears the log and is treated as a fresh load (not Keep Last Session restore)</li>
+        <li><span class="ui">RELOAD</span> / Keep Last Session restore groups, fades, and related session data when possible</li>
+      </ul>
+
+      <h2 id="wwise-prep">3. Wwise setup and EXPORT</h2>
+      <ol>
+        <li>Start <strong>Wwise Authoring</strong> and enable <strong>WAAPI (HTTP)</strong></li>
+        <li>Select the destination object in Project Explorer</li>
+        <li>Set this app’s export path under the connected project’s <code>Originals</code></li>
+        <li>Load audio using one of the patterns above</li>
+        <li>Preview transitions, fades, and grouping</li>
+        <li>Run <span class="ui">EXPORT</span> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>)</li>
+      </ol>
+      <p><span class="ui">EXPORT</span> requires: at least one valid part, WAAPI connected, destination selected, and an existing Originals path. Reasons appear under <code>=== Export Preflight ===</code>.</p>
+
+      <h2 id="layout">4. UI overview</h2>
+      <ol>
+        <li><strong>Project bar</strong></li>
+        <li><strong>Waveform preview</strong></li>
+        <li><strong>TRANSPORT</strong></li>
+        <li><strong>Log / transition panel</strong></li>
+        <li><strong>Action bar</strong> (CLEAR / RELOAD / EXPORT)</li>
+        <li><strong>WAAPI status bar</strong></li>
+      </ol>
+
+      <h2 id="project-bar">5. Project bar</h2>
+      <p>Left to right: project name → export path → folder/delete → <span class="ui">Keep Last Session</span> → <span class="ui">Always on Top</span> → JP/EN → tooltips → <strong>Manual</strong> → gear → spectrum.</p>
+      <table>
+        <thead><tr><th>UI</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">Project name</td><td>Select/rename. <code>+ New Project</code> creates one. Auto-saved.</td></tr>
+          <tr><td class="ui">Export path</td><td>Split WAV destination under Originals.</td></tr>
+          <tr><td class="ui">Keep Last Session</td><td>Default on. Restores the last session when returning to the project.</td></tr>
+          <tr><td class="ui">Always on Top</td><td>Keep the window topmost (default off).</td></tr>
+          <tr><td class="ui">JP / EN</td><td>UI language. The manual opens in the matching language.</td></tr>
+          <tr><td class="ui">Manual</td><td><code>?</code> opens the GitHub Pages user manual in your browser (JP/EN matching the UI).</td></tr>
+          <tr><td class="ui">Gear</td><td>Audio output and default fade curves.</td></tr>
+          <tr><td class="ui">Spectrum</td><td>Simple output spectrum.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="waveform">6. Waveform preview</h2>
+      <p>Measure / Tempo / Signature / Marker lanes, waveform, then Music Segment Name / Music Playlist Name (bar lanes are inactive without XML).</p>
+      <ul>
+        <li>Click/drag to seek</li>
+        <li>Double-click the waveform name to edit the base name (<code>Multi_Wave</code> parent name is not editable in multi-wave mode)</li>
+        <li>White-triangle edge fades are nondestructive and become MusicClip Fade on EXPORT</li>
+      </ul>
+
+      <h2 id="transport">7. TRANSPORT</h2>
+      <p>Position → <span class="ui">TRANS</span> (play / <kbd>G</kbd>) → <span class="ui">NAV</span> → <span class="ui">TIME</span> → <span class="ui">AMP</span> → <span class="ui">SIZE</span>.</p>
+      <ul>
+        <li><kbd>Space</kbd> play/pause; <code>-L</code> regions loop</li>
+        <li>With <span class="ui">Play -E</span> on, a following <code>-E</code> one-shots at loop wrap (Play post-exit preview)</li>
+        <li><kbd>G</kbd> bar jump when bar data exists</li>
+      </ul>
+
+      <h2 id="transition">8. Log / transition panel</h2>
+      <h3>Fade In / Fade Out / Options</h3>
+      <table>
+        <thead><tr><th>UI</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">Fade In</td><td><code>None / 1.0 / 3.0 / 6.0 / 9.0 Sec.</code> (default None). Curve icon picks MusicFade curve. EXPORT → Destination Fade-in.</td></tr>
+          <tr><td class="ui">Fade Out</td><td>Same seconds. EXPORT → Source Fade-out.</td></tr>
+          <tr><td class="ui">Options / Play -E</td><td>Default on. EXPORT → Play post-exit on Any → Object rules.</td></tr>
+        </tbody>
+      </table>
+      <p>Normal Fade In / Fade Out / Exit Source At / Play -E are shared within the same group ID.</p>
+      <h3>Group Fade / Exit Source At / Chg Occ At</h3>
+      <table>
+        <thead><tr><th>UI</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">Group Fade</td><td>Under the <span class="ui">Group</span> band. Shared In/Out. <strong>Per Playlist</strong>. Used for in-group layering. EXPORT → State Group transition times.</td></tr>
+          <tr><td class="ui">Exit Source At</td><td><code>Immediate / Next Bar / Next Beat / Next Cue / Exit Cue</code> (default Immediate).</td></tr>
+          <tr><td class="ui">Chg Occ At</td><td>Change Occurs At. Same candidates (default Immediate). In-group layer switch timing → Music Track States.</td></tr>
+        </tbody>
+      </table>
+      <h3>Music Playlist list</h3>
+      <ul>
+        <li>Click to transition. Same-group uses Same Time; otherwise Entry Cue</li>
+        <li><kbd>Shift</kbd> group / <kbd>Ctrl</kbd> ungroup / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> exclude (<code>Excluded Region n</code>)</li>
+        <li><kbd>Alt</kbd> layer on/off inside a group (max 8, Group Fade)</li>
+        <li><span class="ui">Compact Num.</span> renumbers export IDs (default off)</li>
+      </ul>
+      <h3>More Options</h3>
+      <p>Top: <span class="ui">Stream</span> (left) | <span class="ui">Layer Music Option</span> (right). Bottom: <span class="ui">Marker Comment</span> (left) | <span class="ui">Marker Grid</span> (right).</p>
+      <ul>
+        <li><span class="ui">Stream</span> … Prefetch Length / Look-ahead Time (ms). First Music Segment Look-ahead is fixed at <strong>50 ms</strong>; later segments use the UI value (default 500)</li>
+        <li><span class="ui">Keep Layer Balance</span> … default off; recommended with Wwise Loudness Normalization. Writes relative balance to Music Track Make-Up Gain</li>
+      </ul>
+
+      <h2 id="action-bar">9. Action bar / WAAPI status</h2>
+      <table>
+        <thead><tr><th>UI</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td class="ui">CLEAR</td><td>Clear wave/session/log; reset project settings to app defaults. Keeps export path, Keep Target, Always on Top.</td></tr>
+          <tr><td class="ui">RELOAD</td><td>Reload last WAV/XML; restore session data when possible.</td></tr>
+          <tr><td class="ui">EXPORT</td><td>Write split WAVs and register in Wwise.</td></tr>
+          <tr><td class="ui">Keep Target</td><td>Pin destination. Project-name link or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> opens/focuses Wwise.</td></tr>
+          <tr><td class="ui">Auto Active</td><td>Default on. Bring Wwise to front after EXPORT.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="export">10. What EXPORT creates in Wwise</h2>
+      <p>Designed so <strong>the Interactive Music implementation in Wwise is the master</strong>. Keep one-shot and loop material on one master waveform instead of pre-separating files; build structure nondestructively. Split WAVs are <strong>cut-only</strong>; fades, layer balance, and cues become Wwise properties (nothing is baked into the source).</p>
+      <ul>
+        <li>One part or one group → one Music Playlist Container</li>
+        <li>Two or more playlists → Music Switch Container + matching State Group</li>
+        <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…)</li>
+        <li>Any → Any (Exit Source At = Immediate) plus per-playlist Any → Object rules</li>
+        <li>Edge fades → MusicClip Fade; Keep Layer Balance → Make-Up Gain</li>
+        <li>Nuendo XML single markers → Custom Cues; tempo/signature Override on Music Segments</li>
+      </ul>
+
+      <h2 id="suffixes">11. Suffixes and cues</h2>
+      <table>
+        <thead><tr><th>Suffix</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>-R</code></td><td>Remove / exclude</td></tr>
+          <tr><td><code>-L</code></td><td>Loop</td></tr>
+          <tr><td><code>-E</code></td><td>After Exit Cue (bundled into the same Music Segment)</td></tr>
+          <tr><td><code>-A</code></td><td>Pickup / before Entry Cue (bundled; may be auto-assigned)</td></tr>
+        </tbody>
+      </table>
+      <p>Overlapping suffixes error. A bare region after contiguous <code>-L</code> regions may auto-receive <code>-E</code>.</p>
+
+      <h2 id="shortcuts">12. Shortcuts</h2>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from ~3 seconds earlier</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from last play start</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>Cycle waveform height</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Bar jump</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>EXPORT</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Open / focus Wwise</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd></td><td>Undo / Redo</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Exit confirmation</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="trademarks">13. Trademarks</h2>
+      <ul>
+        <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. A valid Wwise license is required for WAAPI.</li>
+        <li><strong>Nuendo®</strong> / <strong>Cubase®</strong> / <strong>Steinberg®</strong> are trademarks of Steinberg Media Technologies GmbH. This tool is unofficial.</li>
+      </ul>
+
+      <footer>© MIYABI GAME AUDIO INC. — MGA Wwise IMImporter User Manual (en)</footer>
+    </main>
+  </div>
+</body>
+</html>

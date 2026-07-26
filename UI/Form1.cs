@@ -2197,6 +2197,7 @@ public partial class Form1 : Form, IMessageFilter
         RefreshFlatOptionControl(topMostCheckBox);
         languageFlagButton.ApplyColors();
         toolTipToggleButton.ApplyColors();
+        manualHelpButton.ApplyColors();
         settingsGearButton.ApplyColors();
         projectSpectrumView.BackColor = barBack;
         projectSpectrumView.Invalidate();
@@ -2271,6 +2272,7 @@ public partial class Form1 : Form, IMessageFilter
         CenterProjectBarControl(projectDeleteButton, contentHeight);
         CenterProjectBarControl(languageFlagButton, contentHeight);
         CenterProjectBarControl(toolTipToggleButton, contentHeight);
+        CenterProjectBarControl(manualHelpButton, contentHeight);
         CenterProjectBarControl(settingsGearButton, contentHeight);
         CenterProjectBarControl(projectSpectrumView, contentHeight);
     }
@@ -6754,6 +6756,7 @@ public partial class Form1 : Form, IMessageFilter
         Text = UiStrings.FormTitle;
         languageFlagButton.RefreshAppearance();
         toolTipToggleButton.RefreshAppearance();
+        manualHelpButton.RefreshAppearance();
         settingsGearButton.RefreshAppearance();
         ApplyLocalizedControlLabels();
         if (playlistToolTip is DarkToolTip darkTip)
@@ -6905,6 +6908,12 @@ public partial class Form1 : Form, IMessageFilter
         ReleaseFocusToWaveform();
     }
 
+    private void ManualHelpButton_Click(object? sender, EventArgs e)
+    {
+        ManualViewer.Open(this);
+        ReleaseFocusToWaveform();
+    }
+
     private void SettingsGearButton_Click(object? sender, EventArgs e)
     {
         OpenAppSettingsDialog();
@@ -6972,6 +6981,7 @@ public partial class Form1 : Form, IMessageFilter
             ? UiStrings.TipLanguageJapanese
             : UiStrings.TipLanguageEnglish);
         playlistToolTip.SetToolTip(settingsGearButton, UiStrings.TipAudioSettings);
+        playlistToolTip.SetToolTip(manualHelpButton, UiStrings.TipManualHelp);
         playlistToolTip.SetToolTip(compactFileNumbersCheckBox, UiStrings.TipCompactFileNumbers);
         playlistToolTip.SetToolTip(keepLastSessionCheckBox, UiStrings.TipKeepLastSession);
         playlistToolTip.SetToolTip(topMostCheckBox, UiStrings.TipAlwaysOnTop);
