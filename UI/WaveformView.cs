@@ -3530,7 +3530,14 @@ internal sealed class WaveformView : Control
     private void UpdateTimelineTip(Point? mouseLocation)
     {
         string? text = null;
-        if (mouseLocation is { } sourceLocation
+        if (_peaks is null || _peaks.IsEmpty || _peaks.FrameCount <= 0)
+        {
+            if (mouseLocation is not null)
+            {
+                text = UiStrings.TipWaveformDropZone;
+            }
+        }
+        else if (mouseLocation is { } sourceLocation
             && _sourceNameEditable
             && IsSourceNamePoint(sourceLocation))
         {

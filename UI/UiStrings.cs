@@ -262,6 +262,30 @@ internal static class UiStrings
         "ダブルクリックで書き出しファイル名・Playlist名・Switch名を編集",
         "Double-click to edit the export file name, Playlist name, or Switch name");
 
+    public static string TipWaveformDropZone => Get(
+        ".wav または .xml をドロップします。"
+        + Environment.NewLine
+        + "・.wav 1 本（同名 .xml なし）→ Wave 単体モード（埋め込みマーカー。小節線なし）"
+        + Environment.NewLine
+        + "・.wav 2 本以上（いずれも同名 .xml なし）→ 複数波形モード（仮想タイムラインへ連結）"
+        + Environment.NewLine
+        + "・同名の .wav + .xml → Nuendo XML モード（小節・テンポ・拍子・マーカー）"
+        + Environment.NewLine
+        + "・.xml だけ → エラー（波形表示には .wav が必要）"
+        + Environment.NewLine
+        + "・XML あり／なしなど独立ペアが複数 → ログは全部、プレビューは最後の 1 件のみ",
+        "Drop .wav or .xml."
+        + Environment.NewLine
+        + "• One .wav (no matching .xml) → Wave-only mode (embedded markers; no bar lines)"
+        + Environment.NewLine
+        + "• Two or more .wav (none with matching .xml) → Multi-wave mode (concatenated timeline)"
+        + Environment.NewLine
+        + "• Matching .wav + .xml → Nuendo XML mode (bars, tempo, signature, markers)"
+        + Environment.NewLine
+        + "• .xml alone → error (.wav is required to show the waveform)"
+        + Environment.NewLine
+        + "• Multiple independent pairs (e.g. with/without XML) → full log; preview keeps the last one only");
+
     public static string TipWaveformMarkerLane => Get(
         "[Shift]+クリック／ドラッグ: マーカーを連続付与"
         + Environment.NewLine
@@ -1298,8 +1322,8 @@ internal static class UiStrings
     public static string StatusNoProject => Get("(プロジェクトなし)", "(no project)");
 
     public static string WaveformEmptyHint => Get(
-        "Wave / XML をドロップすると波形と小節線を表示します",
-        "Drop a Wave / XML file to show the waveform and bar lines");
+        ".wav または .xml をドロップ",
+        "Drop .wav or .xml");
 
     public static string DialogBarJumpTitle => Get("小節へジャンプ", "Jump to bar");
 
@@ -1579,6 +1603,20 @@ internal static class UiStrings
     public static string LogXmlMissingBars => Get(
         "Message : 同名 .xml が無いため小節線は表示しません。",
         "Message : No matching .xml; bar lines will not be shown.");
+
+    public static string LogMultiplePairsPreviewDiscarded(int pairCount, string keptWavPath) => Format(
+        "Message : 独立したペアが {0} 件あります。波形プレビューに残るのは最後の 1 件だけです（他はログのみ／破棄）。"
+        + Environment.NewLine
+        + "Message : 採用: {1}",
+        "Message : {0} independent pair(s) found. Only the last one is kept in the waveform preview (others are log-only / discarded)."
+        + Environment.NewLine
+        + "Message : Kept: {1}",
+        pairCount,
+        keptWavPath);
+
+    public static string LogMultiplePairsMixedXmlModes => Get(
+        "Message : 同名 XML ありのペアと無しのペアが混在しています。複数波形モードにも連結されません。",
+        "Message : Pairs with and without matching XML are mixed. They are not merged into multi-wave mode.");
 
     public static string LogXmlPairHeader => Get(
         "=== Nuendo XML モード ===",

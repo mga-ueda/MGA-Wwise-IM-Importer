@@ -120,12 +120,61 @@ internal static class DroppedFilesProcessor
             return sb.ToString();
         }
 
+        // 複数ペアはログには全部出すが、プレビューは最後の 1 件だけ残る。
+        var warnMultiplePairs = pairs.Count >= 2;
+        var mixedXmlModes = warnMultiplePairs && HasMixedXmlPresence(pairs);
+        var keptWavPath = warnMultiplePairs ? pairs[^1].WavPath : null;
+
         foreach (var (wavPath, xmlPath) in pairs)
         {
             ProcessPair(sb, wavPath, xmlPath, preview);
         }
 
+        if (warnMultiplePairs && keptWavPath is not null)
+        {
+            sb.AppendLine(UiStrings.LogWarningHeader);
+            sb.AppendLine(UiStrings.LogMultiplePairsPreviewDiscarded(pairs.Count, keptWavPath));
+            if (mixedXmlModes)
+            {
+                sb.AppendLine(UiStrings.LogMultiplePairsMixedXmlModes);
+            }
+
+            sb.AppendLine();
+        }
+
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// 存在する WAV ペアのうち、同名 XML ありと無しが混在しているか。
+    /// </summary>
+    private static bool HasMixedXmlPresence(IReadOnlyList<(string WavPath, string XmlPath)> pairs)
+    {
+        var sawWithXml = false;
+        var sawWithoutXml = false;
+        foreach (var (wavPath, xmlPath) in pairs)
+        {
+            if (!File.Exists(wavPath))
+            {
+                continue;
+            }
+
+            if (File.Exists(xmlPath))
+            {
+                sawWithXml = true;
+            }
+            else
+            {
+                sawWithoutXml = true;
+            }
+
+            if (sawWithXml && sawWithoutXml)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
