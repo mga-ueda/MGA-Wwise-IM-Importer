@@ -125,6 +125,7 @@
         <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> in <span class="ui">More Options</span> are disabled (Wave-only uses its own marker editing)</li>
         <li>Besides embedded markers, you can add, move, and set-move markers in the app (not written back to the WAV)—often without a separate waveform editor</li>
         <li>Markers drive preview/region splitting and are <strong>not</strong> exported as Wwise Custom Cues</li>
+        <li>If the WAV has a sustain loop (smpl), its Start becomes <code>-L</code> and End becomes <code>-E</code>. These take priority over normal embedded markers; markers at the same timing as loop Start/End are discarded (logged)</li>
         <li>Export names look like <code>basename_1.wav</code> (double-click the waveform name to edit the base name)</li>
       </ul>
 
@@ -139,6 +140,7 @@
       <p><strong>Notes</strong></p>
       <ul>
         <li>Sample rate / channel count / bit depth / format must match (mismatch aborts load)</li>
+        <li>Per-file embedded markers / sustain loops (smpl) follow the same rules as Wave-only (sustain Start/End → <code>-L</code>/<code>-E</code> preferred; same-timing markers discarded)</li>
         <li>Wwise parent name is fixed to <code>Multi_Wave</code> (not editable). Playlist names keep the dropped file names</li>
         <li>Export keeps original file names where possible and may reuse source WAVs</li>
         <li>If any file has a matching XML, this mode is not used—pair processing applies instead</li>
@@ -292,6 +294,7 @@
         </tbody>
       </table>
       <p>Overlapping suffixes error. A bare region after contiguous <code>-L</code> regions may auto-receive <code>-E</code>.</p>
+      <p>In Wave-only and Multi-wave modes, a WAV sustain loop (smpl) is applied as <code>-L</code> (Start) and <code>-E</code> (End). Other embedded markers (with comments) are still read, but markers at the same timing as sustain Start/End are discarded and logged.</p>
 
       <h2 id="shortcuts">12. Shortcuts</h2>
       <table>

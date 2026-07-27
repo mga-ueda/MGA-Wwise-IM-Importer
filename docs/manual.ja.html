@@ -125,6 +125,7 @@
         <li><span class="ui">More Options</span> の <span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> は無効です（Wave 単体は別のマーカー編集操作を使います）</li>
         <li>埋め込みマーカーの読み込みに加え、アプリ上での付与・移動・セット移動が可能です（WAV には書き戻しません）。波形エディタでの事前分割が不要なケースが多いです</li>
         <li>埋め込み／編集したマーカーはプレビューとリージョン分割に使い、<strong>Wwise Custom Cue には出しません</strong></li>
+        <li>WAV にサステインループ（smpl）がある場合、その Start を <code>-L</code>・End を <code>-E</code> として扱います。通常の埋め込みマーカーより優先し、ループ Start／End と同タイミングのマーカーは破棄します（ログに記録）</li>
         <li>書き出し名の目安: <code>基底名_1.wav</code> など（波形ファイル名のダブルクリックで基底名を編集可）</li>
       </ul>
 
@@ -139,6 +140,7 @@
       <p><strong>ポイント</strong></p>
       <ul>
         <li>Sample Rate／チャンネル数／ビット深度などが一致している必要があります（不一致だと読み込み中止）</li>
+        <li>ファイルごとの埋め込みマーカー／サステインループ（smpl）は Wave 単体と同じ規則で処理します（サステインの Start／End → <code>-L</code>／<code>-E</code> 優先。同タイミングのマーカーは破棄）</li>
         <li>Wwise 側の親名は固定で <code>Multi_Wave</code>（編集不可）。Playlist 名はドロップ時のファイル名を維持します</li>
         <li>書き出しでは可能な範囲で元 WAV を共用し、ファイル名をむやみに改変しません</li>
         <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
@@ -294,6 +296,7 @@
         </tbody>
       </table>
       <p>重複配置はエラー。<code>-L</code> 連続の直後に接尾辞が無い場合、<code>-E</code> が自動付与されることがあります。</p>
+      <p>Wave 単体／複数波形では、WAV のサステインループ（smpl）があればその Start を <code>-L</code>・End を <code>-E</code> として採用します。通常の埋め込みマーカー（コメント付き）も読み取りますが、サステインの Start／End と同タイミングのマーカーは破棄し、その旨をログに出します。</p>
 
       <h2 id="shortcuts">12. ショートカット一覧</h2>
       <table>

@@ -1636,8 +1636,8 @@ internal static class UiStrings
             "Mode : マーカーのみ／無し（cue + adtl）",
             "Mode : Markers only / none (cue + adtl)"),
         WaveOnlyMode.SmplLoop => Get(
-            "Mode : smpl ループ",
-            "Mode : smpl loop"),
+            "Mode : サステインループ（smpl）",
+            "Mode : Sustain loop (smpl)"),
         WaveOnlyMode.Regions => Get(
             "Mode : リージョン（cue + adtl）",
             "Mode : Regions (cue + adtl)"),
@@ -1658,28 +1658,28 @@ internal static class UiStrings
         if (acceptedLoopCount == 0 && skippedLoopCount == 0)
         {
             return Get(
-                "Message : smpl ループはありません。",
-                "Message : No smpl loops.");
+                "Message : サステインループ（smpl）はありません。",
+                "Message : No sustain loops (smpl).");
         }
 
         if (skippedLoopCount == 0)
         {
             return Format(
-                "Message : smpl ループの Start / End を -L / -E マーカーへ差し替えました（ループ {0} 件）。",
-                "Message : Replaced smpl loop Start / End with -L / -E markers ({0} loop(s)).",
+                "Message : サステインループの Start / End を -L / -E として採用しました（ループ {0} 件）。通常マーカーより優先します。",
+                "Message : Applied sustain-loop Start / End as -L / -E ({0} loop(s)). These take priority over normal markers.",
                 acceptedLoopCount);
         }
 
         return Format(
-            "Message : smpl ループの Start / End を -L / -E マーカーへ差し替えました（採用 {0} 件、範囲外／無効でスキップ {1} 件）。",
-            "Message : Replaced smpl loop Start / End with -L / -E markers ({0} accepted, {1} skipped as out of range / invalid).",
+            "Message : サステインループの Start / End を -L / -E として採用しました（採用 {0} 件、範囲外／無効でスキップ {1} 件）。通常マーカーより優先します。",
+            "Message : Applied sustain-loop Start / End as -L / -E ({0} accepted, {1} skipped as out of range / invalid). These take priority over normal markers.",
             acceptedLoopCount,
             skippedLoopCount);
     }
 
     public static string LogWaveOnlyDiscardedEmbeddedSummary(int count) => Format(
-        "Message : smpl ループ以外の埋め込みマーカー類を破棄しました（{0} 件）。",
-        "Message : Discarded embedded markers other than smpl loops ({0}).",
+        "Message : サステインループの Start / End と同タイミングの埋め込みマーカーを破棄しました（{0} 件）。",
+        "Message : Discarded embedded marker(s) at the same timing as sustain-loop Start / End ({0}).",
         count);
 
     public static string LogWaveOnlyDiscardedEmbeddedItem(
