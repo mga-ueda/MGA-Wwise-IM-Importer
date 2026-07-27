@@ -400,7 +400,9 @@ internal readonly record struct RegionEdgeFade(
 
     /// <summary>
     /// 現在の固まり境界に合わせてフェードを再マップする。
-    /// In/Out が一致するものだけ残し、セグメント跨ぎはクランプして破棄判定する。
+    /// 完全一致を優先し、一致しない場合は重なる固まりへ引き継ぐ
+    /// （例: <c>-E</c> 内に <c>-R</c> を打って末尾が縮んでも先頭 Fade In を残す。
+    /// 固まりが分割されたときは Fade In／Out を先頭／末尾ランへ振り分ける）。
     /// </summary>
     public static IReadOnlyList<RegionEdgeFade> RemapToRuns(
         IReadOnlyList<RegionEdgeFade> existing,
@@ -419,23 +421,139 @@ internal readonly record struct RegionEdgeFade(
 
         var runByBounds = runs.ToDictionary(r => (r.InSample, r.OutSample));
         var kept = new List<RegionEdgeFade>();
+        var claimedBounds = new HashSet<(long In, long Out)>();
+
         foreach (var fade in existing)
         {
-            if (!runByBounds.TryGetValue((fade.InSample, fade.OutSample), out var limits))
+            if (runByBounds.TryGetValue((fade.InSample, fade.OutSample), out var exact))
+            {
+                TryAddRemapped(kept, claimedBounds, fade, exact);
+                continue;
+            }
+
+            var overlapping = runs
+                .Where(r => r.InSample < fade.OutSample && fade.InSample < r.OutSample)
+                .OrderBy(r => r.InSample)
+                .ToList();
+            if (overlapping.Count == 0)
             {
                 continue;
             }
 
-            var normalized = fade.Normalized(
-                limits.FirstSegmentEndSample,
-                limits.LastSegmentStartSample);
-            if (normalized.HasAnyFade)
+            var fadeInRun = FindFadeInRun(overlapping, fade.InSample);
+            var fadeOutRun = FindFadeOutRun(overlapping, fade.OutSample);
+
+            if (fadeInRun.InSample == fadeOutRun.InSample
+                && fadeInRun.OutSample == fadeOutRun.OutSample)
             {
-                kept.Add(normalized);
+                TryAddRemapped(kept, claimedBounds, fade, fadeInRun);
+                continue;
+            }
+
+            // -R などで固まりが割れた: Fade In は先頭側、Fade Out は末尾側へ。
+            if (fade.HasFadeIn)
+            {
+                var inOnly = new RegionEdgeFade(
+                    fade.InSample,
+                    fade.OutSample,
+                    fade.FadeInEndSample,
+                    null,
+                    fade.FadeInCurve,
+                    fade.FadeOutCurve);
+                TryAddRemapped(kept, claimedBounds, inOnly, fadeInRun);
+            }
+
+            if (fade.HasFadeOut)
+            {
+                var outOnly = new RegionEdgeFade(
+                    fade.InSample,
+                    fade.OutSample,
+                    null,
+                    fade.FadeOutStartSample,
+                    fade.FadeInCurve,
+                    fade.FadeOutCurve);
+                TryAddRemapped(kept, claimedBounds, outOnly, fadeOutRun);
             }
         }
 
         return kept;
+    }
+
+    private static RunSegmentLimits FindFadeInRun(
+        IReadOnlyList<RunSegmentLimits> overlapping,
+        long fadeInSample)
+    {
+        foreach (var run in overlapping)
+        {
+            if (run.InSample == fadeInSample)
+            {
+                return run;
+            }
+        }
+
+        foreach (var run in overlapping)
+        {
+            if (run.InSample <= fadeInSample && fadeInSample < run.OutSample)
+            {
+                return run;
+            }
+        }
+
+        return overlapping[0];
+    }
+
+    private static RunSegmentLimits FindFadeOutRun(
+        IReadOnlyList<RunSegmentLimits> overlapping,
+        long fadeOutSample)
+    {
+        for (var i = overlapping.Count - 1; i >= 0; i--)
+        {
+            if (overlapping[i].OutSample == fadeOutSample)
+            {
+                return overlapping[i];
+            }
+        }
+
+        for (var i = overlapping.Count - 1; i >= 0; i--)
+        {
+            var run = overlapping[i];
+            if (run.InSample < fadeOutSample && fadeOutSample <= run.OutSample)
+            {
+                return run;
+            }
+        }
+
+        return overlapping[^1];
+    }
+
+    private static void TryAddRemapped(
+        List<RegionEdgeFade> kept,
+        HashSet<(long In, long Out)> claimedBounds,
+        RegionEdgeFade source,
+        RunSegmentLimits limits)
+    {
+        var key = (limits.InSample, limits.OutSample);
+        if (claimedBounds.Contains(key))
+        {
+            return;
+        }
+
+        var remapped = new RegionEdgeFade(
+            limits.InSample,
+            limits.OutSample,
+            source.FadeInEndSample,
+            source.FadeOutStartSample,
+            source.FadeInCurve,
+            source.FadeOutCurve).Normalized(
+            limits.FirstSegmentEndSample,
+            limits.LastSegmentStartSample);
+        if (!remapped.HasAnyFade)
+        {
+            return;
+        }
+
+        claimedBounds.Add(key);
+        kept.Add(remapped);
     }
 
     public static RegionEdgeFade WithFadeInEnd(
