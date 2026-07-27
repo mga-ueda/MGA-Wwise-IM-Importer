@@ -196,10 +196,21 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>自動再生中の Playlist パート番号（クロック＋上乗せ。最大 8）。</summary>
     private readonly HashSet<int> _playingPlaylistPartNumbers = [];
     private readonly int[] _overlayVoiceIdScratch = new int[WaveAudioPlayer.MaxPlaylistVoices];
+    private readonly int[] _overlayFadeOutVoiceIdScratch = new int[WaveAudioPlayer.MaxPlaylistVoices];
+    private readonly int[] _overlayExitVoiceIdScratch = new int[WaveAudioPlayer.MaxPlaylistVoices];
     private readonly double[] _overlayProgressScratch = new double[WaveAudioPlayer.MaxPlaylistVoices];
     private readonly double[] _overlayExitProgressScratch = new double[WaveAudioPlayer.MaxPlaylistVoices];
     private readonly double[] _overlayFadeOutProgressScratch = new double[WaveAudioPlayer.MaxPlaylistVoices];
     private readonly HashSet<int> _playingPlaylistPartNumbersSyncScratch = [];
+
+    /// <summary>
+    /// 上乗せシークの壁時計アンカー（voiceId → 基準進捗／tick）。
+    /// 主シークと同様に滑らかに進め、残光長が音声バッファ位置の粗さで短くならないようにする。
+    /// </summary>
+    private readonly Dictionary<int, (double AnchorProgress, long AnchorTickMs)> _overlayPlayheadAnchors = [];
+    private readonly Dictionary<int, (double AnchorProgress, long AnchorTickMs)> _overlayFadeOutPlayheadAnchors = [];
+    private readonly Dictionary<int, (double AnchorProgress, long AnchorTickMs)> _overlayExitPlayheadAnchors = [];
+    private readonly HashSet<int> _overlayAnchorLiveIdsScratch = [];
 
     /// <summary>上乗せボイスの絶対進捗（0〜1）。WaveformView の追加シアンシーク用。</summary>
     private readonly List<double> _overlayPlayheadProgresses = [];
@@ -6073,32 +6084,145 @@ public partial class Form1 : Form, IMessageFilter
             ApplyPlaylistSelectorColors();
         }
 
-        var voiceCount = _audioPlayer.CopyOverlayPlaylistVoiceProgresses(_overlayProgressScratch);
-        _overlayPlayheadProgresses.Clear();
-        for (var i = 0; i < voiceCount; i++)
-        {
-            _overlayPlayheadProgresses.Add(_overlayProgressScratch[i]);
-        }
+        var durationSec = _audioPlayer.Duration.TotalSeconds;
+        var now = Environment.TickCount64;
 
+        var voiceCount = _audioPlayer.CopyOverlayPlaylistVoiceProgresses(
+            _overlayProgressScratch,
+            _overlayVoiceIdScratch);
+        FillSmoothedOverlayProgresses(
+            voiceCount,
+            _overlayVoiceIdScratch,
+            _overlayProgressScratch,
+            _overlayPlayheadProgresses,
+            _overlayPlayheadAnchors,
+            durationSec,
+            now,
+            recordTrail);
         waveformView.SetOverlayPlayheads(_overlayPlayheadProgresses, recordTrail);
 
-        var fadeOutCount = _audioPlayer.CopyOverlayFadeOutProgresses(_overlayFadeOutProgressScratch);
-        _overlayFadeOutPlayheadProgresses.Clear();
-        for (var i = 0; i < fadeOutCount; i++)
-        {
-            _overlayFadeOutPlayheadProgresses.Add(_overlayFadeOutProgressScratch[i]);
-        }
-
+        var fadeOutCount = _audioPlayer.CopyOverlayFadeOutProgresses(
+            _overlayFadeOutProgressScratch,
+            _overlayFadeOutVoiceIdScratch);
+        FillSmoothedOverlayProgresses(
+            fadeOutCount,
+            _overlayFadeOutVoiceIdScratch,
+            _overlayFadeOutProgressScratch,
+            _overlayFadeOutPlayheadProgresses,
+            _overlayFadeOutPlayheadAnchors,
+            durationSec,
+            now,
+            recordTrail);
         waveformView.SetOverlayFadeOutPlayheads(_overlayFadeOutPlayheadProgresses, recordTrail);
 
-        var exitCount = _audioPlayer.CopyOverlayExitProgresses(_overlayExitProgressScratch);
-        _overlayExitPlayheadProgresses.Clear();
-        for (var i = 0; i < exitCount; i++)
+        var exitCount = _audioPlayer.CopyOverlayExitProgresses(
+            _overlayExitProgressScratch,
+            _overlayExitVoiceIdScratch);
+        FillSmoothedOverlayProgresses(
+            exitCount,
+            _overlayExitVoiceIdScratch,
+            _overlayExitProgressScratch,
+            _overlayExitPlayheadProgresses,
+            _overlayExitPlayheadAnchors,
+            durationSec,
+            now,
+            recordTrail);
+        waveformView.SetOverlayExitPlayheads(_overlayExitPlayheadProgresses, recordTrail);
+    }
+
+    /// <summary>
+    /// 音声バッファ位置を壁時計で滑らかにし、主シークと同じ進み方で残光が伸びるようにする。
+    /// ループ等で生位置が大きく跳ねたらアンカーを張り直す。
+    /// </summary>
+    private void FillSmoothedOverlayProgresses(
+        int count,
+        int[] voiceIds,
+        double[] rawProgresses,
+        List<double> destination,
+        Dictionary<int, (double AnchorProgress, long AnchorTickMs)> anchors,
+        double durationSec,
+        long now,
+        bool recordTrail)
+    {
+        destination.Clear();
+        _overlayAnchorLiveIdsScratch.Clear();
+        if (!recordTrail || count <= 0)
         {
-            _overlayExitPlayheadProgresses.Add(_overlayExitProgressScratch[i]);
+            anchors.Clear();
+            for (var i = 0; i < count; i++)
+            {
+                destination.Add(Math.Clamp(rawProgresses[i], 0d, 1d));
+            }
+
+            return;
         }
 
-        waveformView.SetOverlayExitPlayheads(_overlayExitPlayheadProgresses, recordTrail);
+        for (var i = 0; i < count; i++)
+        {
+            var voiceId = voiceIds[i];
+            var raw = Math.Clamp(rawProgresses[i], 0d, 1d);
+            _overlayAnchorLiveIdsScratch.Add(voiceId);
+            destination.Add(SmoothOverlayProgress(voiceId, raw, durationSec, now, anchors));
+        }
+
+        if (anchors.Count == _overlayAnchorLiveIdsScratch.Count)
+        {
+            return;
+        }
+
+        List<int>? stale = null;
+        foreach (var id in anchors.Keys)
+        {
+            if (_overlayAnchorLiveIdsScratch.Contains(id))
+            {
+                continue;
+            }
+
+            stale ??= [];
+            stale.Add(id);
+        }
+
+        if (stale is null)
+        {
+            return;
+        }
+
+        foreach (var id in stale)
+        {
+            anchors.Remove(id);
+        }
+    }
+
+    private static double SmoothOverlayProgress(
+        int voiceId,
+        double rawProgress,
+        double durationSec,
+        long now,
+        Dictionary<int, (double AnchorProgress, long AnchorTickMs)> anchors)
+    {
+        if (durationSec <= 0d)
+        {
+            anchors[voiceId] = (rawProgress, now);
+            return rawProgress;
+        }
+
+        if (!anchors.TryGetValue(voiceId, out var anchor))
+        {
+            anchors[voiceId] = (rawProgress, now);
+            return rawProgress;
+        }
+
+        var elapsedSec = (now - anchor.AnchorTickMs) / 1000d;
+        var smooth = anchor.AnchorProgress + elapsedSec / durationSec;
+        var driftSec = Math.Abs(rawProgress - smooth) * durationSec;
+        // WaveformView の残光不連続判定（約 1.25s）に合わせ、ループ巻き戻し等で張り直す
+        if (driftSec >= 1.25d)
+        {
+            anchors[voiceId] = (rawProgress, now);
+            return rawProgress;
+        }
+
+        return Math.Clamp(smooth, 0d, 1d);
     }
 
     private void RequestPlaylistPlayback(WaveformOutputPart target)

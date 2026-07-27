@@ -6339,7 +6339,8 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        // 再生ヘッド基準の距離グラデ（列ラスタの量子化縞を避ける）
+        // 再生ヘッド基準の距離グラデ（長さは TrailTargetLengthPx のまま）。
+        // 左端付近だけ長く透明寄りにして切れ目をぼかし、本体の立ち上がりは従来に近い位置にする。
         var gradLeft = playheadX - TrailTargetLengthPx;
         var gradRight = playheadX;
         if (gradRight - gradLeft < 1f)
@@ -6349,6 +6350,7 @@ internal sealed class WaveformView : Control
 
         var peak = Color.FromArgb(ToByteAlpha(TrailPeakAlpha), color);
         var mid = Color.FromArgb(ToByteAlpha(TrailPeakAlpha * 0.25f), color);
+        var soft = Color.FromArgb(ToByteAlpha(TrailPeakAlpha * 0.06f), color);
         var clear = Color.FromArgb(0, color);
         using var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
             new PointF(gradLeft, content.Top),
@@ -6358,8 +6360,8 @@ internal sealed class WaveformView : Control
         {
             InterpolationColors = new System.Drawing.Drawing2D.ColorBlend
             {
-                Positions = [0f, 0.55f, 1f],
-                Colors = [clear, mid, peak],
+                Positions = [0f, 0.14f, 0.42f, 0.72f, 1f],
+                Colors = [clear, clear, soft, mid, peak],
             },
         };
 

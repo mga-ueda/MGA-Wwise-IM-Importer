@@ -663,17 +663,31 @@ internal sealed class WaveAudioPlayer : IDisposable
     /// Fade Out 中は含めない（白いフェードバー側へ分ける）。戻り値は本数。
     /// </summary>
     public int CopyOverlayPlaylistVoiceProgresses(double[] destination) =>
-        _provider?.CopyOverlayPlaylistVoiceProgresses(destination, FrameCount) ?? 0;
+        CopyOverlayPlaylistVoiceProgresses(destination, voiceIds: null);
+
+    /// <summary>
+    /// 上乗せボイスの進捗と voiceId を同じ順で書き込む。Fade Out 中は含めない。
+    /// </summary>
+    public int CopyOverlayPlaylistVoiceProgresses(double[] destination, int[]? voiceIds) =>
+        _provider?.CopyOverlayPlaylistVoiceProgresses(destination, voiceIds, FrameCount) ?? 0;
 
     /// <summary>
     /// Group Fade Out 中の上乗せボイス進捗（0〜1）。白いシークバー用。
     /// </summary>
     public int CopyOverlayFadeOutProgresses(double[] destination) =>
-        _provider?.CopyOverlayFadeOutProgresses(destination, FrameCount) ?? 0;
+        CopyOverlayFadeOutProgresses(destination, voiceIds: null);
+
+    /// <summary>Group Fade Out 中の上乗せ進捗と voiceId を同じ順で書き込む。</summary>
+    public int CopyOverlayFadeOutProgresses(double[] destination, int[]? voiceIds) =>
+        _provider?.CopyOverlayFadeOutProgresses(destination, voiceIds, FrameCount) ?? 0;
 
     /// <summary>上乗せボイスの -E 二重再生進捗（0〜1）を destination へ書き込む。</summary>
     public int CopyOverlayExitProgresses(double[] destination) =>
-        _provider?.CopyOverlayExitProgresses(destination, FrameCount) ?? 0;
+        CopyOverlayExitProgresses(destination, voiceIds: null);
+
+    /// <summary>上乗せ -E 進捗と voiceId を同じ順で書き込む。</summary>
+    public int CopyOverlayExitProgresses(double[] destination, int[]? voiceIds) =>
+        _provider?.CopyOverlayExitProgresses(destination, voiceIds, FrameCount) ?? 0;
 
     /// <summary>最終クロックの Group Fade Out 中の進捗（0〜1）。</summary>
     public bool TryGetClockFadeOutPlaybackProgress(out double progress)
@@ -2019,7 +2033,10 @@ internal sealed class WaveAudioPlayer : IDisposable
             }
         }
 
-        public int CopyOverlayPlaylistVoiceProgresses(double[] destination, long frameCount)
+        public int CopyOverlayPlaylistVoiceProgresses(
+            double[] destination,
+            int[]? voiceIds,
+            long frameCount)
         {
             if (frameCount <= 0 || destination.Length == 0)
             {
@@ -2037,14 +2054,23 @@ internal sealed class WaveAudioPlayer : IDisposable
                     }
 
                     var sample = CurrentSample(voice.Reader);
-                    destination[count++] = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+                    destination[count] = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+                    if (voiceIds is not null && count < voiceIds.Length)
+                    {
+                        voiceIds[count] = voice.VoiceId;
+                    }
+
+                    count++;
                 }
 
                 return count;
             }
         }
 
-        public int CopyOverlayFadeOutProgresses(double[] destination, long frameCount)
+        public int CopyOverlayFadeOutProgresses(
+            double[] destination,
+            int[]? voiceIds,
+            long frameCount)
         {
             if (frameCount <= 0 || destination.Length == 0)
             {
@@ -2062,7 +2088,13 @@ internal sealed class WaveAudioPlayer : IDisposable
                     }
 
                     var sample = CurrentSample(voice.Reader);
-                    destination[count++] = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+                    destination[count] = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+                    if (voiceIds is not null && count < voiceIds.Length)
+                    {
+                        voiceIds[count] = voice.VoiceId;
+                    }
+
+                    count++;
                 }
 
                 return count;
@@ -2093,7 +2125,10 @@ internal sealed class WaveAudioPlayer : IDisposable
             }
         }
 
-        public int CopyOverlayExitProgresses(double[] destination, long frameCount)
+        public int CopyOverlayExitProgresses(
+            double[] destination,
+            int[]? voiceIds,
+            long frameCount)
         {
             if (frameCount <= 0 || destination.Length == 0)
             {
@@ -2116,7 +2151,13 @@ internal sealed class WaveAudioPlayer : IDisposable
                         continue;
                     }
 
-                    destination[count++] = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+                    destination[count] = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+                    if (voiceIds is not null && count < voiceIds.Length)
+                    {
+                        voiceIds[count] = voice.VoiceId;
+                    }
+
+                    count++;
                 }
 
                 return count;
