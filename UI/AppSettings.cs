@@ -284,12 +284,6 @@ internal sealed class AppSettings
     {
         if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var volume))
         {
-            // 10〜100 の整数パーセントで書かれていた場合も許容する。
-            if (volume > MetronomePlayer.MaxVolume && volume <= 100f)
-            {
-                volume /= 100f;
-            }
-
             return NormalizeMetronomeVolume(volume);
         }
 

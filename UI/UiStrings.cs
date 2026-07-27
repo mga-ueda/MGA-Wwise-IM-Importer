@@ -648,8 +648,8 @@ internal static class UiStrings
         "Snap interval when dragging markers. Does not affect grid line drawing.");
 
     public static string TipMarkerGridTimeline => Get(
-        "現在タイムラインに表示されているグリッドへスナップします。従来と同じ動作です。",
-        "Snap to the grid currently shown on the timeline (legacy behavior).");
+        "現在タイムラインに表示されているグリッドへスナップします。",
+        "Snap to the grid currently shown on the timeline.");
 
     public static string TipMarkerGridBar => Get(
         "タイムラインの表示倍率に関係なく、必ず小節単位でマーカーを付与します。",

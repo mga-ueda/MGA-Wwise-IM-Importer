@@ -13,7 +13,7 @@ internal sealed class LastWaveSessionState
     public string WavePath { get; set; } = string.Empty;
 
     /// <summary>
-    /// 複数波形モード時の全ソース WAV（順序付き）。空なら <see cref="WavePath"/> のみ（旧サイドカー互換）。
+    /// 複数波形モード時の全ソース WAV（順序付き）。空なら <see cref="WavePath"/> の単一パスを使う。
     /// </summary>
     public List<string> WavePaths { get; set; } = [];
 

@@ -10081,7 +10081,7 @@ public partial class Form1 : Form, IMessageFilter
         _audioPlayer.SetMetronomeVolume(_metronomePlayer.Volume);
         transportBar.PulseMetronomeFeedback();
         // 変更後の音量をすぐ確認できるよう 1 クリック鳴らす（確認用は別経路）。
-        _metronomePlayer.PlayClick(accent: true);
+        _metronomePlayer.PlayClick();
         ShowMetronomeVolumeTip();
         return true;
     }

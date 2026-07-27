@@ -858,7 +858,7 @@ internal sealed class WaveAudioPlayer : IDisposable
     public void SetMetronomeClicks(IReadOnlyList<float> high, IReadOnlyList<float> low, int sampleRate)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (sampleRate <= 0)
+        if (sampleRate <= 0 || high.Count == 0 || low.Count == 0)
         {
             _metronomeHigh = [];
             _metronomeLow = [];
@@ -866,12 +866,33 @@ internal sealed class WaveAudioPlayer : IDisposable
         }
         else
         {
-            _metronomeHigh = MetronomePlayer.ResampleMono(high, sampleRate, sampleRate);
-            _metronomeLow = MetronomePlayer.ResampleMono(low, sampleRate, sampleRate);
+            _metronomeHigh = CopyMonoSamples(high);
+            _metronomeLow = CopyMonoSamples(low);
             _metronomeClickSampleRate = sampleRate;
         }
 
         ApplyMetronomeToProvider();
+    }
+
+    private static float[] CopyMonoSamples(IReadOnlyList<float> source)
+    {
+        if (source.Count == 0)
+        {
+            return [];
+        }
+
+        if (source is float[] array)
+        {
+            return (float[])array.Clone();
+        }
+
+        var copy = new float[source.Count];
+        for (var i = 0; i < source.Count; i++)
+        {
+            copy[i] = source[i];
+        }
+
+        return copy;
     }
 
     public void SetMetronomeEnabled(bool enabled)

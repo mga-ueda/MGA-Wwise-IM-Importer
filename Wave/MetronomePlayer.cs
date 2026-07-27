@@ -59,12 +59,11 @@ internal sealed class MetronomePlayer : IDisposable
         return new MetronomePlayer(high, low, highRate);
     }
 
-    /// <summary>一拍目は High、それ以外は Low。</summary>
-    public void PlayClick(bool accent)
+    /// <summary>音量確認用に High クリックを 1 回鳴らす（再生中の拍クリックとは別経路）。</summary>
+    public void PlayClick()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        var samples = accent ? _highSamples : _lowSamples;
-        if (samples.Length == 0)
+        if (_highSamples.Length == 0)
         {
             return;
         }
@@ -73,7 +72,7 @@ internal sealed class MetronomePlayer : IDisposable
         lock (_gate)
         {
             EnsureOutput();
-            _mixer!.AddMixerInput(new MetronomeClickSampleProvider(samples, _sampleRate, gain));
+            _mixer!.AddMixerInput(new MetronomeClickSampleProvider(_highSamples, _sampleRate, gain));
         }
     }
 

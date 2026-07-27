@@ -7,7 +7,7 @@ namespace MgaWwiseIMImporter.UI;
 /// </summary>
 internal enum MarkerGridOverrideMode
 {
-    /// <summary>見た目のグリッド単位（従来仕様）。</summary>
+    /// <summary>タイムラインに表示中のグリッド単位へスナップする。</summary>
     Default,
 
     /// <summary>表示状態に関わらず常に小節単位。</summary>
