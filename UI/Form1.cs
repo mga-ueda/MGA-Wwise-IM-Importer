@@ -1691,7 +1691,7 @@ public partial class Form1 : Form, IMessageFilter
             return true;
         }
 
-        if (keyData == Keys.C && !IsTextEntryFocusActive())
+        if (keyData == Keys.M && !IsTextEntryFocusActive())
         {
             if (TryToggleMetronome())
             {
@@ -1699,7 +1699,8 @@ public partial class Form1 : Form, IMessageFilter
             }
         }
 
-        if ((keyData == Keys.OemPeriod
+        if ((keyData == Keys.C
+                || keyData == Keys.OemPeriod
                 || keyData == Keys.Decimal)
             && !IsTextEntryFocusActive())
         {

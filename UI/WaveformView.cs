@@ -313,7 +313,7 @@ internal sealed class WaveformView : Control
         TimeViewChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>規定波形フォーマットを設定し、Playlist 左下の表示色を更新する。</summary>
+    /// <summary>波形フォーマット規定を設定し、Playlist 左下の表示色を更新する。</summary>
     public void SetExpectedWaveformFormat(ExpectedWaveformFormat format)
     {
         var normalized = ExpectedWaveformFormat.Normalize(

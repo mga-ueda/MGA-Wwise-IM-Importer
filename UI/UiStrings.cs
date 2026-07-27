@@ -64,7 +64,7 @@ internal static class UiStrings
         "Current: English. Click to switch to Japanese.");
 
     public static string TipAudioSettings => Get(
-        "音声出力・フェードカーブ既定・規定波形フォーマットを設定します。",
+        "音声出力・フェードカーブ既定・波形フォーマット規定を設定します。",
         "Configure audio output, default fade curves, and the expected waveform format.");
 
     public static string AccessibleAudioSettingsButton => Get(
@@ -80,7 +80,7 @@ internal static class UiStrings
         "Default Fade Curves");
 
     public static string LabelExpectedWaveformFormat => Get(
-        "規定波形フォーマット",
+        "波形フォーマット規定",
         "Expected Waveform Format");
 
     public static string LabelExpectedSampleRateHz => Get(
@@ -843,10 +843,10 @@ internal static class UiStrings
         "[Z] Cycle waveform height (1×→2×→3×)");
 
     public static string TipTransportMetronome => Get(
-        "[C] メトロノームのオン／オフ（音符またはテンポ。波形再生の拍に同期。テンポ／拍子があるとき）"
+        "[M] メトロノームのオン／オフ（音符またはテンポ。波形再生の拍に同期。テンポ／拍子があるとき）"
         + Environment.NewLine
         + "ホイール … 音量（最大〜10%、10% 刻み。既定 30%。アプリ設定に保存）",
-        "[C] Toggle metronome (note or tempo; synced to waveform playback beats when tempo / time signature is available)"
+        "[M] Toggle metronome (note or tempo; synced to waveform playback beats when tempo / time signature is available)"
         + Environment.NewLine
         + "Wheel … volume (max to 10%, 10% steps; default 30%; saved in app settings)");
 

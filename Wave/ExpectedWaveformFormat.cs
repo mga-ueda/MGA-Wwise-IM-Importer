@@ -3,7 +3,7 @@
 namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
-/// 歯車設定の規定波形フォーマット（Sample Rate / Bit Depth / Channels）。
+/// 歯車設定の波形フォーマット規定（Sample Rate / Bit Depth / Channels）。
 /// </summary>
 internal readonly record struct ExpectedWaveformFormat(
     uint SampleRateHz,

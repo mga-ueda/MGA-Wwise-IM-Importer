@@ -4,7 +4,7 @@ using MgaWwiseIMImporter.Wave;
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// 再生出力・フェードカーブ既定・規定波形フォーマットの設定ダイアログ。
+/// 再生出力・フェードカーブ既定・波形フォーマット規定の設定ダイアログ。
 /// </summary>
 internal sealed class AudioSettingsForm : Form
 {
