@@ -21,3 +21,6 @@ _probe/
 
 # Release artifacts (dotnet publish output / zip)
 publish/
+
+# App settings (may contain local paths / device names)
+*.ini
