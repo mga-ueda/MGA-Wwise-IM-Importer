@@ -56,11 +56,11 @@ internal static class UiStrings
 
     // --- Language toggle ---
     public static string TipLanguageJapanese => Get(
-        "現在: 日本語。クリックで English に切り替えます。",
+        "現在: 日本語。クリックで英語に切り替えます。",
         "Current: Japanese. Click to switch to English.");
 
     public static string TipLanguageEnglish => Get(
-        "現在: English。クリックで日本語に切り替えます。",
+        "現在: 英語。クリックで日本語に切り替えます。",
         "Current: English. Click to switch to Japanese.");
 
     public static string TipAudioSettings => Get(
@@ -195,11 +195,11 @@ internal static class UiStrings
         + "OFF: Keep original numbers (gaps remain).");
 
     public static string TipKeepLastSession => Get(
-        "起動時およびこのプロジェクトへ戻ったときに、最後の作業セッション（波形・グループ／無効化／追加マーカー／Fade・Exit Source At）を復元します（プロジェクト設定・既定オン）。",
-        "On startup and when returning to this project, restore the last session (wave, groups, disables, markers, Fade / Exit Source At). Project setting (default on).");
+        "起動時およびこのプロジェクトへ戻ったときに、最後の作業セッションを復元します（プロジェクト設定・既定オン）。",
+        "On startup and when returning to this project, restore the last session. Project setting (default on).");
 
     public static string TipAlwaysOnTop => Get(
-        "ウィンドウを常に最前面へ表示します（アプリ設定）。",
+        "ウィンドウを常に最前面へ表示します。",
         "Keep the window always on top (app setting).");
 
     public static string TipClear => Get(
@@ -253,8 +253,8 @@ internal static class UiStrings
         "Log for operations, EXPORT, and connection. Use the icons to clear, copy, or save.");
 
     public static string TipLogClear => Get(
-        "ログ表示だけを消去します（ファイルは消しません）。",
-        "Clear the log display only (does not delete files).");
+        "ログ表示を消去します。",
+        "Clear the log display.");
 
     public static string TipLogCopy => Get(
         "ログ全文をクリップボードへコピーします。",
@@ -295,15 +295,15 @@ internal static class UiStrings
         "Double-click to edit the export file name, Playlist name, or Switch name");
 
     public static string TipWaveformDropZone => Get(
-        ".wav または .xml をドロップします。"
+        ".wav または .xml をドロップして下さい。"
         + Environment.NewLine
         + "・.wav 1 本（同名 .xml なし）→ Wave 単体モード（埋め込みマーカー。小節線なし）"
         + Environment.NewLine
         + "・.wav 2 本以上（いずれも同名 .xml なし）→ 複数波形モード（仮想タイムラインへ連結）"
         + Environment.NewLine
-        + "・同名の .wav + .xml → Nuendo XML モード（小節・テンポ・拍子・マーカー）"
+        + "・同名の .wav + .xml → Nuendo/Cubase XML モード（小節・テンポ・拍子・マーカー）"
         + Environment.NewLine
-        + "・.xml だけ → エラー（波形表示には .wav が必要）"
+        + "・.xml のみ → エラー（波形表示には .wav が必要）"
         + Environment.NewLine
         + "・XML あり／なしなど独立ペアが複数 → ログは全部、プレビューは最後の 1 件のみ",
         "Drop .wav or .xml."
@@ -312,7 +312,7 @@ internal static class UiStrings
         + Environment.NewLine
         + "• Two or more .wav (none with matching .xml) → Multi-wave mode (concatenated timeline)"
         + Environment.NewLine
-        + "• Matching .wav + .xml → Nuendo XML mode (bars, tempo, signature, markers)"
+        + "• Matching .wav + .xml → Nuendo/Cubase XML mode (bars, tempo, signature, markers)"
         + Environment.NewLine
         + "• .xml alone → error (.wav is required to show the waveform)"
         + Environment.NewLine
@@ -347,7 +347,7 @@ internal static class UiStrings
         + Environment.NewLine
         + "[Delete] / [Ctrl+Del] 選択したマーカーを削除（アプリ上のみ）"
         + Environment.NewLine
-        + "[Insert] シーク位置にマーカー追加（コメントなし）"
+        + "[Insert] シーク位置にマーカー追加"
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
@@ -389,11 +389,11 @@ internal static class UiStrings
     public static string TipWaveformRegionFadeHandle => Get(
         "白三角をドラッグ: リージョン端フェード（非破壊）"
         + Environment.NewLine
-        + "フェード範囲を右クリック: カーブを選択（Wwise と同じ名前・並び）"
+        + "フェード範囲を右クリック: カーブを選択"
         + Environment.NewLine
         + "Fade In は先頭 Music Segment 内、Fade Out は末尾 Music Segment 内に制限（-A/-E は同一セグメント）"
         + Environment.NewLine
-        + "EXPORT 時は MusicClip の非破壊フェードとして設定（WAV へ焼き込みません）"
+        + "EXPORT 時は MusicClip の非破壊フェードとして設定"
         + Environment.NewLine
         + "Playlist 遷移フェードとは別物で、重ねがけされます"
         + Environment.NewLine
@@ -603,7 +603,7 @@ internal static class UiStrings
     public static string TipLoudnessHeader => Get(
         "Layer Music Option。"
         + " Wwise の Loudness Normalization を利用しているときはオンを推奨します。"
-        + " グループ内の相対バランスを、Music Track の Make-Up Gain で非破壊維持します（WAV へは焼き込みません）。",
+        + " グループ内の相対バランスを、Music Track の Make-Up Gain で非破壊維持します。",
         "Layer Music Option."
         + " Recommended on when using Wwise Loudness Normalization."
         + " Keeps relative balance within a group nondestructively via Music Track Make-Up Gain"
@@ -613,7 +613,7 @@ internal static class UiStrings
         "オンの場合、グループ内各パートの Integrated Loudness（LKFS）を計測し、"
         + "最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差だけ下げます（既定オフ）。"
         + " Wwise の Loudness Normalization 利用時にオンを推奨。"
-        + " 補正は Music Track の Make-Up Gain へ非破壊で書き込み、WAV へは焼き込みません。"
+        + " 補正は Music Track の Make-Up Gain へ非破壊で書き込みます。"
         + " グループ（2 パート以上）が無いときは操作できません。",
         "When on, measures each grouped part’s Integrated Loudness (LKFS),"
         + " sets Make-Up Gain of the loudest part to 0 dB and lowers the others by the relative difference"
@@ -624,7 +624,7 @@ internal static class UiStrings
 
     public static string TipAdditiveLayers => Get(
         "グループをレイヤー切り替えではなく追加再生タイプとして扱います（既定オフ・グループ単位で記憶）。"
-        + " オン時、再生中に同一グループの Playlist をクリックすると追加再生のオン／オフができます（Alt 不要）。"
+        + " オン時、再生中に同一グループの Playlist をクリックすると追加再生のオン／オフができます。"
         + " EXPORT 時、State Volume は累積再生（例: 2 レイヤーなら A=1 本のみ、B=2 本同時）になるよう設定します。"
         + " グループ（2 パート以上）を選んでいるときだけ操作できます。",
         "Treats the group as additive playback instead of exclusive layer switching"
@@ -636,15 +636,13 @@ internal static class UiStrings
 
     public static string TipMoreOptionsHeader => Get(
         "Stream／Layer Music Option／Marker Comment／Marker Grid を開閉します（既定は開いた状態）。"
-        + " 開閉状態はプロジェクト設定へ自動保存されます。"
-        + " 開閉しても Music Playlist の高さは変わりません。",
+        + " 開閉状態はプロジェクト設定へ自動保存されます。",
         "Expand/collapse Stream / Layer Music Option / Marker Comment / Marker Grid (default open)."
-        + " Expansion is saved per project."
-        + " Playlist height is unchanged when toggling.");
+        + " Expansion is saved per project.");
 
 
     public static string TipMarkerGridHeader => Get(
-        "マーカーをドラッグで付与するときのスナップ間隔を指定します。縦線の描画には影響しません。",
+        "マーカーをドラッグで付与するときのスナップ間隔を指定します。",
         "Snap interval when dragging markers. Does not affect grid line drawing.");
 
     public static string TipMarkerGridTimeline => Get(
@@ -843,7 +841,7 @@ internal static class UiStrings
         "[Z] Cycle waveform height (1×→2×→3×)");
 
     public static string TipTransportMetronome => Get(
-        "[M] メトロノームのオン／オフ（音符またはテンポ。波形再生の拍に同期。テンポ／拍子があるとき）"
+        "[M] メトロノームのオン／オフ（テンポ／拍子があるとき）"
         + Environment.NewLine
         + "ホイール … 音量（最大〜10%、10% 刻み。既定 30%。アプリ設定に保存）",
         "[M] Toggle metronome (note or tempo; synced to waveform playback beats when tempo / time signature is available)"
@@ -1660,16 +1658,16 @@ internal static class UiStrings
         keptWavPath);
 
     public static string LogMultiplePairsMixedXmlModes => Get(
-        "Message : 同名 XML ありのペアと無しのペアが混在しています。複数波形モードにも連結されません。",
+        "Message : 同名 XML ありのペアと無しのペアが混在しています。複数波形モードには連結されません。",
         "Message : Pairs with and without matching XML are mixed. They are not merged into multi-wave mode.");
 
     public static string LogXmlPairHeader => Get(
-        "=== Nuendo XML モード ===",
-        "=== Nuendo XML mode ===");
+        "=== Nuendo/Cubase XML モード ===",
+        "=== Nuendo/Cubase XML mode ===");
 
     public static string LogXmlPairModeName => Get(
-        "Mode : WAV + 同名 XML（Nuendo トラックリスト）",
-        "Mode : WAV + matching XML (Nuendo tracklist)");
+        "Mode : WAV + 同名 XML（Nuendo/Cubase トラックリスト）",
+        "Mode : WAV + matching XML (Nuendo/Cubase tracklist)");
 
     public static string LogWaveOnlyHeader => Get(
         "=== Wave 単体モード ===",
@@ -2276,8 +2274,8 @@ internal static class UiStrings
     public static string LogWaveHeader => Get("=== Wave ===", "=== Wave ===");
     public static string LogWaveformHeader => Get("=== Waveform ===", "=== Waveform ===");
     public static string LogNuendoTempoTrackHeader => Get(
-        "=== Nuendo Tempo Track ===",
-        "=== Nuendo Tempo Track ===");
+        "=== Nuendo/Cubase Tempo Track ===",
+        "=== Nuendo/Cubase Tempo Track ===");
 
     // Report / log field keys（固定幅の列見出しは日英共通）
     public static string KeyStatus => Get("Status  :", "Status  :");

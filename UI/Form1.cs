@@ -2434,7 +2434,7 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>
     /// プロジェクト名コンボと出力先テキストボックスの高さをバーの内側高さに揃え、
-    /// 双方のテキスト縦位置も一致させる。コンボ幅は情報レーン右端に合わせる。
+    /// 双方のテキストをフォント基準で上下中央にする。コンボ幅は情報レーン右端に合わせる。
     /// 右端アイコン（フォルダ／削除／言語／スペクトラム）は上下中央に揃える。
     /// </summary>
     private void AlignProjectBarInputs()
@@ -2509,25 +2509,27 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>
     /// 出力先テキストボックス（Multiline）の整形矩形を EM_SETRECT で調整し、
-    /// テキスト上端をコンボの編集領域上端（スクリーン座標）に合わせる。
+    /// フォント高さ基準でテキストを上下中央に置く（プロジェクト名コンボと同じ見た目）。
     /// </summary>
     private void AlignProjectPathTextRect()
     {
-        if (!projectOutputPathTextBox.IsHandleCreated
-            || !projectNameComboBox.IsHandleCreated
-            || projectNameComboBox.GetEditItemBounds() is not Rectangle editBounds)
+        if (!projectOutputPathTextBox.IsHandleCreated)
         {
             return;
         }
 
-        var comboTextTop = projectNameComboBox.PointToScreen(editBounds.Location).Y;
-        var boxClientTop = projectOutputPathTextBox.PointToScreen(Point.Empty).Y;
-        var topInset = Math.Max(0, comboTextTop - boxClientTop);
         var client = projectOutputPathTextBox.ClientSize;
         if (client.Width <= 0 || client.Height <= 0)
         {
             return;
         }
+
+        var textHeight = TextRenderer.MeasureText(
+            "Mg",
+            projectOutputPathTextBox.Font,
+            new Size(int.MaxValue, int.MaxValue),
+            TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Height;
+        var topInset = Math.Max(0, (client.Height - textHeight) / 2);
 
         var rect = new NativeRect
         {

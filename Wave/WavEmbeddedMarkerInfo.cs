@@ -43,7 +43,7 @@ internal readonly record struct WavSmplLoop(
 
 /// <summary>
 /// WAV の cue / adtl / smpl から埋め込マーカー情報を読む（Wave 単体モード用）。
-/// Nuendo XML 経路とは独立。
+/// Nuendo/Cubase XML 経路とは独立。
 /// </summary>
 internal sealed class WavEmbeddedMarkerInfo
 {

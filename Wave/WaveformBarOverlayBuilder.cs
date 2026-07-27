@@ -155,7 +155,7 @@ internal sealed class WaveformBarOverlayResult
 }
 
 /// <summary>
-/// Nuendo XML のテンポ／拍子と WAV の iXML TimeReference から、
+/// Nuendo/Cubase XML のテンポ／拍子と WAV の iXML TimeReference から、
 /// 波形ローカル座標の小節線を構築する。
 /// <para>
 /// 小節番号はプロジェクト絶対番号ではなく、波形先頭を 1 小節目とする相対番号。

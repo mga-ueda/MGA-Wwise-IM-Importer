@@ -20,7 +20,7 @@ internal sealed class NuendoTempoEvent
     public double QuarterNotes => Ppq / NuendoTracklistInfo.PulsesPerQuarterNote;
 
     /// <summary>
-    /// Nuendo: Func=1 は「直前イベントの BPM からこのイベントの BPM へ」直線変化。
+    /// Nuendo/Cubase: Func=1 は「直前イベントの BPM からこのイベントの BPM へ」直線変化。
     /// </summary>
     public bool IsRamp => Func is 1;
 }

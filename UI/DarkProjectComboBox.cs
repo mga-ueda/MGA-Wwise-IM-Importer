@@ -56,6 +56,10 @@ internal sealed class DarkProjectComboBox : ComboBox
     [DllImport("user32.dll")]
     private static extern bool HideCaret(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    private static extern bool MoveWindow(
+        IntPtr hWnd, int x, int y, int nWidth, int nHeight, bool bRepaint);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
 
@@ -213,6 +217,7 @@ internal sealed class DarkProjectComboBox : ComboBox
         // ドロップダウン一覧のスクロールバーへ対応 OS のダークテーマを適用する。
         _ = SetWindowTheme(Handle, "DarkMode_CFD", null);
         ApplyControlHeightTarget();
+        CenterEditChild();
         AttachEditGuard();
     }
 
@@ -220,6 +225,18 @@ internal sealed class DarkProjectComboBox : ComboBox
     {
         DetachEditGuard();
         base.OnHandleDestroyed(e);
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        CenterEditChild();
+    }
+
+    protected override void OnFontChanged(EventArgs e)
+    {
+        base.OnFontChanged(e);
+        CenterEditChild();
     }
 
     /// <summary>
@@ -253,20 +270,65 @@ internal sealed class DarkProjectComboBox : ComboBox
         {
             _ = SendMessage(Handle, CbSetItemHeight, (IntPtr)(-1), (IntPtr)desired);
         }
+
+        // CB_SETITEMHEIGHT 後は EDIT が上寄せで伸びるため、フォント高に戻して中央へ。
+        CenterEditChild();
     }
 
     /// <summary>
-    /// 選択フィールド内の編集子ウィンドウ（テキスト表示領域）の矩形。
-    /// このコントロールのクライアント座標。取得できないときは null。
+    /// 子 EDIT を選択フィールド内で上下中央に置く。
+    /// 単一行 EDIT は領域が高くても文字が上寄せ描画されるため、ウィンドウ自体を中央へ移す。
     /// </summary>
-    public Rectangle? GetEditItemBounds()
+    private void CenterEditChild()
     {
-        if (!TryGetEditInfo(out var info))
+        if (!TryGetEditInfo(out var info) || info.HwndItem == IntPtr.Zero)
         {
-            return null;
+            return;
         }
 
-        return info.RcItem.ToRectangle();
+        var item = info.RcItem.ToRectangle();
+        var button = info.RcButton.ToRectangle();
+        if (item.Width <= 0 || Height <= 2)
+        {
+            return;
+        }
+
+        const int border = 1;
+        var fieldTop = border;
+        var fieldHeight = Height - border * 2;
+        var textHeight = TextRenderer.MeasureText(
+            "Mg",
+            Font,
+            new Size(int.MaxValue, int.MaxValue),
+            TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Height;
+        var editHeight = Math.Min(fieldHeight, Math.Max(Font.Height, textHeight));
+        var top = fieldTop + Math.Max(0, (fieldHeight - editHeight) / 2);
+        var left = Math.Max(border, item.Left);
+        var right = button.Width > 0 ? button.Left : Width - border;
+        var width = Math.Max(0, right - left);
+        if (width <= 0)
+        {
+            return;
+        }
+
+        if (!GetWindowRect(info.HwndItem, out var currentScreen))
+        {
+            return;
+        }
+
+        var currentLoc = PointToClient(new Point(currentScreen.Left, currentScreen.Top));
+        var currentW = currentScreen.Right - currentScreen.Left;
+        var currentH = currentScreen.Bottom - currentScreen.Top;
+        if (currentLoc.X == left
+            && currentLoc.Y == top
+            && currentW == width
+            && currentH == editHeight)
+        {
+            return;
+        }
+
+        _ = MoveWindow(info.HwndItem, left, top, width, editHeight, true);
+        Invalidate();
     }
 
     private bool TryGetEditHwnd(out IntPtr editHwnd)
@@ -572,8 +634,21 @@ internal sealed class DarkProjectComboBox : ComboBox
         Rectangle buttonBounds;
         if (GetComboBoxInfo(Handle, ref info))
         {
-            editBounds = info.RcItem.ToRectangle();
             buttonBounds = info.RcButton.ToRectangle();
+            // MoveWindow 後の実位置を使う（rcItem が古い広い領域のままだと余白が塗られない）。
+            if (info.HwndItem != IntPtr.Zero && GetWindowRect(info.HwndItem, out var editScreen))
+            {
+                var topLeft = PointToClient(new Point(editScreen.Left, editScreen.Top));
+                editBounds = new Rectangle(
+                    topLeft.X,
+                    topLeft.Y,
+                    editScreen.Right - editScreen.Left,
+                    editScreen.Bottom - editScreen.Top);
+            }
+            else
+            {
+                editBounds = info.RcItem.ToRectangle();
+            }
         }
         else
         {
