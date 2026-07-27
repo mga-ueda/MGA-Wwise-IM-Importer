@@ -231,9 +231,10 @@
           <tr><td class="ui">Fade In</td><td><code>None / 1.0 / 3.0 / 6.0 / 9.0 Sec.</code> (default None). Curve icon picks MusicFade curve. EXPORT → Destination Fade-in.</td></tr>
           <tr><td class="ui">Fade Out</td><td>Same seconds. EXPORT → Source Fade-out.</td></tr>
           <tr><td class="ui">Options / Play -E</td><td>Default on. EXPORT → Play post-exit on Any → Object rules.</td></tr>
+          <tr><td class="ui">Options / Additive Layer</td><td>Default off. Per group. Additive playback (normal click toggles overlay). EXPORT uses cumulative State Volume (e.g. A = first only, B = both).</td></tr>
         </tbody>
       </table>
-      <p>Normal Fade In / Fade Out / Exit Source At / Play -E are shared within the same group ID.</p>
+      <p>Normal Fade In / Fade Out / Exit Source At / Play -E / Additive Layer are shared within the same group ID.</p>
       <h3 id="group-exit">Group Fade / Exit Source At / Chg Occ At</h3>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
@@ -247,7 +248,7 @@
       <ul>
         <li>Click to transition. Same-group uses Same Time; otherwise Entry Cue</li>
         <li><kbd>Shift</kbd> group / <kbd>Ctrl</kbd> ungroup / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> exclude (<code>Excluded Region n</code>)</li>
-        <li><kbd>Alt</kbd> layer on/off inside a group (max 8, Group Fade)</li>
+        <li><kbd>Alt</kbd> layer on/off inside a group (max 8, Group Fade). With <span class="ui">Additive Layer</span> on, a normal click also works</li>
         <li><span class="ui">Compact Num.</span> renumbers export IDs (default off)</li>
       </ul>
       <h3 id="more-options">More Options</h3>

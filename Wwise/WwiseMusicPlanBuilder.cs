@@ -8,7 +8,8 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <item>未グループのパート 1 つ = Music Playlist Container 1 つ。</item>
 /// <item>グループ（2 パート以上）= Music Playlist Container 1 つ（同期 Segment 内に複数 Music Track）。
 /// あわせてグループ名の State Group と State（A/B/C…）を作る。Group Fade が全員同一なら Default Transition Time のみ、
-/// 異なれば Custom TransitionList（遷移先ごと）。各 Music Track へ割当し対応 State のみ 0dB・他は -108dB の Volume を設定する。</item>
+/// 異なれば Custom TransitionList（遷移先ごと）。各 Music Track へ割当し、
+/// 既定は対応 State のみ 0dB・他は -108dB。Additive Layers 時は累積再生（下位レイヤー以降を 0dB）にする。</item>
 /// <item>最終 Playlist が複数なら Music Switch Container の下に並べる。</item>
 /// <item>リージョン 1 つ = Music Segment 1 つ。ただし -A は次のリージョンと、-E は直前のリージョンと同一セグメントに束ねる。</item>
 /// <item>-A 部分は Entry Cue より前（アウフタクト）、-E 部分は Exit Cue より後として扱う。</item>
@@ -44,6 +45,7 @@ internal static class WwiseMusicPlanBuilder
         PlaylistExitSourceMode defaultChangeOccursAt = PlaylistExitSourceMode.Immediate,
         IReadOnlyDictionary<int, bool>? partPlayPostExit = null,
         bool defaultPlayPostExit = true,
+        IReadOnlyDictionary<int, bool>? partAdditiveLayers = null,
         string? containerNameOverride = null)
     {
         if (sampleRate == 0)
@@ -141,7 +143,8 @@ internal static class WwiseMusicPlanBuilder
                     partGroupFadeSeconds,
                     defaultGroupFadeSeconds,
                     partChangeOccursAtModes,
-                    defaultChangeOccursAt));
+                    defaultChangeOccursAt,
+                    ResolveUnitAdditiveLayers(unit.Parts, partAdditiveLayers)));
             }
         }
 
@@ -191,6 +194,19 @@ internal static class WwiseMusicPlanBuilder
         }
 
         return defaultPlayPostExit;
+    }
+
+    private static bool ResolveUnitAdditiveLayers(
+        IReadOnlyList<WaveformOutputPart> parts,
+        IReadOnlyDictionary<int, bool>? partAdditiveLayers)
+    {
+        if (parts.Count == 0 || partAdditiveLayers is null)
+        {
+            return false;
+        }
+
+        var representativeNumber = parts.Min(part => part.Number);
+        return partAdditiveLayers.TryGetValue(representativeNumber, out var enabled) && enabled;
     }
 
     private static PlaylistExitSourceMode ResolvePartChangeOccursAt(
@@ -506,7 +522,8 @@ internal static class WwiseMusicPlanBuilder
         IReadOnlyDictionary<int, double>? partGroupFadeSeconds,
         double defaultGroupFadeSeconds,
         IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes,
-        PlaylistExitSourceMode defaultChangeOccursAt)
+        PlaylistExitSourceMode defaultChangeOccursAt,
+        bool additiveLayers)
     {
         var orderedParts = parts
             .OrderBy(part => part.Number)
@@ -657,6 +674,7 @@ internal static class WwiseMusicPlanBuilder
                 UseDefaultTransitionOnly = useDefaultOnly,
                 DefaultTransitionSeconds = defaultTransitionSeconds,
                 TransitionSecondsByState = transitionSecondsByState,
+                AdditiveLayers = additiveLayers,
             },
             Segments = segments,
         };

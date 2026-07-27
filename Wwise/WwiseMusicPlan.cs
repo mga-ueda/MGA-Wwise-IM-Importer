@@ -93,6 +93,12 @@ internal sealed class WwiseGroupStatePlan
     /// Custom TransitionList の From→To では <b>To（遷移先 State）</b> の秒数を使う。
     /// </summary>
     public required IReadOnlyDictionary<string, double> TransitionSecondsByState { get; init; }
+
+    /// <summary>
+    /// true なら追加再生タイプ。State Volume は累積（下位レイヤー以降を 0dB、それ未満を -108dB）。
+    /// false（既定）なら排他切替（対応 State のみ 0dB）。
+    /// </summary>
+    public bool AdditiveLayers { get; init; }
 }
 
 /// <summary>

@@ -23,7 +23,7 @@ internal static class AppVersion
 
     private static readonly Lazy<string> CurrentLazy = new(ReadCurrent);
 
-    /// <summary>表示・比較・ログ共通の版（例: <c>1.0.9-beta</c>）。</summary>
+    /// <summary>表示・比較・ログ共通の版（例: <c>1.1.0-beta</c>）。</summary>
     public static string Current => CurrentLazy.Value;
 
     public static string FormTitle =>

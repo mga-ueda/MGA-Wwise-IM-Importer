@@ -63,6 +63,9 @@ internal sealed class LastWaveSessionState
     /// <summary>パート番号 → Play -E（Wwise Play post-exit。同一グループで共有）。</summary>
     public Dictionary<string, bool> PartPlayPostExit { get; set; } = new(StringComparer.Ordinal);
 
+    /// <summary>パート番号 → Additive Layers（同一グループで共有。既定オフ）。</summary>
+    public Dictionary<string, bool> PartAdditiveLayers { get; set; } = new(StringComparer.Ordinal);
+
     /// <summary>連続リージョン固まりのイン／アウト端フェード（プレビュー用）。</summary>
     public List<LastWaveRegionEdgeFadeState> RegionEdgeFades { get; set; } = [];
 
@@ -118,6 +121,7 @@ internal sealed class LastWaveSessionState
         IReadOnlyDictionary<int, RegionFadeCurveKind> partFadeOutCurves,
         IReadOnlyDictionary<int, double> partGroupFadeSeconds,
         IReadOnlyDictionary<int, bool> partPlayPostExit,
+        IReadOnlyDictionary<int, bool>? partAdditiveLayers = null,
         IReadOnlyList<WaveformMarkerMark>? waveOnlySessionMarkers = null,
         IReadOnlyList<RegionEdgeFade>? regionEdgeFades = null,
         IReadOnlyList<string>? wavePaths = null)
@@ -190,6 +194,11 @@ internal sealed class LastWaveSessionState
                 pair => pair.Key.ToString(),
                 pair => pair.Value,
                 StringComparer.Ordinal),
+            PartAdditiveLayers = (partAdditiveLayers ?? new Dictionary<int, bool>())
+                .ToDictionary(
+                    pair => pair.Key.ToString(),
+                    pair => pair.Value,
+                    StringComparer.Ordinal),
             RegionEdgeFades = (regionEdgeFades ?? [])
                 .Where(fade => fade.HasAnyFade)
                 .Select(fade => new LastWaveRegionEdgeFadeState
@@ -441,6 +450,27 @@ internal sealed class LastWaveSessionState
             }
 
             partPlayPostExit[partNumber] = pair.Value;
+        }
+
+        return true;
+    }
+
+    public bool TryGetPartAdditiveLayers(out Dictionary<int, bool> partAdditiveLayers)
+    {
+        partAdditiveLayers = new Dictionary<int, bool>();
+        if (PartAdditiveLayers is null || PartAdditiveLayers.Count == 0)
+        {
+            return true;
+        }
+
+        foreach (var pair in PartAdditiveLayers)
+        {
+            if (!TryParseInvariantInt(pair.Key, out var partNumber))
+            {
+                return false;
+            }
+
+            partAdditiveLayers[partNumber] = pair.Value;
         }
 
         return true;

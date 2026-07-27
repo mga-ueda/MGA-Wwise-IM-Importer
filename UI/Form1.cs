@@ -167,6 +167,9 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>パート番号 → Play -E（同一グループ ID で共有。Last Session へ永続化）。</summary>
     private readonly Dictionary<int, bool> _playlistPlayPostExitByPart = new();
 
+    /// <summary>パート番号 → Additive Layers（同一グループ ID で共有。Last Session へ永続化。既定オフ）。</summary>
+    private readonly Dictionary<int, bool> _playlistAdditiveLayersByPart = new();
+
     /// <summary>パート番号 → Fade In 秒数。</summary>
     private readonly Dictionary<int, double> _playlistFadeInSecondsByPart = new();
 
@@ -2800,6 +2803,13 @@ public partial class Form1 : Form, IMessageFilter
         playMinusECheckBox.CheckedChanged += PlayMinusECheckBox_CheckedChanged;
     }
 
+    private void SelectAdditiveLayersCheck(bool enabled)
+    {
+        additiveLayersCheckBox.CheckedChanged -= AdditiveLayersCheckBox_CheckedChanged;
+        additiveLayersCheckBox.Checked = enabled;
+        additiveLayersCheckBox.CheckedChanged += AdditiveLayersCheckBox_CheckedChanged;
+    }
+
     private void SelectChangeOccursAtRadio(PlaylistExitSourceMode mode)
     {
         FlatOptionRadioButton? match = null;
@@ -2865,6 +2875,16 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         return _playlistPlayPostExit;
+    }
+
+    private bool ResolveAdditiveLayers(int partNumber)
+    {
+        if (_playlistAdditiveLayersByPart.TryGetValue(partNumber, out var enabled))
+        {
+            return enabled;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -2977,7 +2997,7 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// Exit Source / Fade In・Out / Play -E の適用範囲。
+    /// Exit Source / Fade In・Out / Play -E / Additive Layers の適用範囲。
     /// 同一グループ ID のメンバーだけ共通。未グループ／別 ID は各パート独立。
     /// Group Fade は常にパート単位（このスコープの対象外）。
     /// </summary>
@@ -3013,6 +3033,14 @@ public partial class Form1 : Form, IMessageFilter
         foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
         {
             _playlistPlayPostExitByPart[scoped] = enabled;
+        }
+    }
+
+    private void StoreAdditiveLayers(int partNumber, bool enabled)
+    {
+        foreach (var scoped in EnumerateTransitionSettingsScope(partNumber))
+        {
+            _playlistAdditiveLayersByPart[scoped] = enabled;
         }
     }
 
@@ -3255,14 +3283,17 @@ public partial class Form1 : Form, IMessageFilter
         SelectExitSourceRadio(ResolveExitSourceMode(partNumber));
         SelectChangeOccursAtRadio(ResolveChangeOccursAtMode(partNumber));
         SelectPlayPostExitCheck(ResolvePlayPostExit(partNumber));
+        SelectAdditiveLayersCheck(ResolveAdditiveLayers(partNumber));
         UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
+        UpdateAdditiveLayersOptionEnabled();
     }
 
     private void ClearPlaylistTransitionSettingsState()
     {
         _playlistExitSourceModes.Clear();
         _playlistPlayPostExitByPart.Clear();
+        _playlistAdditiveLayersByPart.Clear();
         _playlistFadeInSecondsByPart.Clear();
         _playlistFadeOutSecondsByPart.Clear();
         _playlistFadeInCurveByPart.Clear();
@@ -3279,9 +3310,11 @@ public partial class Form1 : Form, IMessageFilter
         SelectExitSourceRadio(_playlistExitSourceMode);
         SelectChangeOccursAtRadio(_playlistChangeOccursAtMode);
         SelectPlayPostExitCheck(_playlistPlayPostExit);
+        SelectAdditiveLayersCheck(false);
         UpdatePlaylistFadeCurveIcons();
         UpdateWaveOnlyExitSourceOptionsEnabled();
         UpdateGroupFadeRadioEnabled();
+        UpdateAdditiveLayersOptionEnabled();
     }
 
     /// <summary>
@@ -3965,6 +3998,9 @@ public partial class Form1 : Form, IMessageFilter
         playMinusECheckBox.BackColor = back;
         playMinusECheckBox.ForeColor = UiColors.PlaylistOptionFore;
         RefreshFlatOptionControl(playMinusECheckBox);
+        additiveLayersCheckBox.BackColor = back;
+        additiveLayersCheckBox.ForeColor = UiColors.PlaylistOptionFore;
+        RefreshFlatOptionControl(additiveLayersCheckBox);
         changeOccursAtChoicesPanel.BackColor = back;
         changeOccursAtHeaderLabel.BackColor = back;
         changeOccursAtHeaderLabel.BarColor = headerBack;
@@ -4195,7 +4231,7 @@ public partial class Form1 : Form, IMessageFilter
                 button.AccessibleName = name;
             }
 
-            TipService.Set(control, BuildPlaylistGroupTip(name));
+            TipService.Set(control, BuildPlaylistGroupTip(part));
         }
 
         if (updateWaveform)
@@ -4468,6 +4504,77 @@ public partial class Form1 : Form, IMessageFilter
                 part = _transitionSettingsEditPartNumber,
                 stored = _transitionSettingsEditPartNumber is not null,
             });
+    }
+
+    private void AdditiveLayersCheckBox_CheckedChanged(object? sender, EventArgs e)
+    {
+        if (_transitionSettingsEditPartNumber is not int partNumber
+            || !IsPartInEffectiveGroup(partNumber))
+        {
+            return;
+        }
+
+        var enabled = additiveLayersCheckBox.Checked;
+        StoreAdditiveLayers(partNumber, enabled);
+        PersistLastWaveSessionIfPossible();
+        ApplyPlaylistItemTips();
+        ReleaseFocusToWaveform();
+        WritePlaybackDiagnostic(
+            "playlist.additive-layers-changed",
+            new
+            {
+                additiveLayers = enabled,
+                part = partNumber,
+            });
+    }
+
+    /// <summary>
+    /// Additive Layers は有効グループ（無効を除き 2 パート以上）選択時のみ操作可能。
+    /// </summary>
+    private void UpdateAdditiveLayersOptionEnabled()
+    {
+        var enabled = _transitionSettingsEditPartNumber is int partNumber
+            && IsPartInEffectiveGroup(partNumber);
+        if (additiveLayersCheckBox.Enabled != enabled)
+        {
+            additiveLayersCheckBox.Enabled = enabled;
+            RefreshFlatOptionControl(additiveLayersCheckBox);
+        }
+
+        if (!enabled && additiveLayersCheckBox.Checked)
+        {
+            SelectAdditiveLayersCheck(false);
+        }
+        else if (enabled && _transitionSettingsEditPartNumber is int part)
+        {
+            SelectAdditiveLayersCheck(ResolveAdditiveLayers(part));
+        }
+    }
+
+    private bool IsPartInEffectiveGroup(int partNumber)
+    {
+        if (_disabledPlaylistPartNumbers.Contains(partNumber)
+            || !_playlistPartGroupIds.TryGetValue(partNumber, out var groupId))
+        {
+            return false;
+        }
+
+        var memberCount = 0;
+        foreach (var pair in _playlistPartGroupIds)
+        {
+            if (pair.Value != groupId || _disabledPlaylistPartNumbers.Contains(pair.Key))
+            {
+                continue;
+            }
+
+            memberCount++;
+            if (memberCount >= 2)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -4756,7 +4863,7 @@ public partial class Form1 : Form, IMessageFilter
                 button.MouseLeave += PlaylistButton_MouseLeave;
                 button.DragEnter += EditorTextBox_DragEnter;
                 button.DragDrop += EditorTextBox_DragDrop;
-                TipService.Set(button, BuildPlaylistGroupTip(name));
+                TipService.Set(button, BuildPlaylistGroupTip(part));
 
                 var swatch = new PlaylistGroupSwatch
                 {
@@ -4778,7 +4885,7 @@ public partial class Form1 : Form, IMessageFilter
                 swatch.DragEnter += EditorTextBox_DragEnter;
                 swatch.DragDrop += EditorTextBox_DragDrop;
                 swatch.GroupColor = TryGetPlaylistGroupColor(part.Number);
-                TipService.Set(swatch, BuildPlaylistGroupTip(name));
+                TipService.Set(swatch, BuildPlaylistGroupTip(part));
 
                 playlistListLayout.Controls.Add(swatch);
                 playlistListLayout.Controls.Add(button);
@@ -4987,8 +5094,42 @@ public partial class Form1 : Form, IMessageFilter
                 part.EndSampleOffset,
             });
         ShowTransitionSettingsForPart(part.Number);
-        RequestPlaylistPlayback(part);
+        if (ShouldUseAdditiveLayerClick(part))
+        {
+            RequestPlaylistOverlayToggle(part);
+        }
+        else
+        {
+            RequestPlaylistPlayback(part);
+        }
+
         ReleaseFocusToWaveform();
+    }
+
+    /// <summary>
+    /// Additive Layers オンかつ、再生中の同一グループ内クリックなら
+    /// 通常クリックで追加再生トグル（従来の Alt+クリック相当）にする。
+    /// </summary>
+    private bool ShouldUseAdditiveLayerClick(WaveformOutputPart target)
+    {
+        if (!ResolveAdditiveLayers(target.Number)
+            || !_audioPlayer.IsPlaying
+            || _disabledPlaylistPartNumbers.Contains(target.Number)
+            || !_playlistPartGroupIds.TryGetValue(target.Number, out var targetGroupId))
+        {
+            return false;
+        }
+
+        foreach (var playingPartNumber in _playingPlaylistPartNumbers)
+        {
+            if (_playlistPartGroupIds.TryGetValue(playingPartNumber, out var playingGroupId)
+                && playingGroupId == targetGroupId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void PlaylistGroupTarget_MouseDown(object? sender, MouseEventArgs e)
@@ -5150,8 +5291,11 @@ public partial class Form1 : Form, IMessageFilter
         }
     }
 
-    private static string BuildPlaylistGroupTip(string playlistName) =>
-        UiStrings.TipPlaylistItem(playlistName);
+    private string BuildPlaylistGroupTip(WaveformOutputPart part)
+    {
+        var name = ResolvePlaylistTipName(part);
+        return UiStrings.TipPlaylistItem(name, ResolveAdditiveLayers(part.Number));
+    }
 
     private WaveformOutputPart? HitTestPlaylistPartAtCursor()
     {
@@ -5350,6 +5494,7 @@ public partial class Form1 : Form, IMessageFilter
             .GroupBy(pair => pair.Value)
             .Any(group => group.Count() >= 2);
         markerOptionsPanel.SetLayerMusicOptionEnabled(hasEffectiveGroup);
+        UpdateAdditiveLayersOptionEnabled();
     }
 
     private Dictionary<int, int> BuildEnabledPartGroupIds() =>
@@ -5406,6 +5551,7 @@ public partial class Form1 : Form, IMessageFilter
         var leader = members[0];
         var exit = ResolveExitSourceMode(leader);
         var playPostExit = ResolvePlayPostExit(leader);
+        var additiveLayers = ResolveAdditiveLayers(leader);
         var fadeIn = ResolveFadeInSeconds(leader);
         var fadeOut = ResolveFadeOutSeconds(leader);
         var fadeInCurve = ResolveFadeInCurve(leader);
@@ -5414,6 +5560,7 @@ public partial class Form1 : Form, IMessageFilter
         {
             _playlistExitSourceModes[member] = exit;
             _playlistPlayPostExitByPart[member] = playPostExit;
+            _playlistAdditiveLayersByPart[member] = additiveLayers;
             _playlistFadeInSecondsByPart[member] = fadeIn;
             _playlistFadeOutSecondsByPart[member] = fadeOut;
             _playlistFadeInCurveByPart[member] = fadeInCurve;
@@ -7139,6 +7286,7 @@ public partial class Form1 : Form, IMessageFilter
         tipsHeaderLabel.Text = UiStrings.LabelTips;
         logHeaderLabel.Text = UiStrings.LabelLog;
         playMinusECheckBox.Text = UiStrings.LabelPlayMinusE;
+        additiveLayersCheckBox.Text = UiStrings.LabelAdditiveLayers;
 
         FlatOptionRadioButton[] fadeRadios =
         [
@@ -7197,8 +7345,7 @@ public partial class Form1 : Form, IMessageFilter
                 continue;
             }
 
-            var name = ResolvePlaylistTipName(part);
-            TipService.Set(control, BuildPlaylistGroupTip(name));
+            TipService.Set(control, BuildPlaylistGroupTip(part));
         }
     }
 
@@ -7345,6 +7492,7 @@ public partial class Form1 : Form, IMessageFilter
         TipService.Set(fadeInGroupDividerLabel, UiStrings.TipGroupFadeHeader);
         TipService.Set(optionsHeaderLabel, UiStrings.TipOptionsHeader);
         TipService.Set(playMinusECheckBox, UiStrings.TipPlayMinusE);
+        TipService.Set(additiveLayersCheckBox, UiStrings.TipAdditiveLayers);
         TipService.Set(changeOccursAtHeaderLabel, UiStrings.TipChangeOccursAtHeader);
         UpdatePlaylistFadeCurveIcons();
 
@@ -7728,7 +7876,8 @@ public partial class Form1 : Form, IMessageFilter
             BuildExportFadeCurves(enabledNumbers, ResolveFadeInCurve),
             BuildExportFadeCurves(enabledNumbers, ResolveFadeOutCurve),
             BuildExportFadeSeconds(enabledNumbers, ResolveGroupFadeSeconds),
-            BuildExportPlayPostExit(enabledNumbers));
+            BuildExportPlayPostExit(enabledNumbers),
+            BuildExportAdditiveLayers(enabledNumbers));
     }
 
     private IReadOnlyDictionary<int, bool> BuildExportPlayPostExit(
@@ -7738,6 +7887,18 @@ public partial class Form1 : Form, IMessageFilter
         foreach (var partNumber in enabledNumbers)
         {
             result[partNumber] = ResolvePlayPostExit(partNumber);
+        }
+
+        return result;
+    }
+
+    private IReadOnlyDictionary<int, bool> BuildExportAdditiveLayers(
+        IReadOnlySet<int> enabledNumbers)
+    {
+        var result = new Dictionary<int, bool>();
+        foreach (var partNumber in enabledNumbers)
+        {
+            result[partNumber] = ResolveAdditiveLayers(partNumber);
         }
 
         return result;
@@ -7805,7 +7966,8 @@ public partial class Form1 : Form, IMessageFilter
         IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeInCurves,
         IReadOnlyDictionary<int, RegionFadeCurveKind> PartFadeOutCurves,
         IReadOnlyDictionary<int, double> PartGroupFadeSeconds,
-        IReadOnlyDictionary<int, bool> PartPlayPostExit);
+        IReadOnlyDictionary<int, bool> PartPlayPostExit,
+        IReadOnlyDictionary<int, bool> PartAdditiveLayers);
 
     private void CopyrightLinkLabel_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
     {
@@ -8523,7 +8685,8 @@ public partial class Form1 : Form, IMessageFilter
                 out var savedFadeOuts,
                 out var savedGroupFades)
             || !state.TryGetPartFadeCurves(out var savedFadeInCurves, out var savedFadeOutCurves)
-            || !state.TryGetPartPlayPostExit(out var savedPlayPostExit))
+            || !state.TryGetPartPlayPostExit(out var savedPlayPostExit)
+            || !state.TryGetPartAdditiveLayers(out var savedAdditiveLayers))
         {
             AppendReport(
                 $"{UiStrings.LogSessionHeader}{Environment.NewLine}"
@@ -8547,6 +8710,7 @@ public partial class Form1 : Form, IMessageFilter
             || savedFadeOutCurves.Count > 0
             || savedGroupFades.Count > 0
             || savedPlayPostExit.Count > 0
+            || savedAdditiveLayers.Count > 0
             || state.RegionEdgeFades.Count > 0;
         if (!hasAny)
         {
@@ -8896,7 +9060,6 @@ public partial class Form1 : Form, IMessageFilter
             groupFadeApplied++;
         }
 
-        var playPostExitApplied = 0;
         foreach (var (savedPartNumber, enabled) in savedPlayPostExit)
         {
             var partNumber = MapPartNumber(savedPartNumber);
@@ -8911,7 +9074,22 @@ public partial class Form1 : Form, IMessageFilter
             }
 
             _playlistPlayPostExitByPart[partNumber] = enabled;
-            playPostExitApplied++;
+        }
+
+        foreach (var (savedPartNumber, enabled) in savedAdditiveLayers)
+        {
+            var partNumber = MapPartNumber(savedPartNumber);
+            if (!loadedByNumber.ContainsKey(partNumber))
+            {
+                continue;
+            }
+
+            if (state.Parts.Count > 0 && !matchingNumbers.Contains(partNumber))
+            {
+                continue;
+            }
+
+            _playlistAdditiveLayersByPart[partNumber] = enabled;
         }
 
         UpdatePlaylistFadeCurveIcons();
@@ -8922,6 +9100,7 @@ public partial class Form1 : Form, IMessageFilter
             .Concat(_playlistFadeOutSecondsByPart.Keys)
             .Concat(_playlistGroupFadeSecondsByPart.Keys)
             .Concat(_playlistPlayPostExitByPart.Keys)
+            .Concat(_playlistAdditiveLayersByPart.Keys)
             .Where(loadedByNumber.ContainsKey)
             .OrderBy(number => number)
             .Cast<int?>()
@@ -8993,6 +9172,7 @@ public partial class Form1 : Form, IMessageFilter
             _playlistFadeOutCurveByPart,
             _playlistGroupFadeSecondsByPart,
             _playlistPlayPostExitByPart,
+            _playlistAdditiveLayersByPart,
             session.GetWaveOnlySessionMarkers(),
             session.RegionEdgeFades,
             _lastWavePaths.Count > 0 ? _lastWavePaths : LastWaveSessionState.GetLoadedWavePaths(preview));
@@ -9325,6 +9505,7 @@ public partial class Form1 : Form, IMessageFilter
                 _playlistChangeOccursAtMode,
                 snapshot.PartPlayPostExit,
                 _playlistPlayPostExit,
+                snapshot.PartAdditiveLayers,
                 containerNameOverride);
             ReportProgress(UiStrings.LogPlanReady(plan.Playlists.Count));
             AppendReport(WaapiMusicImporter.FormatPlanSummary(plan) + Environment.NewLine);

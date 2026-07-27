@@ -17,7 +17,7 @@ Authoring 上で Music Playlist Container／Music Switch Container／Music Segme
 **Wwise に実装したデータをマスター波形として扱う**想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。
 
 - Music Playlist の遷移プレビュー（Exit Source At／Fade In／Fade Out／Play -E）
-- グループ化による縦レイヤー（Alt 上乗せ、Group Fade、Change Occurs At）
+- グループ化による縦レイヤー（Alt 上乗せ／Additive Layer、Group Fade、Change Occurs At）
 - ストリーミング（Prefetch Length／Look-ahead Time）や Keep Layer Balance（Make-Up Gain）
 - WAAPI 経由で Music 構造を自動生成
 - **複数波形の同時ドロップやマーカートラック XML の利用により、何曲でもまとめて実装可能**

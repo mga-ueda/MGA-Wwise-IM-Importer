@@ -19,7 +19,8 @@ namespace MgaWwiseIMImporter.Wwise;
 /// 4. グループ化 Playlist はグループ名の State Group（State A/B/C…）を作り、
 ///    Group Fade が全員同一なら Default Transition Time のみ、異なれば Custom Transition Time
 ///    （遷移先 State ごと。このとき Default は Wwise 既定 1 秒のまま）、
-///    各 Music Track へ割当し、対応 State のみ Volume 0dB・他は -108dB を設定する。
+///    各 Music Track へ割当し、対応 State のみ Volume 0dB・他は -108dB を設定する
+///    （Additive Layers 時は累積再生: 下位レイヤー以降を 0dB）。
 ///    完了後に現在 State を先頭へ設定し、作成した Switch／Playlist を選択する（プレビュー用）。
 /// 5. 必要なら MusicClip トリムとリージョン端フェード（非破壊）を設定する。
 ///    Fade Duration が WAAPI 上限（3.6 秒）を超える場合は WWU 直接編集で本値を書く。
@@ -448,6 +449,10 @@ internal static class WaapiMusicImporter
                         groupState.UseDefaultTransitionOnly
                             ? groupState.DefaultTransitionSeconds
                             : WwiseDefaultStateTransitionSeconds));
+                if (groupState.AdditiveLayers)
+                {
+                    sb.AppendLine("  Additive Layers: ON (cumulative State Volume)");
+                }
             }
 
             for (var i = 0; i < playlist.Segments.Count; i++)
@@ -1230,7 +1235,8 @@ internal static class WaapiMusicImporter
                     log(UiStrings.LogGroupStateTrackVolumePlan(
                         track.Name,
                         activeState,
-                        GroupStateMuteVolumeDb));
+                        GroupStateMuteVolumeDb,
+                        groupState.AdditiveLayers));
                     volumePatches.Add(new MusicTrackStateVolumePatch(
                         trackWwuPath,
                         trackId,
@@ -1238,7 +1244,9 @@ internal static class WaapiMusicImporter
                         groupState.Name,
                         stateGroupId,
                         stateIds,
+                        groupState.StateNames,
                         activeState,
+                        groupState.AdditiveLayers,
                         GroupStateMuteVolumeDb,
                         WaapiMusicTransitionDefaults.ToWaapiMusicSyncType(
                             track.ChangeOccursAt ?? PlaylistExitSourceMode.Immediate)));
@@ -1498,7 +1506,8 @@ internal static class WaapiMusicImporter
         bool UseDefaultTransitionOnly);
 
     /// <summary>
-    /// Music Track の State Volume（対応 State=0dB、他=-108dB）と
+    /// Music Track の State Volume（排他: 対応 State=0dB・他=-108dB／
+    /// Additive: 下位レイヤー以降=0dB）と
     /// Change Occurs At（StateGroupInfo/@MusicSyncType）を WWU へ書くためのパッチ。
     /// </summary>
     private readonly record struct MusicTrackStateVolumePatch(
@@ -1508,7 +1517,9 @@ internal static class WaapiMusicImporter
         string StateGroupName,
         string StateGroupId,
         IReadOnlyDictionary<string, string> StateIdsByName,
-        string ActiveStateName,
+        IReadOnlyList<string> OrderedStateNames,
+        string LayerStateName,
+        bool AdditiveLayers,
         double MuteVolumeDb,
         int MusicSyncType);
 
@@ -2662,7 +2673,8 @@ internal static class WaapiMusicImporter
 
     /// <summary>
     /// Music Track の StateInfo／CustomStateList に Volume を書く。
-    /// 対応 State は 0dB（Property 省略）、他 State は MuteVolumeDb。
+    /// 排他: 対応 State は 0dB（Property 省略）、他 State は MuteVolumeDb。
+    /// Additive: 当該レイヤー以降の State は 0dB、それ未満は MuteVolumeDb。
     /// </summary>
     private static void PatchMusicTrackStateVolumesInWorkUnitFile(
         string wwuPath,
@@ -2735,16 +2747,13 @@ internal static class WaapiMusicImporter
 
             foreach (var (stateName, stateId) in patch.StateIdsByName)
             {
-                var isActive = string.Equals(
-                    stateName,
-                    patch.ActiveStateName,
-                    StringComparison.Ordinal);
+                var isUnmuted = IsGroupStateVolumeUnmuted(patch, stateName);
                 customStateList.AppendChild(
                     BuildCustomStateVolumeElement(
                         doc,
                         stateName,
                         stateId,
-                        isActive ? null : patch.MuteVolumeDb));
+                        isUnmuted ? null : patch.MuteVolumeDb));
             }
         }
 
@@ -2767,11 +2776,8 @@ internal static class WaapiMusicImporter
 
             foreach (var (stateName, _) in patch.StateIdsByName)
             {
-                var isActive = string.Equals(
-                    stateName,
-                    patch.ActiveStateName,
-                    StringComparison.Ordinal);
-                var expected = isActive ? 0.0 : patch.MuteVolumeDb;
+                var isUnmuted = IsGroupStateVolumeUnmuted(patch, stateName);
+                var expected = isUnmuted ? 0.0 : patch.MuteVolumeDb;
                 var actual = ReadCustomStateVolume(track, stateName);
                 if (actual is null
                     || Math.Abs(actual.Value - expected) > 1e-6)
@@ -2798,6 +2804,40 @@ internal static class WaapiMusicImporter
                         syncType));
             }
         }
+    }
+
+    /// <summary>
+    /// グループ State Volume が 0dB になるか。
+    /// 排他: 当該レイヤー State のみ。Additive: 当該レイヤー以降すべて。
+    /// </summary>
+    private static bool IsGroupStateVolumeUnmuted(
+        MusicTrackStateVolumePatch patch,
+        string stateName)
+    {
+        if (!patch.AdditiveLayers)
+        {
+            return string.Equals(
+                stateName,
+                patch.LayerStateName,
+                StringComparison.Ordinal);
+        }
+
+        var layerIndex = IndexOfStateName(patch.OrderedStateNames, patch.LayerStateName);
+        var stateIndex = IndexOfStateName(patch.OrderedStateNames, stateName);
+        return layerIndex >= 0 && stateIndex >= layerIndex;
+    }
+
+    private static int IndexOfStateName(IReadOnlyList<string> stateNames, string stateName)
+    {
+        for (var i = 0; i < stateNames.Count; i++)
+        {
+            if (string.Equals(stateNames[i], stateName, StringComparison.Ordinal))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static System.Xml.XmlElement BuildCustomStateVolumeElement(

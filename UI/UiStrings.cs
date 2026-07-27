@@ -240,17 +240,21 @@ internal static class UiStrings
         "遷移先として選ぶ Music Playlist の一覧です。クリックで Fade／Exit Source At を反映し、再生中は遷移を予約します。",
         "List of Music Playlists to jump to. Click to apply Fade / Exit Source At; while playing, schedules a transition.");
 
-    public static string TipPlaylistItem(string playlistName) => Format(
+    public static string TipPlaylistItem(string playlistName, bool additiveLayers = false) => Format(
         "{0}{1}"
         + "[Shift]+クリック／ドラッグ: グループ化（既存グループも新しい ID で上書き可）{1}"
         + "[Ctrl]+クリック／ドラッグ: グループ解除{1}"
         + "[Ctrl+Shift]+クリック／ドラッグ: 無効化／再有効化{1}"
-        + "[Alt]+クリック: グループ内で重ね再生（再クリックで個別停止）",
+        + (additiveLayers
+            ? "クリック: グループ内で追加再生のオン／オフ（再生中・同一グループ時）"
+            : "[Alt]+クリック: グループ内で重ね再生（再クリックで個別停止）"),
         "{0}{1}"
         + "[Shift]+click/drag: group (can overwrite an existing group with a new ID){1}"
         + "[Ctrl]+click/drag: ungroup{1}"
         + "[Ctrl+Shift]+click/drag: disable / re-enable{1}"
-        + "[Alt]+click: layer playback within a group (click again to stop that layer)",
+        + (additiveLayers
+            ? "Click: toggle additive layer playback within a group (while playing in that group)"
+            : "[Alt]+click: layer playback within a group (click again to stop that layer)"),
         playlistName,
         Environment.NewLine);
 
@@ -446,14 +450,18 @@ internal static class UiStrings
     public static string TipPlayMinusE => Get(
         "オンのとき、`-L` ループ折り返しで `-E` を二重再生します（Wwise の Play post-exit 相当）。"
         + Environment.NewLine
+        + "同一グループ ID の Playlist では設定を共有します（未グループは Playlist ごと）。"
+        + Environment.NewLine
         + "EXPORT 時は遷移先向け Any→Object ルールの Play post-exit へ反映します。"
         + Environment.NewLine
-        + "[E] 再生中（またはシークバー位置）の Playlist をトグル",
+        + "[E] 再生中（またはシークバー位置）の Playlist（グループなら共有値）をトグル",
         "When on, dual-plays -E on -L loop wrap (Wwise Play post-exit)."
+        + Environment.NewLine
+        + "Shared within the same group ID (per playlist when ungrouped)."
         + Environment.NewLine
         + "EXPORT writes Play post-exit on Any→Object transition rules for the destination."
         + Environment.NewLine
-        + "[E] toggle for the playing (or seek-bar) playlist");
+        + "[E] toggle for the playing (or seek-bar) playlist (shared value if grouped)");
 
     public static string TipAutoActive => Get(
         "オンのとき、EXPORT 完了後に Wwise を前面化します。"
@@ -557,6 +565,18 @@ internal static class UiStrings
         + " Recommended when using Wwise Loudness Normalization."
         + " Writes Make-Up Gain on the Music Track nondestructively (not baked into WAV)."
         + " Disabled when no group of 2+ parts exists.");
+
+    public static string TipAdditiveLayers => Get(
+        "グループをレイヤー切り替えではなく追加再生タイプとして扱います（既定オフ・グループ単位で記憶）。"
+        + " オン時、再生中に同一グループの Playlist をクリックすると追加再生のオン／オフができます（Alt 不要）。"
+        + " EXPORT 時、State Volume は累積再生（例: 2 レイヤーなら A=1 本のみ、B=2 本同時）になるよう設定します。"
+        + " グループ（2 パート以上）を選んでいるときだけ操作できます。",
+        "Treats the group as additive playback instead of exclusive layer switching"
+        + " (default off; remembered per group)."
+        + " When on, click a playlist in the same group while playing to toggle additive layers (no Alt needed)."
+        + " On EXPORT, State Volumes are set for cumulative playback"
+        + " (e.g. 2 layers: A = first only, B = both)."
+        + " Enabled only when a group of 2+ parts is selected.");
 
     public static string TipMoreOptionsHeader => Get(
         "Stream／Layer Music Option／Marker Comment／Marker Grid を開閉します（既定は開いた状態）。"
@@ -1065,9 +1085,14 @@ internal static class UiStrings
     public static string LogGroupStateTrackVolumePlan(
         string trackName,
         string activeState,
-        double muteDb) => Format(
-        "Group State Volume: Track '{0}'  {1}=0dB / others={2:0.###}dB",
-        "Group State Volume: Track '{0}'  {1}=0dB / others={2:0.###}dB",
+        double muteDb,
+        bool additiveLayers = false) => Format(
+        additiveLayers
+            ? "Group State Volume (Additive): Track '{0}'  unmuted from {1} onward / muted={2:0.###}dB"
+            : "Group State Volume: Track '{0}'  {1}=0dB / others={2:0.###}dB",
+        additiveLayers
+            ? "Group State Volume (Additive): Track '{0}'  unmuted from {1} onward / muted={2:0.###}dB"
+            : "Group State Volume: Track '{0}'  {1}=0dB / others={2:0.###}dB",
         trackName,
         activeState,
         muteDb);
@@ -2086,6 +2111,8 @@ internal static class UiStrings
         "Layer Music Option",
         "Layer Music Option");
     public static string LabelKeepLayerBalance => Get("Keep Layer Balance", "Keep Layer Balance");
+
+    public static string LabelAdditiveLayers => Get("Additive\nLayer", "Additive\nLayer");
     public static string LabelMarkerGridHeader => Get("Marker Grid", "Marker Grid");
     public static string LabelMarkerComment => Get("Marker Comment", "Marker Comment");
     public static string LabelDigits => Get("Digits", "Digits");

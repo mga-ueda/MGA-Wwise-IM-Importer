@@ -34,6 +34,7 @@ partial class Form1
     private SectionHeaderLabel optionsHeaderLabel;
     private FlowLayoutPanel optionsChoicesPanel;
     private FlatOptionCheckBox playMinusECheckBox;
+    private FlatOptionCheckBox additiveLayersCheckBox;
     private SectionHeaderLabel fadeInGroupDividerLabel;
     private FlowLayoutPanel fadeInGroupChoicesPanel;
     private FlatOptionRadioButton fadeInGroupNoneRadio;
@@ -144,6 +145,7 @@ partial class Form1
         optionsHeaderLabel = new SectionHeaderLabel();
         optionsChoicesPanel = new FlowLayoutPanel();
         playMinusECheckBox = new FlatOptionCheckBox();
+        additiveLayersCheckBox = new FlatOptionCheckBox();
         fadeInGroupDividerLabel = new SectionHeaderLabel();
         fadeInGroupChoicesPanel = new FlowLayoutPanel();
         fadeInGroupNoneRadio = new FlatOptionRadioButton();
@@ -730,6 +732,7 @@ partial class Form1
         optionsChoicesPanel.TabIndex = 3;
         optionsChoicesPanel.WrapContents = false;
         optionsChoicesPanel.Controls.Add(playMinusECheckBox);
+        optionsChoicesPanel.Controls.Add(additiveLayersCheckBox);
         //
         // playMinusECheckBox
         //
@@ -743,6 +746,19 @@ partial class Form1
         playMinusECheckBox.Text = "Play -E";
         playMinusECheckBox.UseVisualStyleBackColor = true;
         playMinusECheckBox.CheckedChanged += PlayMinusECheckBox_CheckedChanged;
+        //
+        // additiveLayersCheckBox
+        //
+        additiveLayersCheckBox.AutoSize = true;
+        additiveLayersCheckBox.Checked = false;
+        additiveLayersCheckBox.Enabled = false;
+        additiveLayersCheckBox.Font = new Font("Yu Gothic UI", 8.5F);
+        additiveLayersCheckBox.Margin = new Padding(3, 1, 3, 1);
+        additiveLayersCheckBox.Name = "additiveLayersCheckBox";
+        additiveLayersCheckBox.TabIndex = 1;
+        additiveLayersCheckBox.Text = "Additive\nLayer";
+        additiveLayersCheckBox.UseVisualStyleBackColor = true;
+        additiveLayersCheckBox.CheckedChanged += AdditiveLayersCheckBox_CheckedChanged;
         //
         // fadeInGroupDividerLabel
         //
@@ -1367,7 +1383,7 @@ partial class Form1
         MinimumSize = new Size(480, 320);
         Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
-        Text = "MGA Wwise IMImporter - Version 1.0.9-beta";
+        Text = "MGA Wwise IMImporter - Version 1.1.0-beta";
         ((System.ComponentModel.ISupportInitialize)brandLogoPictureBox).EndInit();
         projectActionPanel.ResumeLayout(false);
         projectActionPanel.PerformLayout();

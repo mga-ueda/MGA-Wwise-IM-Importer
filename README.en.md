@@ -17,7 +17,7 @@ Building Music Playlist Containers, Music Switch Containers, Music Segments, Mus
 The workflow assumes **the Interactive Music data in Wwise is the master**. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.
 
 - Music Playlist transition preview (Exit Source At / Fade In / Fade Out / Play -E)
-- Vertical layers via grouping (Alt layering, Group Fade, Change Occurs At)
+- Vertical layers via grouping (Alt layering / Additive Layer, Group Fade, Change Occurs At)
 - Streaming (Prefetch Length / Look-ahead Time) and Keep Layer Balance (Make-Up Gain)
 - Automatic Music hierarchy creation over WAAPI
 - **Drop multiple waves at once, or use marker-track XML, to implement any number of pieces together**

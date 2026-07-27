@@ -185,11 +185,15 @@ internal sealed class FlatOptionCheckBox : CheckBox
         // コントロール寸法とテキスト位置は従来どおりに保ち、枠だけを小さく描画する。
         var glyph = ScaleLogical(LayoutGlyphSize);
         var gap = ScaleLogical(6);
+        var textFlags = GetTextFormatFlags();
         var text = TextRenderer.MeasureText(
             Text,
             Font,
-            Size.Empty,
-            TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
+            // 改行ありは自然な複数行サイズを測る。
+            textFlags.HasFlag(TextFormatFlags.SingleLine)
+                ? Size.Empty
+                : new Size(short.MaxValue, short.MaxValue),
+            textFlags);
         return new Size(
             Padding.Horizontal + glyph + gap + text.Width + ScaleLogical(2),
             Padding.Vertical + Math.Max(glyph, text.Height) + ScaleLogical(4));
@@ -271,11 +275,22 @@ internal sealed class FlatOptionCheckBox : CheckBox
             Font,
             new Rectangle(textLeft, 0, Math.Max(0, Width - textLeft), Height),
             Enabled ? ForeColor : UiColors.OptionGlyphDisabled,
-            TextFormatFlags.Left
+            GetTextFormatFlags());
+    }
+
+    private TextFormatFlags GetTextFormatFlags()
+    {
+        var flags = TextFormatFlags.Left
             | TextFormatFlags.VerticalCenter
             | TextFormatFlags.NoPadding
-            | TextFormatFlags.NoPrefix
-            | TextFormatFlags.SingleLine);
+            | TextFormatFlags.NoPrefix;
+        if (Text.Contains('\n', StringComparison.Ordinal)
+            || Text.Contains('\r', StringComparison.Ordinal))
+        {
+            return flags;
+        }
+
+        return flags | TextFormatFlags.SingleLine;
     }
 
     private Color ResolveBorderColor() =>

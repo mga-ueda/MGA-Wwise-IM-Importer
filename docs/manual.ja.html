@@ -233,9 +233,10 @@
           <tr><td class="ui">Fade In</td><td><code>None / 1.0 / 3.0 / 6.0 / 9.0 Sec.</code>（既定 None）。カーブアイコンで MusicFade カーブ選択。EXPORT 時は Destination Fade-in。</td></tr>
           <tr><td class="ui">Fade Out</td><td>同様。EXPORT 時は Source Fade-out。</td></tr>
           <tr><td class="ui">Options / Play -E</td><td>既定オン。EXPORT 時は Any → Object の Play post-exit。</td></tr>
+          <tr><td class="ui">Options / Additive Layer</td><td>既定オフ。グループ単位。追加再生タイプ（通常クリックで上乗せ／停止）。EXPORT 時は累積 State Volume（例: A=1 本、B=2 本同時）。</td></tr>
         </tbody>
       </table>
-      <p>通常の Fade In／Fade Out／Exit Source At／Play -E は同一グループ ID で共有されます。</p>
+      <p>通常の Fade In／Fade Out／Exit Source At／Play -E／Additive Layer は同一グループ ID で共有されます。</p>
       <h3 id="group-exit">Group Fade／Exit Source At／Chg Occ At</h3>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
@@ -249,7 +250,7 @@
       <ul>
         <li>クリックで遷移。再生中は Exit Source At に従う。同一グループ内は Same Time、以外は Entry Cue</li>
         <li><kbd>Shift</kbd> … グループ化（縦レイヤー）／<kbd>Ctrl</kbd> … 解除／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> … 除外（<code>Excluded Region n</code>）</li>
-        <li><kbd>Alt</kbd> … グループ内上乗せ／停止（最大 8、Group Fade）</li>
+        <li><kbd>Alt</kbd> … グループ内上乗せ／停止（最大 8、Group Fade）。<span class="ui">Additive Layer</span> オン時は通常クリックでも可</li>
         <li><span class="ui">Compact Num.</span> … 書き出し番号を詰める（既定オフ）</li>
       </ul>
       <h3 id="more-options">More Options</h3>
