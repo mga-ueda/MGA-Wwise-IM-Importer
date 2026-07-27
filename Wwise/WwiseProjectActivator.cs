@@ -31,6 +31,7 @@ internal static class WwiseProjectActivator
             return (false, UiStrings.LogWwiseProjectFileMissing(path));
         }
 
+        var waapiReachable = false;
         try
         {
             using var client = new WaapiHttpClient(
@@ -39,6 +40,7 @@ internal static class WwiseProjectActivator
 
             var info = await client.CallAsync("ak.wwise.core.getInfo", cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
+            waapiReachable = true;
             if (TryGetProcessId(info, out var processId))
             {
                 _ = AllowSetForegroundWindow(processId);
@@ -51,7 +53,7 @@ internal static class WwiseProjectActivator
                         "ak.wwise.core.getProjectInfo",
                         cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
-                currentPath = ReadProjectFilePath(project);
+                currentPath = WaapiJson.ReadProjectFilePath(project);
             }
             catch
             {
@@ -92,8 +94,15 @@ internal static class WwiseProjectActivator
 
             return (true, UiStrings.LogWwiseProjectOpened(Path.GetFileNameWithoutExtension(path)));
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // getInfo 応答済み＝Wwise は起動中。project.open の遅延／タイムアウトで
+            // シェル起動へ落とすと Wwise が二重起動するため、失敗として返す。
+            if (waapiReachable)
+            {
+                return (false, UiStrings.LogWwiseProjectOpenRequestFailed(ex.Message));
+            }
+
             return OpenViaAuthoringOrShell(path);
         }
     }
@@ -286,21 +295,6 @@ internal static class WwiseProjectActivator
         }
     }
 
-    private static string ReadProjectFilePath(JsonElement project)
-    {
-        if (TryGetString(project, "path", out var path))
-        {
-            return path;
-        }
-
-        if (TryGetString(project, "filePath", out var filePath))
-        {
-            return filePath;
-        }
-
-        return string.Empty;
-    }
-
     private static bool TryGetProcessId(JsonElement info, out int processId)
     {
         processId = 0;
@@ -326,19 +320,5 @@ internal static class WwiseProjectActivator
         }
 
         return false;
-    }
-
-    private static bool TryGetString(JsonElement element, string propertyName, out string value)
-    {
-        value = string.Empty;
-        if (element.ValueKind != JsonValueKind.Object
-            || !element.TryGetProperty(propertyName, out var property)
-            || property.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        value = property.GetString() ?? string.Empty;
-        return value.Length > 0;
     }
 }

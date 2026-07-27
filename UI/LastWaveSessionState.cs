@@ -337,7 +337,7 @@ internal sealed class LastWaveSessionState
         partGroupIds = new Dictionary<int, int>();
         foreach (var pair in PartGroupIds)
         {
-            if (!int.TryParse(pair.Key, out var partNumber))
+            if (!TryParseInvariantInt(pair.Key, out var partNumber))
             {
                 return false;
             }
@@ -353,7 +353,7 @@ internal sealed class LastWaveSessionState
         groupColorIndexes = new Dictionary<int, int>();
         foreach (var pair in GroupColorIndexes)
         {
-            if (!int.TryParse(pair.Key, out var groupId))
+            if (!TryParseInvariantInt(pair.Key, out var groupId))
             {
                 return false;
             }
@@ -374,7 +374,7 @@ internal sealed class LastWaveSessionState
 
         foreach (var pair in PartExitSourceModes)
         {
-            if (!int.TryParse(pair.Key, out var partNumber)
+            if (!TryParseInvariantInt(pair.Key, out var partNumber)
                 || !Enum.TryParse<PlaylistExitSourceMode>(pair.Value, ignoreCase: true, out var mode))
             {
                 return false;
@@ -396,7 +396,7 @@ internal sealed class LastWaveSessionState
 
         foreach (var pair in PartChangeOccursAtModes)
         {
-            if (!int.TryParse(pair.Key, out var partNumber)
+            if (!TryParseInvariantInt(pair.Key, out var partNumber)
                 || !Enum.TryParse<PlaylistExitSourceMode>(pair.Value, ignoreCase: true, out var mode))
             {
                 return false;
@@ -435,7 +435,7 @@ internal sealed class LastWaveSessionState
 
         foreach (var pair in PartPlayPostExit)
         {
-            if (!int.TryParse(pair.Key, out var partNumber))
+            if (!TryParseInvariantInt(pair.Key, out var partNumber))
             {
                 return false;
             }
@@ -456,6 +456,17 @@ internal sealed class LastWaveSessionState
             && TryParseFadeCurveMap(PartFadeOutCurves, partFadeOutCurves);
     }
 
+    /// <summary>
+    /// JSON 辞書キー（アプリが書いたパート／グループ番号）の読み戻し。
+    /// UI カルチャーに依存しないよう Invariant で解釈する。
+    /// </summary>
+    private static bool TryParseInvariantInt(string text, out int value) =>
+        int.TryParse(
+            text,
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out value);
+
     private static bool TryParseFadeCurveMap(
         Dictionary<string, string>? source,
         Dictionary<int, RegionFadeCurveKind> destination)
@@ -467,7 +478,7 @@ internal sealed class LastWaveSessionState
 
         foreach (var pair in source)
         {
-            if (!int.TryParse(pair.Key, out var partNumber)
+            if (!TryParseInvariantInt(pair.Key, out var partNumber)
                 || !Enum.TryParse<RegionFadeCurveKind>(pair.Value, ignoreCase: true, out var curve))
             {
                 return false;
@@ -490,7 +501,7 @@ internal sealed class LastWaveSessionState
 
         foreach (var pair in source)
         {
-            if (!int.TryParse(pair.Key, out var partNumber))
+            if (!TryParseInvariantInt(pair.Key, out var partNumber))
             {
                 return false;
             }

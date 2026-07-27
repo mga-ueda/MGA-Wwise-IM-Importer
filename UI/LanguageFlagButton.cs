@@ -6,33 +6,14 @@ namespace MgaWwiseIMImporter.UI;
 /// <summary>
 /// 表示言語切替（スペクトラム左）。JP／EN をトランスポート同様に画像描画し、薄い枠付きの正方形。
 /// </summary>
-internal sealed class LanguageFlagButton : Button
+internal sealed class LanguageFlagButton : SquareToolbarButton
 {
-    private bool _hovered;
-    private bool _pressed;
-
     public LanguageFlagButton()
     {
-        AccessibleRole = AccessibleRole.PushButton;
-        FlatStyle = FlatStyle.Flat;
-        FlatAppearance.BorderSize = 0;
-        Size = new Size(24, 24);
         Margin = new Padding(8, 0, 4, 0);
-        TabStop = false;
-        Cursor = Cursors.Hand;
-        UseVisualStyleBackColor = false;
-        SetStyle(
-            ControlStyles.AllPaintingInWmPaint
-            | ControlStyles.OptimizedDoubleBuffer
-            | ControlStyles.UserPaint,
-            true);
-        SetStyle(ControlStyles.Selectable, false);
         ApplyColors();
         RefreshAppearance();
     }
-
-    public Color HoverBackColor { get; set; }
-    public Color PressedBackColor { get; set; }
 
     public void RefreshAppearance()
     {
@@ -42,58 +23,6 @@ internal sealed class LanguageFlagButton : Button
         Invalidate();
     }
 
-    public void ApplyColors()
-    {
-        BackColor = UiColors.ForControlBack(UiColors.ProjectBarBack);
-        ForeColor = UiColors.LogButtonFore;
-        HoverBackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
-        PressedBackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
-        Invalidate();
-    }
-
-    /// <summary>
-    /// <see cref="AutoScaleMode.Font"/> は縦横倍率が異なるため、正方形を維持する。
-    /// </summary>
-    protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
-    {
-        var keepSquare = Width == Height;
-        base.ScaleControl(factor, specified);
-        if (keepSquare && Width != Height)
-        {
-            var side = Math.Min(Width, Height);
-            Size = new Size(side, side);
-        }
-    }
-
-    protected override void OnMouseEnter(EventArgs e)
-    {
-        _hovered = true;
-        Invalidate();
-        base.OnMouseEnter(e);
-    }
-
-    protected override void OnMouseLeave(EventArgs e)
-    {
-        _hovered = false;
-        _pressed = false;
-        Invalidate();
-        base.OnMouseLeave(e);
-    }
-
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        _pressed = e.Button == MouseButtons.Left;
-        Invalidate();
-        base.OnMouseDown(e);
-    }
-
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        _pressed = false;
-        Invalidate();
-        base.OnMouseUp(e);
-    }
-
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
@@ -101,11 +30,8 @@ internal sealed class LanguageFlagButton : Button
         g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
         g.Clear(BackColor);
 
-        var fill = _pressed
-            ? PressedBackColor
-            : _hovered
-                ? HoverBackColor
-                : BackColor;
+        // 従来どおり右下 1px を空けた矩形で塗る（見た目を維持）。
+        var fill = ResolveFillColor();
         var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
         using (var fillBrush = new SolidBrush(fill))
         {

@@ -7,7 +7,8 @@ namespace MgaWwiseIMImporter.Wwise;
 /// </summary>
 internal static class WaapiSelection
 {
-    private const string FindInProjectExplorerCommand = "FindInProjectExplorerSyncGroup1";
+    /// <summary>Project Explorer で対象を選択する Wwise UI コマンド（WaapiMusicImporter と共用）。</summary>
+    internal const string FindInProjectExplorerCommand = "FindInProjectExplorerSyncGroup1";
 
     /// <summary>
     /// 指定パスのオブジェクトを Project Explorer で選択する。

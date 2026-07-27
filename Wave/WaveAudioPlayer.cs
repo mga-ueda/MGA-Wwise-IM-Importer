@@ -474,20 +474,8 @@ internal sealed class WaveAudioPlayer : IDisposable
             return false;
         }
 
-        var fadeInFrameCount = fadeInSeconds <= 0d
-            ? 0
-            : Math.Max(
-                1,
-                (int)Math.Min(
-                    int.MaxValue,
-                    Math.Round(_provider.WaveFormat.SampleRate * fadeInSeconds)));
-        var fadeFrameCount = fadeSeconds <= 0d
-            ? 0
-            : Math.Max(
-                1,
-                (int)Math.Min(
-                    int.MaxValue,
-                    Math.Round(_provider.WaveFormat.SampleRate * fadeSeconds)));
+        var fadeInFrameCount = SecondsToFadeFrames(fadeInSeconds);
+        var fadeFrameCount = SecondsToFadeFrames(fadeSeconds);
         var accepted = _provider.TrySchedulePlaylistTransition(
             startSample,
             endSample,
@@ -734,11 +722,21 @@ internal sealed class WaveAudioPlayer : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         StopAndRelease();
-        _path = path;
-        // 元 WAV を掴み続けないよう、再生用に一時コピーを開く。
-        // （外部アプリが同じファイルへ上書き保存できるようにする）
-        _playbackCopyPath = CreatePlaybackCopy(path);
-        OpenReadersFromPlaybackCopy(path);
+        try
+        {
+            _path = path;
+            // 元 WAV を掴み続けないよう、再生用に一時コピーを開く。
+            // （外部アプリが同じファイルへ上書き保存できるようにする）
+            _playbackCopyPath = CreatePlaybackCopy(path);
+            OpenReadersFromPlaybackCopy(path);
+        }
+        catch
+        {
+            // 半開きのリーダー・一時コピー・HasSource 不整合を残さない。
+            StopAndRelease();
+            _path = null;
+            throw;
+        }
     }
 
     /// <summary>
@@ -753,9 +751,19 @@ internal sealed class WaveAudioPlayer : IDisposable
         }
 
         StopAndRelease();
-        _path = spans[0].Path;
-        _playbackCopyPath = WavConcatWriter.WriteTempConcat(spans);
-        OpenReadersFromPlaybackCopy(_playbackCopyPath);
+        try
+        {
+            _path = spans[0].Path;
+            _playbackCopyPath = WavConcatWriter.WriteTempConcat(spans);
+            OpenReadersFromPlaybackCopy(_playbackCopyPath);
+        }
+        catch
+        {
+            // 半開きのリーダー・一時連結 WAV・HasSource 不整合を残さない。
+            StopAndRelease();
+            _path = null;
+            throw;
+        }
     }
 
     private void OpenReadersFromPlaybackCopy(string formatSourcePath)
@@ -855,8 +863,17 @@ internal sealed class WaveAudioPlayer : IDisposable
                 + $" '{_outputSettings.DeviceId}'): {ex.Message}; falling back to WaveOut default.";
             Trace($"audio.output-fallback {message}");
             Diagnostic?.Invoke(this, message);
-            _output = AudioOutputFactory.Create(AudioOutputSettings.Default, out _);
-            _output.Init(_provider);
+            try
+            {
+                _output = AudioOutputFactory.Create(AudioOutputSettings.Default, out _);
+                _output.Init(_provider);
+            }
+            catch
+            {
+                // フォールバックも失敗したら、イベント未購読の壊れたデバイスを残さない。
+                DisposeOutputOnly();
+                throw;
+            }
         }
 
         _output.PlaybackStopped += OnPlaybackStopped;
@@ -1142,11 +1159,15 @@ internal sealed class WaveAudioPlayer : IDisposable
         // 末尾到達時のみ終了扱い（Stop 呼び出しでも発火するため位置で判定）
         // ループ中はプロバイダが折り返すので、ここに来るのは真の EOF／Stop
         var playlistEnded = _provider?.TryResetPlaylistAfterEnd() == true;
+        // 最終クロックの Group Fade Out 完了で Read が 0 を返した場合、
+        // リーダはファイル中盤のままなので位置判定では終了にならない。フラグで回収する。
+        var clockFadeOutEnded = _provider?.ConsumeForceEndAfterClockFadeOut() == true;
         if (playlistEnded
+            || clockFadeOutEnded
             || _reader.Position >= _reader.Length
             || _reader.CurrentTime >= _reader.TotalTime)
         {
-            CompletePlaybackEnded(playlistEnded);
+            CompletePlaybackEnded(playlistEnded || clockFadeOutEnded);
         }
     }
 
@@ -1167,6 +1188,8 @@ internal sealed class WaveAudioPlayer : IDisposable
         if (_output is AsioOut { HasReachedEnd: true })
         {
             var playlistEnded = _provider?.TryResetPlaylistAfterEnd() == true;
+            // クロック FO 由来の終了フラグを消費し、次の Play が即終了しないようにする。
+            var clockFadeOutEnded = _provider?.ConsumeForceEndAfterClockFadeOut() == true;
             _suppressPlaybackEnded = true;
             try
             {
@@ -1177,7 +1200,7 @@ internal sealed class WaveAudioPlayer : IDisposable
                 _suppressPlaybackEnded = false;
             }
 
-            CompletePlaybackEnded(playlistEnded);
+            CompletePlaybackEnded(playlistEnded || clockFadeOutEnded);
             return true;
         }
 
@@ -2143,6 +2166,25 @@ internal sealed class WaveAudioPlayer : IDisposable
             _clockFadeOutFrameCount = 0;
             _stopAfterClockFadeOut = false;
             _forceEndAfterClockFadeOut = false;
+        }
+
+        /// <summary>
+        /// 最終クロック Group Fade Out 完了による強制終了フラグを消費する。
+        /// 立っていた場合は true（Read が 0 を返して停止した要因の判定用）。
+        /// </summary>
+        public bool ConsumeForceEndAfterClockFadeOut()
+        {
+            lock (_gate)
+            {
+                if (!_forceEndAfterClockFadeOut && !_stopAfterClockFadeOut)
+                {
+                    return false;
+                }
+
+                _stopAfterClockFadeOut = false;
+                _forceEndAfterClockFadeOut = false;
+                return true;
+            }
         }
 
         public bool TryResetPlaylistAfterEnd()

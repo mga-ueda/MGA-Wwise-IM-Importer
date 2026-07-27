@@ -63,7 +63,7 @@ internal sealed class AppSettings
         return settings;
     }
 
-    public void Save() => WriteValues(ToDictionary());
+    public void Save() => IniFile.WriteSection(Section, ToDictionary());
 
     public void SaveAlwaysOnTop(bool enabled)
     {
@@ -130,46 +130,16 @@ internal sealed class AppSettings
         ["DefaultPlaylistFadeOutCurve"] = DefaultPlaylistFadeOutCurve.ToString(),
     };
 
-    private static void WriteValues(Dictionary<string, string> values)
-    {
-        IniFile.WriteSection(Section, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["AlwaysOnTop"] = values.TryGetValue("AlwaysOnTop", out var alwaysOnTop) ? alwaysOnTop : "0",
-            ["UiLanguage"] = values.TryGetValue("UiLanguage", out var language) ? language : "ja",
-            ["SkippedUpdateVersion"] = values.TryGetValue("SkippedUpdateVersion", out var skipped)
-                ? skipped
-                : string.Empty,
-            ["ShowTips"] = values.TryGetValue("ShowTips", out var showTips) ? showTips : "1",
-            ["AudioApi"] = values.TryGetValue("AudioApi", out var audioApi) ? audioApi : "WaveOut",
-            ["AudioDeviceId"] = values.TryGetValue("AudioDeviceId", out var deviceId) ? deviceId : string.Empty,
-            ["WaveformHeightScale"] = values.TryGetValue("WaveformHeightScale", out var scale)
-                ? NormalizeWaveformHeightScale(scale).ToString(CultureInfo.InvariantCulture)
-                : "1",
-            ["DefaultWaveformFadeInCurve"] = values.TryGetValue("DefaultWaveformFadeInCurve", out var wIn)
-                ? wIn
-                : RegionEdgeFade.BuiltinWaveformFadeInCurve.ToString(),
-            ["DefaultWaveformFadeOutCurve"] = values.TryGetValue("DefaultWaveformFadeOutCurve", out var wOut)
-                ? wOut
-                : RegionEdgeFade.BuiltinWaveformFadeOutCurve.ToString(),
-            ["DefaultPlaylistFadeInCurve"] = values.TryGetValue("DefaultPlaylistFadeInCurve", out var pIn)
-                ? pIn
-                : RegionEdgeFade.BuiltinPlaylistFadeInCurve.ToString(),
-            ["DefaultPlaylistFadeOutCurve"] = values.TryGetValue("DefaultPlaylistFadeOutCurve", out var pOut)
-                ? pOut
-                : RegionEdgeFade.BuiltinPlaylistFadeOutCurve.ToString(),
-        });
-    }
-
     private static AppSettings Parse(Dictionary<string, string> values) => new()
     {
-        AlwaysOnTop = ReadBool(values, "AlwaysOnTop", defaultValue: false),
+        AlwaysOnTop = IniFile.ReadBool(values, "AlwaysOnTop", defaultValue: false),
         UiLanguage = values.TryGetValue("UiLanguage", out var languageText)
             ? UiStrings.ParseLanguage(languageText)
             : UiLanguage.Japanese,
         SkippedUpdateVersion = values.TryGetValue("SkippedUpdateVersion", out var skipped)
             ? AppVersion.NormalizeTag(skipped)
             : string.Empty,
-        ShowTips = ReadBool(values, "ShowTips", defaultValue: true),
+        ShowTips = IniFile.ReadBool(values, "ShowTips", defaultValue: true),
         AudioApi = values.TryGetValue("AudioApi", out var audioApiText)
             ? AudioOutputSettings.ParseApi(audioApiText)
             : AudioOutputApi.WaveOut,
@@ -231,20 +201,5 @@ internal sealed class AppSettings
         }
 
         return 1;
-    }
-
-    private static bool ReadBool(Dictionary<string, string> values, string key, bool defaultValue)
-    {
-        if (!values.TryGetValue(key, out var text))
-        {
-            return defaultValue;
-        }
-
-        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
-        {
-            return number != 0;
-        }
-
-        return bool.TryParse(text, out var flag) ? flag : defaultValue;
     }
 }

@@ -13,12 +13,6 @@ internal static class TextFileUtf8
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     private static bool _codePagesRegistered;
 
-    /// <summary>設定ファイルなど、外部エディタで開かれやすいファイル向け（BOM 付き）。</summary>
-    public static Encoding WriteEncodingWithBom => Utf8WithBom;
-
-    /// <summary>ログなど、BOM 無し UTF-8 が望ましいファイル向け。</summary>
-    public static Encoding WriteEncodingNoBom => Utf8NoBom;
-
     public static string ReadAllText(string path)
     {
         var bytes = File.ReadAllBytes(path);

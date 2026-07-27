@@ -30,14 +30,14 @@ internal sealed class WavFileInfo
         using var stream = File.OpenRead(path);
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: false);
 
-        var riff = ReadFourCc(reader);
+        var riff = WavRiff.ReadFourCc(reader);
         if (riff != "RIFF")
         {
             throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
         }
 
         _ = reader.ReadUInt32();
-        var wave = ReadFourCc(reader);
+        var wave = WavRiff.ReadFourCc(reader);
         if (wave != "WAVE")
         {
             throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
@@ -56,7 +56,7 @@ internal sealed class WavFileInfo
         // data の後ろに iXML が付くことがあるため、全チャンクを走査する
         while (stream.Position + 8 <= stream.Length)
         {
-            var chunkId = ReadFourCc(reader);
+            var chunkId = WavRiff.ReadFourCc(reader);
             var chunkSize = reader.ReadUInt32();
             var chunkDataStart = stream.Position;
             if (chunkDataStart + chunkSize > stream.Length)
@@ -143,8 +143,4 @@ internal sealed class WavFileInfo
             + $" ({duration.TotalSeconds:0.000} sec)";
     }
 
-    private static string ReadFourCc(BinaryReader reader)
-    {
-        return Encoding.ASCII.GetString(reader.ReadBytes(4));
-    }
 }

@@ -1,4 +1,6 @@
-﻿namespace MgaWwiseIMImporter.UI;
+﻿using System.Globalization;
+
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// 簡易 INI（セクション単位のキー=値）。コメント行と未知セクションは保持する。
@@ -7,6 +9,27 @@
 internal static class IniFile
 {
     public static string Path => System.IO.Path.Combine(AppContext.BaseDirectory, "MgaWwiseIMImporter.ini");
+
+    /// <summary>
+    /// INI の真偽値を読む。整数なら 0 以外を true、それ以外は <see cref="bool.TryParse"/>。
+    /// </summary>
+    public static bool ReadBool(
+        IReadOnlyDictionary<string, string> values,
+        string key,
+        bool defaultValue)
+    {
+        if (!values.TryGetValue(key, out var text))
+        {
+            return defaultValue;
+        }
+
+        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+        {
+            return number != 0;
+        }
+
+        return bool.TryParse(text, out var flag) ? flag : defaultValue;
+    }
 
     public static Dictionary<string, string> ReadSection(string section)
     {
@@ -58,26 +81,7 @@ internal static class IniFile
             : [];
 
         var sectionHeader = $"[{section}]";
-        var start = -1;
-        var end = lines.Count;
-
-        for (var i = 0; i < lines.Count; i++)
-        {
-            var trimmed = lines[i].Trim();
-            if (trimmed.StartsWith('[') && trimmed.EndsWith(']'))
-            {
-                if (start >= 0)
-                {
-                    end = i;
-                    break;
-                }
-
-                if (string.Equals(trimmed, sectionHeader, StringComparison.OrdinalIgnoreCase))
-                {
-                    start = i;
-                }
-            }
-        }
+        var (start, end) = FindSectionRange(lines, sectionHeader);
 
         var replacement = new List<string> { sectionHeader };
         foreach (var pair in values)
@@ -120,7 +124,28 @@ internal static class IniFile
         }
 
         var lines = TextFileUtf8.ReadAllLines(path).ToList();
-        var sectionHeader = $"[{section}]";
+        var (start, end) = FindSectionRange(lines, $"[{section}]");
+
+        if (start < 0)
+        {
+            return;
+        }
+
+        lines.RemoveRange(start, end - start);
+        while (start < lines.Count && lines[start].Trim().Length == 0)
+        {
+            lines.RemoveAt(start);
+        }
+
+        TextFileUtf8.WriteAllLines(path, lines, emitBom: true);
+    }
+
+    /// <summary>
+    /// セクションヘッダー行の位置と、次セクション開始（または末尾）までの範囲を返す。
+    /// 見つからなければ start は -1。
+    /// </summary>
+    private static (int Start, int End) FindSectionRange(List<string> lines, string sectionHeader)
+    {
         var start = -1;
         var end = lines.Count;
 
@@ -142,23 +167,6 @@ internal static class IniFile
             }
         }
 
-        if (start < 0)
-        {
-            return;
-        }
-
-        lines.RemoveRange(start, end - start);
-        while (start < lines.Count && lines[start].Trim().Length == 0)
-        {
-            lines.RemoveAt(start);
-        }
-
-        if (start > 0 && start <= lines.Count && lines[start - 1].Trim().Length == 0
-            && (start == lines.Count || lines[start].Trim().StartsWith('[')))
-        {
-            // 直前の空行は残してよい
-        }
-
-        TextFileUtf8.WriteAllLines(path, lines, emitBom: true);
+        return (start, end);
     }
 }

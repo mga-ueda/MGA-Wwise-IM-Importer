@@ -2,6 +2,31 @@
 
 namespace MgaWwiseIMImporter.UI;
 
+/// <summary>FlatOptionRadioButton / FlatOptionCheckBox 共通のグリフ配色・DPI 換算。</summary>
+internal static class FlatOptionGlyph
+{
+    public static Color ResolveBorderColor(bool enabled, bool isChecked, bool hovered)
+    {
+        if (!enabled)
+        {
+            return UiColors.OptionGlyphDisabled;
+        }
+
+        if (isChecked)
+        {
+            return UiColors.OptionGlyphChecked;
+        }
+
+        return hovered ? UiColors.OptionGlyphHover : UiColors.OptionGlyphBorder;
+    }
+
+    public static int ScaleLogical(int deviceDpi, int value) =>
+        (int)Math.Round(value * deviceDpi / 96f);
+
+    public static float ScaleLogical(int deviceDpi, float value) =>
+        value * deviceDpi / 96f;
+}
+
 internal sealed class FlatOptionRadioButton : RadioButton
 {
     /// <summary>プレイリスト項目と同じ行高（AutoScale 後も固定）。</summary>
@@ -105,20 +130,8 @@ internal sealed class FlatOptionRadioButton : RadioButton
         DrawText(g, glyphSize);
     }
 
-    private Color ResolveBorderColor()
-    {
-        if (!Enabled)
-        {
-            return UiColors.OptionGlyphDisabled;
-        }
-
-        if (Checked)
-        {
-            return UiColors.OptionGlyphChecked;
-        }
-
-        return _hovered ? UiColors.OptionGlyphHover : UiColors.OptionGlyphBorder;
-    }
+    private Color ResolveBorderColor() =>
+        FlatOptionGlyph.ResolveBorderColor(Enabled, Checked, _hovered);
 
     private void DrawText(Graphics g, int glyphSize)
     {
@@ -136,11 +149,9 @@ internal sealed class FlatOptionRadioButton : RadioButton
             | TextFormatFlags.SingleLine);
     }
 
-    private int ScaleLogical(int value) =>
-        (int)Math.Round(value * DeviceDpi / 96f);
+    private int ScaleLogical(int value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
 
-    private float ScaleLogical(float value) =>
-        value * DeviceDpi / 96f;
+    private float ScaleLogical(float value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
 }
 
 internal sealed class FlatOptionCheckBox : CheckBox
@@ -267,24 +278,10 @@ internal sealed class FlatOptionCheckBox : CheckBox
             | TextFormatFlags.SingleLine);
     }
 
-    private Color ResolveBorderColor()
-    {
-        if (!Enabled)
-        {
-            return UiColors.OptionGlyphDisabled;
-        }
+    private Color ResolveBorderColor() =>
+        FlatOptionGlyph.ResolveBorderColor(Enabled, Checked, _hovered);
 
-        if (Checked)
-        {
-            return UiColors.OptionGlyphChecked;
-        }
+    private int ScaleLogical(int value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
 
-        return _hovered ? UiColors.OptionGlyphHover : UiColors.OptionGlyphBorder;
-    }
-
-    private int ScaleLogical(int value) =>
-        (int)Math.Round(value * DeviceDpi / 96f);
-
-    private float ScaleLogical(float value) =>
-        value * DeviceDpi / 96f;
+    private float ScaleLogical(float value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
 }

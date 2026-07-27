@@ -251,27 +251,10 @@ internal sealed class AudioSettingsForm : Form
         return row;
     }
 
-    private static void WireFadeCurveIconHover(PictureBox icon)
-    {
-        var idle = UiColors.ForControlBack(UiColors.ProjectBarInputBack);
-        var hover = UiColors.ForControlBack(UiColors.TransportHoverBack);
-        var pressed = UiColors.ForControlBack(UiColors.TransportPressedBack);
-
-        icon.MouseEnter += (_, _) => icon.BackColor = hover;
-        icon.MouseLeave += (_, _) => icon.BackColor = idle;
-        icon.MouseDown += (_, e) =>
-        {
-            if (e.Button == MouseButtons.Left)
-            {
-                icon.BackColor = pressed;
-            }
-        };
-        icon.MouseUp += (_, _) =>
-        {
-            var local = icon.PointToClient(Control.MousePosition);
-            icon.BackColor = icon.ClientRectangle.Contains(local) ? hover : idle;
-        };
-    }
+    private static void WireFadeCurveIconHover(PictureBox icon) =>
+        ControlHoverChrome.WireBackColor(
+            icon,
+            () => UiColors.ForControlBack(UiColors.ProjectBarInputBack));
 
     private void ShowFadeCurvePicker(FadeCurveRow row)
     {

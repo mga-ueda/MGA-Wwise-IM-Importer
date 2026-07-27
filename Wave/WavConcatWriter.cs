@@ -52,20 +52,20 @@ internal static class WavConcatWriter
         using (var probe = File.OpenRead(spans[0].Path))
         using (var reader = new BinaryReader(probe, Encoding.ASCII, leaveOpen: true))
         {
-            if (ReadFourCc(reader) != "RIFF")
+            if (WavRiff.ReadFourCc(reader) != "RIFF")
             {
                 throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
             }
 
             _ = reader.ReadUInt32();
-            if (ReadFourCc(reader) != "WAVE")
+            if (WavRiff.ReadFourCc(reader) != "WAVE")
             {
                 throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
             }
 
             while (probe.Position + 8 <= probe.Length)
             {
-                var id = ReadFourCc(reader);
+                var id = WavRiff.ReadFourCc(reader);
                 var size = reader.ReadUInt32();
                 var chunkDataStart = probe.Position;
                 if (chunkDataStart + size > probe.Length)
@@ -90,11 +90,16 @@ internal static class WavConcatWriter
         }
 
         var fmtPadded = fmtData.Length + (fmtData.Length & 1);
-        var dataPadded = totalDataBytes + (totalDataBytes & 1);
-        var riffSize = 4 + (8 + fmtPadded) + (8 + dataPadded);
+        // int.MaxValue 近傍の data サイズでパディング・ヘッダ加算がラップしないよう long で計算する。
+        var dataPadded = (long)totalDataBytes + (totalDataBytes & 1);
+        var riffSize = 4L + (8 + fmtPadded) + (8 + dataPadded);
+        if (riffSize > int.MaxValue)
+        {
+            throw new InvalidDataException(UiStrings.ErrMultiWaveOnlyTooLong);
+        }
 
         writer.Write(Encoding.ASCII.GetBytes("RIFF"));
-        writer.Write(riffSize);
+        writer.Write((int)riffSize);
         writer.Write(Encoding.ASCII.GetBytes("WAVE"));
         writer.Write(Encoding.ASCII.GetBytes("fmt "));
         writer.Write(fmtData.Length);
@@ -128,13 +133,13 @@ internal static class WavConcatWriter
         using var source = File.OpenRead(sourcePath);
         using var reader = new BinaryReader(source, Encoding.ASCII, leaveOpen: true);
 
-        if (ReadFourCc(reader) != "RIFF")
+        if (WavRiff.ReadFourCc(reader) != "RIFF")
         {
             throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
         }
 
         _ = reader.ReadUInt32();
-        if (ReadFourCc(reader) != "WAVE")
+        if (WavRiff.ReadFourCc(reader) != "WAVE")
         {
             throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
         }
@@ -143,7 +148,7 @@ internal static class WavConcatWriter
         uint dataSize = 0;
         while (source.Position + 8 <= source.Length)
         {
-            var id = ReadFourCc(reader);
+            var id = WavRiff.ReadFourCc(reader);
             var size = reader.ReadUInt32();
             var chunkDataStart = source.Position;
             if (chunkDataStart + size > source.Length)
@@ -187,9 +192,6 @@ internal static class WavConcatWriter
             remaining -= read;
         }
     }
-
-    private static string ReadFourCc(BinaryReader reader) =>
-        Encoding.ASCII.GetString(reader.ReadBytes(4));
 
     private static void TryDelete(string path)
     {

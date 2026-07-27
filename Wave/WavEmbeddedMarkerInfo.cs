@@ -59,14 +59,14 @@ internal sealed class WavEmbeddedMarkerInfo
         using var stream = File.OpenRead(path);
         using var reader = new BinaryReader(stream, Encoding.ASCII, leaveOpen: false);
 
-        var riff = ReadFourCc(reader);
+        var riff = WavRiff.ReadFourCc(reader);
         if (riff != "RIFF")
         {
             throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
         }
 
         _ = reader.ReadUInt32();
-        var wave = ReadFourCc(reader);
+        var wave = WavRiff.ReadFourCc(reader);
         if (wave != "WAVE")
         {
             throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
@@ -80,7 +80,7 @@ internal sealed class WavEmbeddedMarkerInfo
 
         while (stream.Position + 8 <= stream.Length)
         {
-            var chunkId = ReadFourCc(reader);
+            var chunkId = WavRiff.ReadFourCc(reader);
             var chunkSize = reader.ReadUInt32();
             var chunkDataStart = stream.Position;
             if (chunkDataStart + chunkSize > stream.Length)
@@ -98,7 +98,7 @@ internal sealed class WavEmbeddedMarkerInfo
             }
             else if (chunkId == "LIST" && chunkSize >= 4)
             {
-                var listType = ReadFourCc(reader);
+                var listType = WavRiff.ReadFourCc(reader);
                 if (listType == "adtl")
                 {
                     ReadAdtlList(reader, chunkDataStart + 4, chunkSize - 4, labels, notes, regionLengths);
@@ -176,7 +176,7 @@ internal sealed class WavEmbeddedMarkerInfo
 
             var cueId = reader.ReadUInt32();
             var position = reader.ReadUInt32();
-            var fccChunk = ReadFourCc(reader);
+            var fccChunk = WavRiff.ReadFourCc(reader);
             _ = reader.ReadUInt32(); // dwChunkStart
             _ = reader.ReadUInt32(); // dwBlockStart
             var sampleOffset = reader.ReadUInt32();
@@ -241,7 +241,7 @@ internal sealed class WavEmbeddedMarkerInfo
 
         while (stream.Position + 8 <= listEnd)
         {
-            var subId = ReadFourCc(reader);
+            var subId = WavRiff.ReadFourCc(reader);
             var subSize = reader.ReadUInt32();
             var subStart = stream.Position;
             if (subStart + subSize > listEnd)
@@ -306,8 +306,4 @@ internal sealed class WavEmbeddedMarkerInfo
         }
     }
 
-    private static string ReadFourCc(BinaryReader reader)
-    {
-        return Encoding.ASCII.GetString(reader.ReadBytes(4));
-    }
 }

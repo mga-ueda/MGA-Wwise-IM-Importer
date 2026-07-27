@@ -142,7 +142,7 @@ internal static class UiStrings
     public static string LabelAudioApiAsio => Get("ASIO", "ASIO");
 
     public static string ButtonAudioSettingsOk => Get("OK", "OK");
-    public static string ButtonAudioSettingsCancel => Get("CANSEL", "CANSEL");
+    public static string ButtonAudioSettingsCancel => Get("CANCEL", "CANCEL");
 
     public static string ErrAudioOutputApplyFailed(string detail) => Format(
         "出力設定の適用に失敗しました。\n{0}",
@@ -189,10 +189,10 @@ internal static class UiStrings
         + "The log is cleared. If a sidecar JSON exists, grouping, disables, added markers, and Fade / Exit Source At are restored.");
 
     public static string TipExport => Get(
-        "分割 WAV を書き出し、続けて Wwise へインポートします。  [Ctrl+Shift+E]"
+        "[Ctrl+Shift+E] 分割 WAV を書き出し、続けて Wwise へインポートします。"
         + Environment.NewLine
         + "無効化した Playlist は書き出し対象外です。",
-        "Export split WAVs and import them into Wwise.  [Ctrl+Shift+E]"
+        "[Ctrl+Shift+E] Export split WAVs and import them into Wwise."
         + Environment.NewLine
         + "Disabled playlists are excluded.");
 
@@ -201,8 +201,8 @@ internal static class UiStrings
         "Choose the export folder (must be under the connected Wwise project's Originals).");
 
     public static string TipProjectDelete => Get(
-        "選択中のプロジェクトを削除します（DEL）。",
-        "Delete the selected project (DEL).");
+        "[Del] 選択中のプロジェクトを削除します。",
+        "[Del] Delete the selected project.");
 
     public static string TipProjectName => Get(
         "プロジェクト名の選択と編集。末尾の「+ New Project」で新規作成します。",
@@ -242,13 +242,13 @@ internal static class UiStrings
 
     public static string TipPlaylistItem(string playlistName) => Format(
         "{0}{1}"
-        + "Shift + クリック／ドラッグ: グループ化（既存グループも新しい ID で上書き可）{1}"
-        + "Ctrl + クリック／ドラッグ: グループ解除{1}"
-        + "Ctrl + Shift + クリック／ドラッグ: 無効化／再有効化",
+        + "[Shift]+クリック／ドラッグ: グループ化（既存グループも新しい ID で上書き可）{1}"
+        + "[Ctrl]+クリック／ドラッグ: グループ解除{1}"
+        + "[Ctrl+Shift]+クリック／ドラッグ: 無効化／再有効化",
         "{0}{1}"
-        + "Shift + click/drag: group (can overwrite an existing group with a new ID){1}"
-        + "Ctrl + click/drag: ungroup{1}"
-        + "Ctrl + Shift + click/drag: disable / re-enable",
+        + "[Shift]+click/drag: group (can overwrite an existing group with a new ID){1}"
+        + "[Ctrl]+click/drag: ungroup{1}"
+        + "[Ctrl+Shift]+click/drag: disable / re-enable",
         playlistName,
         Environment.NewLine);
 
@@ -257,72 +257,72 @@ internal static class UiStrings
         "Double-click to edit the export file name, Playlist name, or Switch name");
 
     public static string TipWaveformMarkerLane => Get(
-        "Shift + クリック／ドラッグ: マーカーを連続付与"
+        "[Shift]+クリック／ドラッグ: マーカーを連続付与"
         + Environment.NewLine
-        + "Ctrl + クリック／ドラッグ: マーカーを連続削除",
-        "Shift + click/drag: add markers continuously"
+        + "[Ctrl]+クリック／ドラッグ: マーカーを連続削除",
+        "[Shift]+click/drag: add markers continuously"
         + Environment.NewLine
-        + "Ctrl + click/drag: remove markers continuously");
+        + "[Ctrl]+click/drag: remove markers continuously");
 
     public static string TipWaveformMarkerLaneSessionEdit => Get(
         "▼ドラッグ: マーカーを移動"
         + Environment.NewLine
-        + "Alt + ▼ドラッグ: 一つ前のマーカーも同量移動"
+        + "[Alt]+▼ドラッグ: 一つ前のマーカーも同量移動"
         + Environment.NewLine
-        + "← / →: シークバーを 1px 移動"
+        + "[←] / [→]: シークバーを 1px 移動"
         + Environment.NewLine
-        + "Alt + ← / →: シーク位置のマーカーを 1px 移動（シークも連動）"
+        + "[Alt]+[←] / [→]: シーク位置のマーカーを 1px 移動（シークも連動）"
         + Environment.NewLine
-        + "Ctrl+Alt + ← / →: シーク位置のマーカー＋一つ前を 1px 同時移動"
+        + "[Ctrl+Alt]+[←] / [→]: シーク位置のマーカー＋一つ前を 1px 同時移動"
         + Environment.NewLine
         + "▼／コメントをダブルクリック: コメントを編集"
         + Environment.NewLine
-        + "Ctrl+Shift+R: シーク位置のマーカーをリネーム"
+        + "[Ctrl+Shift+R] シーク位置のマーカーをリネーム"
         + Environment.NewLine
-        + "Ctrl+← / →: 前後の Playlist 先頭／末尾、またはマーカーへ移動"
+        + "[Ctrl]+[←] / [→]: 前後の Playlist 先頭／末尾、またはマーカーへ移動"
         + Environment.NewLine
-        + "Ctrl+Shift+← / →: 前後のマーカーへ移動（Playlist 境界は飛ばす）"
+        + "[Ctrl+Shift]+[←] / [→]: 前後のマーカーへ移動（Playlist 境界は飛ばす）"
         + Environment.NewLine
-        + "選択して Delete / Ctrl+Del: マーカーを削除（アプリ上のみ）"
+        + "[Delete] / [Ctrl+Del] 選択したマーカーを削除（アプリ上のみ）"
         + Environment.NewLine
-        + "Insert: シーク位置にマーカー追加（コメントなし）"
+        + "[Insert] シーク位置にマーカー追加（コメントなし）"
         + Environment.NewLine
-        + "Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y: Undo / Redo"
+        + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
         + "コメント -L: 無限ループ / -R: リムーブ / -E: Exit Cue 以降 / -A: Entry Cue 前"
         + Environment.NewLine
-        + "数字キー／テンキー 0〜9: 表示中画面内の 0%〜90% へジャンプ"
+        + "[0〜9] 表示中画面内の 0%〜90% へジャンプ（数字キー／テンキー）"
         + Environment.NewLine
-        + "C / .: シーク位置を変えずに表示を中央寄せ",
+        + "[C] / [.] シーク位置を変えずに表示を中央寄せ",
         "Drag ▼: move marker"
         + Environment.NewLine
-        + "Alt + drag ▼: also move previous marker by the same delta"
+        + "[Alt]+drag ▼: also move previous marker by the same delta"
         + Environment.NewLine
-        + "← / →: nudge seek bar by 1px"
+        + "[←] / [→]: nudge seek bar by 1px"
         + Environment.NewLine
-        + "Alt + ← / →: nudge marker at seek by 1px (seek follows)"
+        + "[Alt]+[←] / [→]: nudge marker at seek by 1px (seek follows)"
         + Environment.NewLine
-        + "Ctrl+Alt + ← / →: nudge marker at seek and the previous one by 1px"
+        + "[Ctrl+Alt]+[←] / [→]: nudge marker at seek and the previous one by 1px"
         + Environment.NewLine
         + "Double-click ▼ / comment: edit comment"
         + Environment.NewLine
-        + "Ctrl+Shift+R: rename marker at seek"
+        + "[Ctrl+Shift+R] rename marker at seek"
         + Environment.NewLine
-        + "Ctrl+← / →: jump to previous / next Playlist start/end or marker"
+        + "[Ctrl]+[←] / [→]: jump to previous / next Playlist start/end or marker"
         + Environment.NewLine
-        + "Ctrl+Shift+← / →: jump to previous / next marker (skip Playlist edges)"
+        + "[Ctrl+Shift]+[←] / [→]: jump to previous / next marker (skip Playlist edges)"
         + Environment.NewLine
-        + "Select + Delete / Ctrl+Del: remove marker (app session only)"
+        + "[Delete] / [Ctrl+Del] remove selected marker (app session only)"
         + Environment.NewLine
-        + "Insert: add marker at seek position (no comment)"
+        + "[Insert] add marker at seek position (no comment)"
         + Environment.NewLine
-        + "Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y: Undo / Redo"
+        + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
         + "Comment -L: loop / -R: remove / -E: after Exit Cue / -A: before Entry Cue"
         + Environment.NewLine
-        + "Number keys 0–9: jump to 0%–90% within the current view"
+        + "[0–9] jump to 0%–90% within the current view (number keys)"
         + Environment.NewLine
-        + "C / .: center the view on the seek position (seek unchanged)");
+        + "[C] / [.] center the view on the seek position (seek unchanged)");
 
     public static string TipWaveformRegionFadeHandle => Get(
         "白三角をドラッグ: リージョン端フェード（非破壊）"
@@ -335,7 +335,7 @@ internal static class UiStrings
         + Environment.NewLine
         + "Playlist 遷移フェードとは別物で、重ねがけされます"
         + Environment.NewLine
-        + "Ctrl+Z / Ctrl+Y: Undo / Redo",
+        + "[Ctrl+Z] / [Ctrl+Y] Undo / Redo",
         "Drag white triangle: region-edge fade (non-destructive)"
         + Environment.NewLine
         + "Right-click fade area: choose curve (same names/order as Wwise)"
@@ -346,7 +346,7 @@ internal static class UiStrings
         + Environment.NewLine
         + "Independent from Playlist transition fades; gains multiply"
         + Environment.NewLine
-        + "Ctrl+Z / Ctrl+Y: Undo / Redo");
+        + "[Ctrl+Z] / [Ctrl+Y] Undo / Redo");
 
     public static string LabelRegionFadeCurve(RegionFadeCurveKind kind) => kind switch
     {
@@ -382,20 +382,24 @@ internal static class UiStrings
 
     /// <summary>全モード共通の波形シーク系ショートカット（タイムライン Tips 用）。</summary>
     public static string TipWaveformCommonKeys => Get(
-        "数字キー／テンキー 0〜9: 表示中画面内の 0%〜90% へジャンプ"
+        "[0〜9] 表示中画面内の 0%〜90% へジャンプ（数字キー／テンキー）"
         + Environment.NewLine
-        + "C / .: シーク位置を変えずに表示を中央寄せ"
+        + "[C] / [.] シーク位置を変えずに表示を中央寄せ"
         + Environment.NewLine
-        + "L: ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）"
+        + "[L] ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）"
         + Environment.NewLine
-        + "Z: 波形表示エリアの高さを 1倍 → 2倍 → 3倍 → 1倍",
-        "Number keys 0–9: jump to 0%–90% within the current view"
+        + "[E] 再生中（またはシークバー位置）の Playlist の Play -E をトグル"
         + Environment.NewLine
-        + "C / .: center the view on the seek position (seek unchanged)"
+        + "[Z] 波形表示エリアの高さを 1倍 → 2倍 → 3倍 → 1倍",
+        "[0–9] jump to 0%–90% within the current view (number keys)"
         + Environment.NewLine
-        + "L: jump to 1 bar before loop end (or 3 seconds before without bar data)"
+        + "[C] / [.] center the view on the seek position (seek unchanged)"
         + Environment.NewLine
-        + "Z: cycle waveform height 1× → 2× → 3× → 1×");
+        + "[L] jump to 1 bar before loop end (or 3 seconds before without bar data)"
+        + Environment.NewLine
+        + "[E] toggle Play -E for the playing (or seek-bar) playlist"
+        + Environment.NewLine
+        + "[Z] cycle waveform height 1× → 2× → 3× → 1×");
 
     public static string TipWaveformZoomFitAll => Get(
         "ダブルクリックでタイムライン全体を表示",
@@ -439,9 +443,15 @@ internal static class UiStrings
 
     public static string TipPlayMinusE => Get(
         "オンのとき、`-L` ループ折り返しで `-E` を二重再生します（Wwise の Play post-exit 相当）。"
-        + " EXPORT 時は遷移先向け Any→Object ルールの Play post-exit へ反映します。",
+        + Environment.NewLine
+        + "EXPORT 時は遷移先向け Any→Object ルールの Play post-exit へ反映します。"
+        + Environment.NewLine
+        + "[E] 再生中（またはシークバー位置）の Playlist をトグル",
         "When on, dual-plays -E on -L loop wrap (Wwise Play post-exit)."
-        + " EXPORT writes Play post-exit on Any→Object transition rules for the destination.");
+        + Environment.NewLine
+        + "EXPORT writes Play post-exit on Any→Object transition rules for the destination."
+        + Environment.NewLine
+        + "[E] toggle for the playing (or seek-bar) playlist");
 
     public static string TipAutoActive => Get(
         "オンのとき、EXPORT 完了後に Wwise を前面化します。"
@@ -642,8 +652,8 @@ internal static class UiStrings
         "Unlock the destination path (this project setting).");
 
     public static string TipWwiseProjectNameOpen => Get(
-        "クリックでこの Wwise プロジェクトを開きます（既に開いていれば前面に表示）。  [Ctrl+Shift+W]",
-        "Click to open this Wwise project (or bring it to the front if already open).  [Ctrl+Shift+W]");
+        "[Ctrl+Shift+W] この Wwise プロジェクトを開きます（既に開いていれば前面に表示）。",
+        "[Ctrl+Shift+W] Open this Wwise project (or bring it to the front if already open).");
 
     public static string KeepTargetOnLabel => Get("- Keep Target -", "- Keep Target -");
     public static string KeepTargetOffLabel => Get("- Not Keep Target -", "- Not Keep Target -");
@@ -655,104 +665,104 @@ internal static class UiStrings
             english + Environment.NewLine + "Hold for key repeat");
 
     public static string TipTransportPlayPause => Get(
-        "再生 / 一時停止  [Space]"
+        "[Space] 再生 / 一時停止"
         + Environment.NewLine
-        + "直前の開始位置から再生し直し  [Alt+Enter] / Alt+クリック"
+        + "[Alt+Enter] / Alt+クリック 直前の開始位置から再生し直し"
         + Environment.NewLine
-        + "3秒前から再生  [Ctrl+Space] / Ctrl+クリック",
-        "Play / Pause  [Space]"
+        + "[Ctrl+Space] / Ctrl+クリック 3秒前から再生",
+        "[Space] Play / Pause"
         + Environment.NewLine
-        + "Restart from last start  [Alt+Enter] / Alt+click"
+        + "[Alt+Enter] / Alt+click Restart from last start"
         + Environment.NewLine
-        + "Play from 3 seconds earlier  [Ctrl+Space] / Ctrl+click");
+        + "[Ctrl+Space] / Ctrl+click Play from 3 seconds earlier");
 
     public static string TipTransportJumpToBar => Get(
-        "小節番号を指定して移動  [G]",
-        "Jump to bar number  [G]");
+        "[G] 小節番号を指定して移動",
+        "[G] Jump to bar number");
 
     public static string TipTransportGoToStart => WithKeyRepeat(
-        "先頭へ移動  [Ctrl+Home]",
-        "Go to start  [Ctrl+Home]");
+        "[Ctrl+Home] 先頭へ移動",
+        "[Ctrl+Home] Go to start");
 
     public static string TipTransportPreviousPage => WithKeyRepeat(
-        "前の表示ページ  [Page Up]",
-        "Previous view page  [Page Up]");
+        "[Page Up] 前の表示ページ",
+        "[Page Up] Previous view page");
 
     public static string TipTransportPreviousPlaylist => WithKeyRepeat(
-        "前の Music Playlist 先頭／末尾、またはマーカーへ移動  [Ctrl+←]",
-        "Previous Music Playlist start/end or marker  [Ctrl+←]");
+        "[Ctrl+←] 前の Music Playlist 先頭／末尾、またはマーカーへ移動",
+        "[Ctrl+←] Previous Music Playlist start/end or marker");
 
     public static string TipTransportPreviousMarker => WithKeyRepeat(
-        "前のマーカーへ移動  [Ctrl+Shift+←]",
-        "Previous marker  [Ctrl+Shift+←]");
+        "[Ctrl+Shift+←] 前のマーカーへ移動",
+        "[Ctrl+Shift+←] Previous marker");
 
     public static string TipTransportPreviousBar => WithKeyRepeat(
-        "前の小節  [Home]",
-        "Previous bar  [Home]");
+        "[Home] 前の小節",
+        "[Home] Previous bar");
 
     public static string TipTransportNextBar => WithKeyRepeat(
-        "次の小節  [End]",
-        "Next bar  [End]");
+        "[End] 次の小節",
+        "[End] Next bar");
 
     public static string TipTransportPreviousViewStep => WithKeyRepeat(
-        "表示の約 5% 前へ移動  [Home]",
-        "Move back about 5% of the view  [Home]");
+        "[Home] 表示の約 5% 前へ移動",
+        "[Home] Move back about 5% of the view");
 
     public static string TipTransportNextViewStep => WithKeyRepeat(
-        "表示の約 5% 先へ移動  [End]",
-        "Move forward about 5% of the view  [End]");
+        "[End] 表示の約 5% 先へ移動",
+        "[End] Move forward about 5% of the view");
 
     public static string TipTransportNextPlaylist => WithKeyRepeat(
-        "次の Music Playlist 先頭／末尾、またはマーカーへ移動  [Ctrl+→]",
-        "Next Music Playlist start/end or marker  [Ctrl+→]");
+        "[Ctrl+→] 次の Music Playlist 先頭／末尾、またはマーカーへ移動",
+        "[Ctrl+→] Next Music Playlist start/end or marker");
 
     public static string TipTransportNextMarker => WithKeyRepeat(
-        "次のマーカーへ移動  [Ctrl+Shift+→]",
-        "Next marker  [Ctrl+Shift+→]");
+        "[Ctrl+Shift+→] 次のマーカーへ移動",
+        "[Ctrl+Shift+→] Next marker");
 
     public static string TipTransportNextPage => WithKeyRepeat(
-        "次の表示ページ  [Page Down]",
-        "Next view page  [Page Down]");
+        "[Page Down] 次の表示ページ",
+        "[Page Down] Next view page");
 
     public static string TipTransportGoToEnd => WithKeyRepeat(
-        "末尾へ移動  [Ctrl+End]",
-        "Go to end  [Ctrl+End]");
+        "[Ctrl+End] 末尾へ移動",
+        "[Ctrl+End] Go to end");
 
     public static string TipTransportTimeZoomIn => WithKeyRepeat(
-        "時間軸を拡大  [↑]",
-        "Zoom in time  [↑]");
+        "[↑] 時間軸を拡大",
+        "[↑] Zoom in time");
 
     public static string TipTransportTimeZoomOut => WithKeyRepeat(
-        "時間軸を縮小  [↓]",
-        "Zoom out time  [↓]");
+        "[↓] 時間軸を縮小",
+        "[↓] Zoom out time");
 
     public static string TipTransportTimeZoomMax => WithKeyRepeat(
-        "時間軸を最大拡大  [Ctrl+↑]",
-        "Max time zoom  [Ctrl+↑]");
+        "[Ctrl+↑] 時間軸を最大拡大",
+        "[Ctrl+↑] Max time zoom");
 
     public static string TipTransportTimeZoomReset => WithKeyRepeat(
-        "時間軸を全体表示  [Ctrl+↓]",
-        "Fit time to view  [Ctrl+↓]");
+        "[Ctrl+↓] 時間軸を全体表示",
+        "[Ctrl+↓] Fit time to view");
 
     public static string TipTransportAmpZoomIn => WithKeyRepeat(
-        "振幅を拡大  [Shift+↑]",
-        "Zoom in amplitude  [Shift+↑]");
+        "[Shift+↑] 振幅を拡大",
+        "[Shift+↑] Zoom in amplitude");
 
     public static string TipTransportAmpZoomOut => WithKeyRepeat(
-        "振幅を縮小  [Shift+↓]",
-        "Zoom out amplitude  [Shift+↓]");
+        "[Shift+↓] 振幅を縮小",
+        "[Shift+↓] Zoom out amplitude");
 
     public static string TipTransportAmpZoomMax => WithKeyRepeat(
-        "振幅を最大拡大  [Ctrl+Shift+↑]",
-        "Max amplitude zoom  [Ctrl+Shift+↑]");
+        "[Ctrl+Shift+↑] 振幅を最大拡大",
+        "[Ctrl+Shift+↑] Max amplitude zoom");
 
     public static string TipTransportAmpZoomReset => WithKeyRepeat(
-        "振幅を既定に戻す  [Ctrl+Shift+↓]",
-        "Reset amplitude zoom  [Ctrl+Shift+↓]");
+        "[Ctrl+Shift+↓] 振幅を既定に戻す",
+        "[Ctrl+Shift+↓] Reset amplitude zoom");
 
     public static string TipTransportCycleWaveformHeight => Get(
-        "波形表示エリアの高さを切替（1倍→2倍→3倍）  [Z]",
-        "Cycle waveform height (1×→2×→3×)  [Z]");
+        "[Z] 波形表示エリアの高さを切替（1倍→2倍→3倍）",
+        "[Z] Cycle waveform height (1×→2×→3×)");
 
     public static string TipForTransportCommand(
         TransportCommand command,
@@ -1348,6 +1358,11 @@ internal static class UiStrings
         "Keep Target : Wwise プロジェクトを開きました → {0}",
         "Keep Target : opened Wwise project → {0}",
         projectName);
+
+    public static string LogWwiseProjectOpenRequestFailed(string detail) => Format(
+        "Keep Target : Wwise への WAAPI 呼び出しに失敗しました（起動済みのため二重起動は行いません）: {0}",
+        "Keep Target : WAAPI call to Wwise failed (skipped launching another instance because Wwise is already running): {0}",
+        detail);
 
     public static string LogWwiseProjectShellOpen(string projectName) => Format(
         "Keep Target : Wwise プロジェクトを起動しました → {0}",
@@ -2406,6 +2421,12 @@ internal static class UiStrings
     public static string ErrPlayAtProjectPathUnknown => Format(
         "プロジェクト（.wproj）のパスを取得できなかったため PlayAt を設定できません",
         "Cannot apply PlayAt because the project (.wproj) path could not be resolved");
+
+    public static string ErrProjectCloseTimeout => Format(
+        "Wwise プロジェクトのクローズ完了を待機中にタイムアウトしました。"
+        + "プロジェクトが開いたままの可能性があるため、WWU 直接編集を中止しました",
+        "Timed out while waiting for the Wwise project to finish closing. "
+        + "Direct work-unit editing was aborted because the project may still be open");
 
     public static string ErrPlayAtClipXmlMissing(string clipId, string wwuPath) => Format(
         "WWU 内に MusicClip {0} が見つかりません（{1}）。プロジェクトの保存に失敗している可能性があります。",

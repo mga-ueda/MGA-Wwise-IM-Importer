@@ -20,14 +20,11 @@ internal static class WwiseObjectNames
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     };
 
-    /// <summary>複数波形モードの Music Switch / State Group 名を返す。</summary>
-    public static string MakeMultiWaveContainerName() => MultiWaveContainerName;
-
     /// <summary>
     /// Wwise は先頭が数字のオブジェクト名を付けられない。
     /// 空文字は「数字始まり」とはみなさない（呼び出し側で別判定）。
     /// </summary>
-    public static bool StartsWithDigit(string? name)
+    private static bool StartsWithDigit(string? name)
     {
         if (string.IsNullOrEmpty(name))
         {
@@ -80,7 +77,7 @@ internal static class WwiseObjectNames
     }
 
     /// <summary>Windows 予約デバイス名（CON / COM1 など）か。</summary>
-    public static bool IsReservedWindowsFileName(string name)
+    private static bool IsReservedWindowsFileName(string name)
     {
         if (string.IsNullOrEmpty(name))
         {

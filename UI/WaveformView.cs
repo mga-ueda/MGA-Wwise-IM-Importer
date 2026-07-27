@@ -138,7 +138,6 @@ internal sealed class WaveformView : Control
     private bool _rawDetailReading;
     private IReadOnlyList<WaveformBarMark> _bars = [];
     private IReadOnlyList<WaveformMarkerMark> _markers = [];
-    private IReadOnlyList<WaveformCycleMark> _cycles = [];
     private IReadOnlyList<WaveformRegionMark> _regions = [];
     private IReadOnlyList<WaveformOutputPart> _outputParts = [];
     private IReadOnlyDictionary<int, string> _playlistDisplayNames =
@@ -239,7 +238,6 @@ internal sealed class WaveformView : Control
         WavFileInfo? wavInfo = null,
         IReadOnlyList<WaveformBarMark>? bars = null,
         IReadOnlyList<WaveformMarkerMark>? markers = null,
-        IReadOnlyList<WaveformCycleMark>? cycles = null,
         IReadOnlyList<WaveformRegionMark>? regions = null,
         IReadOnlyList<WaveformOutputPart>? outputParts = null,
         bool allowsSessionMarkerEdit = false,
@@ -267,10 +265,10 @@ internal sealed class WaveformView : Control
         }
         _bars = bars ?? [];
         _markers = markers ?? [];
-        _cycles = cycles ?? [];
         _regions = regions ?? [];
         _outputParts = outputParts ?? [];
         _allowsSessionMarkerEdit = allowsSessionMarkerEdit;
+        EndSourceNameEdit(commit: false);
         ClearMarkerSessionEditState();
         ClearFadeDragState();
         _regionEdgeFades = [];
@@ -280,11 +278,20 @@ internal sealed class WaveformView : Control
         _playlistGroupColors = new Dictionary<int, Color>();
         SetHoveredPlaylistPart(null);
         SetPlaylistHoverHighlight(null);
+        SetSourceNameHovered(false);
         RebuildSegmentNameMarks();
         ResetTimeZoom(refresh: false);
         ResetAmpZoom(refresh: false);
         ClearExportHighlight();
         ClearPlayhead();
+        // 旧波形でのドラッグ／ホバー／Tip 状態を新しい波形へ持ち越さない。
+        _isDraggingSeek = false;
+        _seekMovedDuringDrag = false;
+        _lastMouseSeekProgress = double.NaN;
+        ClearMarkerDragState();
+        _markerEditMode = null;
+        Capture = false;
+        UpdateTimelineTip(null);
         _mouseGuideX = null;
         Cursor = Cursors.Default;
 
@@ -473,7 +480,6 @@ internal sealed class WaveformView : Control
         _pyramidGeneration++;
         _bars = [];
         _markers = [];
-        _cycles = [];
         _regions = [];
         _outputParts = [];
         _regionEdgeFades = [];
@@ -487,6 +493,7 @@ internal sealed class WaveformView : Control
         UpdateTimelineTip(null);
         SetHoveredPlaylistPart(null);
         SetPlaylistHoverHighlight(null);
+        SetSourceNameHovered(false);
         _segmentNames = [];
         ResetTimeZoom(refresh: false);
         ResetAmpZoom(refresh: false);
@@ -496,6 +503,7 @@ internal sealed class WaveformView : Control
         _lastMouseSeekProgress = double.NaN;
         ClearMarkerDragState();
         _markerEditMode = null;
+        Capture = false;
         _mouseGuideX = null;
         ClearPlayhead();
         Cursor = Cursors.Default;
@@ -4043,6 +4051,15 @@ internal sealed class WaveformView : Control
         }
     }
 
+    /// <summary>情報レーン 4 行（小節番号／テンポ／拍子／マーカー）の背景色。都度取得（色は実行時に変わり得る）。</summary>
+    private static Color[] InfoRowBackColors =>
+    [
+        UiColors.BarNumberBg,
+        UiColors.TempoBg,
+        UiColors.SignatureBg,
+        UiColors.MarkerRowBg,
+    ];
+
     private void DrawInfoLane(
         Graphics g,
         Rectangle info,
@@ -4058,13 +4075,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        ReadOnlySpan<Color> rowColors =
-        [
-            UiColors.BarNumberBg,
-            UiColors.TempoBg,
-            UiColors.SignatureBg,
-            UiColors.MarkerRowBg,
-        ];
+        var rowColors = InfoRowBackColors;
 
         using var textBrush = new SolidBrush(UiColors.WaveformInfoFg);
         using var disabledTextBrush = new SolidBrush(UiColors.TransportDisabledFore);
@@ -4308,14 +4319,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        ReadOnlySpan<Color> rowColors =
-        [
-            UiColors.BarNumberBg,
-            UiColors.TempoBg,
-            UiColors.SignatureBg,
-            UiColors.MarkerRowBg,
-        ];
-
+        var rowColors = InfoRowBackColors;
         var count = Math.Min(visibleRowCount, rowColors.Length);
         for (var i = 0; i < count; i++)
         {
@@ -5114,27 +5118,36 @@ internal sealed class WaveformView : Control
                 // 読み失敗時は近似のまま表示を続ける
             }
 
+            void CompleteOnUi()
+            {
+                _rawDetailReading = false;
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                if (generation == _pyramidGeneration)
+                {
+                    ApplyRawDetail(wanted, data);
+                }
+
+                PumpRawDetailRead();
+            }
+
             try
             {
-                BeginInvoke(() =>
+                if (!IsHandleCreated || IsDisposed)
                 {
+                    // UI へマーシャリングできない。次回 SetPreview / Clear で再構築する。
                     _rawDetailReading = false;
-                    if (IsDisposed)
-                    {
-                        return;
-                    }
+                    return;
+                }
 
-                    if (generation == _pyramidGeneration)
-                    {
-                        ApplyRawDetail(wanted, data);
-                    }
-
-                    PumpRawDetailRead();
-                });
+                BeginInvoke(CompleteOnUi);
             }
             catch (InvalidOperationException)
             {
-                // ハンドル破棄後などは無視（次回 SetPreview で再構築）
+                // ハンドル破棄レースなどは無視（次回 SetPreview で再構築）
                 _rawDetailReading = false;
             }
         });
@@ -5220,6 +5233,12 @@ internal sealed class WaveformView : Control
     {
         try
         {
+            if (!IsHandleCreated || IsDisposed)
+            {
+                // UI へマーシャリングできない。次回 SetPreview で再構築する。
+                return;
+            }
+
             BeginInvoke(() =>
             {
                 if (generation != _pyramidGeneration || IsDisposed)
@@ -5747,9 +5766,8 @@ internal sealed class WaveformView : Control
             DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
             DashPattern = [3f, 3f],
         };
-        using var barBrush = new SolidBrush(UiColors.WaveformInfoFg);
-        using var tempoBrush = new SolidBrush(UiColors.WaveformInfoFg);
-        using var signatureBrush = new SolidBrush(UiColors.WaveformInfoFg);
+        // 小節番号／テンポ／拍子ラベルは同色（WaveformInfoFg）で 1 本のブラシを共有する。
+        using var infoLabelBrush = new SolidBrush(UiColors.WaveformInfoFg);
 
         var barLabelY = barRowTop + 1f;
         var tempoLabelY = tempoRowTop + 1f;
@@ -5773,7 +5791,7 @@ internal sealed class WaveformView : Control
                 {
                     var tempoX = AbsoluteToX(abs, labels);
                     g.DrawLine(tempoChangePen, tempoX, tempoRowTop, tempoX, tempoRowTop + rowHeight);
-                    TryDrawTempoLabel(g, tempoLabel, tempoRounded, tempoX, tempoLabelY, tempoBrush,
+                    TryDrawTempoLabel(g, tempoLabel, tempoRounded, tempoX, tempoLabelY, infoLabelBrush,
                         ref lastTempoLabelX, ref lastShownTempo, minLabelGap: 0f, force: true);
                 }
 
@@ -5805,7 +5823,7 @@ internal sealed class WaveformView : Control
             var drawNumber = isStructural || onGrid;
             if (drawNumber)
             {
-                g.DrawString(bar.BarNumber.ToString(), Font, barBrush, x + 3f, barLabelY);
+                g.DrawString(bar.BarNumber.ToString(), Font, infoLabelBrush, x + 3f, barLabelY);
             }
 
             // 拍子／テンポ変化（および先頭）では必ずテンポ・拍子ラベルも出す
@@ -5815,7 +5833,7 @@ internal sealed class WaveformView : Control
                 tempoRounded,
                 x,
                 tempoLabelY,
-                tempoBrush,
+                infoLabelBrush,
                 ref lastTempoLabelX,
                 ref lastShownTempo,
                 minLabelGap: minBarNumberGap,
@@ -5824,7 +5842,7 @@ internal sealed class WaveformView : Control
             if (isStructural)
             {
                 var signatureLabel = $"{bar.Numerator}/{bar.Denominator}";
-                g.DrawString(signatureLabel, Font, signatureBrush, x + 3f, signatureLabelY);
+                g.DrawString(signatureLabel, Font, infoLabelBrush, x + 3f, signatureLabelY);
             }
 
             prevBarTempo = tempoRounded;

@@ -1,4 +1,6 @@
-﻿namespace MgaWwiseIMImporter.Wave;
+﻿using System.Text;
+
+namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
 /// ペア XML が無い Wave 単体ドロップ時の処理モード。
@@ -573,5 +575,64 @@ internal static class WaveOnlyModeProcessor
         }
 
         return changed;
+    }
+
+    /// <summary>Wave 単体／MultiWave 共通のリージョン種別サマリーをログへ追記する。</summary>
+    public static void AppendRegionSummary(
+        StringBuilder sb,
+        IReadOnlyList<WaveformMarkerMark> markers,
+        int outputPartCount)
+    {
+        var loopRegionCount = markers.Count == 2
+            ? 1
+            : markers.Count(marker => IsLoopRelatedComment(marker.Comment));
+        if (loopRegionCount > 0)
+        {
+            sb.AppendLine(UiStrings.LogWaveOnlyLoopRegions(loopRegionCount));
+        }
+
+        var removeRegionCount = markers.Count(marker => IsRemoveOnlyComment(marker.Comment));
+        if (removeRegionCount > 0)
+        {
+            sb.AppendLine(UiStrings.LogWaveOnlyRemoveRegions(removeRegionCount));
+        }
+
+        var exitRegionCount = markers.Count(marker => IsExitOnlyComment(marker.Comment));
+        if (exitRegionCount > 0)
+        {
+            sb.AppendLine(UiStrings.LogWaveOnlyExitRegions(exitRegionCount));
+        }
+
+        var anacrusisRegionCount = markers.Count(marker => IsAnacrusisOnlyComment(marker.Comment));
+        if (anacrusisRegionCount > 0)
+        {
+            sb.AppendLine(UiStrings.LogWaveOnlyAnacrusisRegions(anacrusisRegionCount));
+        }
+
+        if (outputPartCount > 0)
+        {
+            sb.AppendLine(UiStrings.LogWaveOnlyOutputParts(outputPartCount));
+        }
+    }
+
+    /// <summary>smpl モードで破棄した埋め込みマークをログへ追記する。</summary>
+    public static void AppendDiscardedEmbeddedMarks(
+        StringBuilder sb,
+        IReadOnlyList<DiscardedEmbeddedMark> discardedMarks)
+    {
+        if (discardedMarks.Count == 0)
+        {
+            return;
+        }
+
+        sb.AppendLine(UiStrings.LogWaveOnlyDiscardedEmbeddedSummary(discardedMarks.Count));
+        foreach (var mark in discardedMarks)
+        {
+            sb.AppendLine(
+                UiStrings.LogWaveOnlyDiscardedEmbeddedItem(
+                    mark.Kind,
+                    mark.SampleOffset,
+                    mark.Comment));
+        }
     }
 }

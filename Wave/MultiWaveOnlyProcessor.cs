@@ -9,8 +9,6 @@ namespace MgaWwiseIMImporter.Wave;
 /// </summary>
 internal static class MultiWaveOnlyProcessor
 {
-    private const int OverviewPeakCount = 2400;
-
     public static WaveformPreviewData? TryBuild(
         IReadOnlyList<string> wavPaths,
         StringBuilder sb)
@@ -71,7 +69,7 @@ internal static class MultiWaveOnlyProcessor
             totalFrames = checked(totalFrames + info.FrameCount);
         }
 
-        var peakAllocations = AllocatePeakBuckets(OverviewPeakCount, infos);
+        var peakAllocations = AllocatePeakBuckets(WavPeakReader.DefaultOverviewPeakCount, infos);
         var spans = new List<WaveformSourceSpan>(infos.Count);
         var allMarkers = new List<WaveformMarkerMark>();
         var peakBuckets = new List<WavPeakData>(infos.Count);
@@ -123,7 +121,7 @@ internal static class MultiWaveOnlyProcessor
                             UiStrings.LogWaveOnlySmplLoopSummary(
                                 smplBuild.AcceptedLoopCount,
                                 smplBuild.SkippedLoopCount));
-                        AppendDiscardedEmbeddedMarks(sb, smplBuild.DiscardedMarks);
+                        WaveOnlyModeProcessor.AppendDiscardedEmbeddedMarks(sb, smplBuild.DiscardedMarks);
                     }
 
                     regions = WaveOnlyModeProcessor.BuildRegionsFromMarkers(markers, frameCount);
@@ -140,7 +138,7 @@ internal static class MultiWaveOnlyProcessor
                                 rename.ToComment));
                     }
 
-                    AppendWaveOnlyRegionSummary(sb, markers, localParts.Count);
+                    WaveOnlyModeProcessor.AppendRegionSummary(sb, markers, localParts.Count);
                 }
                 else
                 {
@@ -330,66 +328,5 @@ internal static class MultiWaveOnlyProcessor
             HasIXml = false,
             TimeReferenceSamples = 0,
         };
-    }
-
-    private static void AppendWaveOnlyRegionSummary(
-        StringBuilder sb,
-        IReadOnlyList<WaveformMarkerMark> markers,
-        int outputPartCount)
-    {
-        var loopRegionCount = markers.Count == 2
-            ? 1
-            : markers.Count(marker =>
-                WaveOnlyModeProcessor.IsLoopRelatedComment(marker.Comment));
-        if (loopRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyLoopRegions(loopRegionCount));
-        }
-
-        var removeRegionCount = markers.Count(marker =>
-            WaveOnlyModeProcessor.IsRemoveOnlyComment(marker.Comment));
-        if (removeRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyRemoveRegions(removeRegionCount));
-        }
-
-        var exitRegionCount = markers.Count(marker =>
-            WaveOnlyModeProcessor.IsExitOnlyComment(marker.Comment));
-        if (exitRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyExitRegions(exitRegionCount));
-        }
-
-        var anacrusisRegionCount = markers.Count(marker =>
-            WaveOnlyModeProcessor.IsAnacrusisOnlyComment(marker.Comment));
-        if (anacrusisRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyAnacrusisRegions(anacrusisRegionCount));
-        }
-
-        if (outputPartCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyOutputParts(outputPartCount));
-        }
-    }
-
-    private static void AppendDiscardedEmbeddedMarks(
-        StringBuilder sb,
-        IReadOnlyList<WaveOnlyModeProcessor.DiscardedEmbeddedMark> discardedMarks)
-    {
-        if (discardedMarks.Count == 0)
-        {
-            return;
-        }
-
-        sb.AppendLine(UiStrings.LogWaveOnlyDiscardedEmbeddedSummary(discardedMarks.Count));
-        foreach (var mark in discardedMarks)
-        {
-            sb.AppendLine(
-                UiStrings.LogWaveOnlyDiscardedEmbeddedItem(
-                    mark.Kind,
-                    mark.SampleOffset,
-                    mark.Comment));
-        }
     }
 }

@@ -318,20 +318,20 @@ internal static class LoudnessMeter
     private static long FindDataChunk(BinaryReader reader, Stream source, out uint dataSize)
     {
         source.Position = 0;
-        if (ReadFourCc(reader) != "RIFF")
+        if (WavRiff.ReadFourCc(reader) != "RIFF")
         {
             throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
         }
 
         _ = reader.ReadUInt32();
-        if (ReadFourCc(reader) != "WAVE")
+        if (WavRiff.ReadFourCc(reader) != "WAVE")
         {
             throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
         }
 
         while (source.Position + 8 <= source.Length)
         {
-            var id = ReadFourCc(reader);
+            var id = WavRiff.ReadFourCc(reader);
             var size = reader.ReadUInt32();
             var chunkDataStart = source.Position;
             if (chunkDataStart + size > source.Length)
@@ -385,9 +385,6 @@ internal static class LoudnessMeter
             PcmSampleFormat.Float32 => BitConverter.ToSingle(frame, offset),
             _ => 0f,
         };
-
-    private static string ReadFourCc(BinaryReader reader) =>
-        Encoding.ASCII.GetString(reader.ReadBytes(4));
 
     private enum PcmSampleFormat
     {

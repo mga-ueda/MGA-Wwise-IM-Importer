@@ -396,7 +396,6 @@ internal static class WaveformRegionBuilder
             // 波形先頭ちょうどは既に 0 がある
             if (Math.Abs(barPpq - waveStartPpq) <= PpqEpsilon)
             {
-                previousBarPpq = barPpq;
                 previousBpm = tempoMap.GetBpmAt(barPpq);
                 continue;
             }
@@ -413,7 +412,6 @@ internal static class WaveformRegionBuilder
                     barPpq);
             }
 
-            previousBarPpq = barPpq;
             previousBpm = bpm;
         }
     }

@@ -134,6 +134,8 @@ public partial class Form1 : Form, IMessageFilter
     private IReadOnlyList<string> _lastInputFiles = [];
     private string? _sourceBaseNameOverride;
     private bool _exportBusy;
+    /// <summary>重なった読み込み（起動時 Starting→Last Session）の Load ロック所有数。</summary>
+    private int _loadLockCount;
     private UiInteractionLock _uiInteractionLocks;
     private ExportGlassOverlay? _exportOverlay;
     private string _busyOverlayMessage = UiStrings.OverlayExporting;
@@ -1435,6 +1437,13 @@ public partial class Form1 : Form, IMessageFilter
                 ExportButton_Click(exportButton, EventArgs.Empty);
             }
 
+            return true;
+        }
+
+        // Play -E トグル。[E] 単体のみ（Ctrl+Shift+E の EXPORT と競合しない）。
+        if (keyData == Keys.E && !IsTextEntryFocusActive())
+        {
+            TogglePlayPostExitForCurrentPlaylist();
             return true;
         }
 
@@ -3062,7 +3071,8 @@ public partial class Form1 : Form, IMessageFilter
             ref _playlistFadeCurveMenu);
     }
 
-    private void UpdatePlaylistFadeCurveIcons()
+    /// <summary>編集中パート（未選択時は共有既定値）の Fade In／Out カーブを解決する。</summary>
+    private (RegionFadeCurveKind FadeIn, RegionFadeCurveKind FadeOut) ResolveEditingFadeCurves()
     {
         var partNumber = _transitionSettingsEditPartNumber;
         var fadeIn = partNumber is int inPart
@@ -3071,6 +3081,12 @@ public partial class Form1 : Form, IMessageFilter
         var fadeOut = partNumber is int outPart
             ? ResolveFadeOutCurve(outPart)
             : _playlistFadeOutCurve;
+        return (fadeIn, fadeOut);
+    }
+
+    private void UpdatePlaylistFadeCurveIcons()
+    {
+        var (fadeIn, fadeOut) = ResolveEditingFadeCurves();
 
         LayoutPlaylistFadeCurveIcon(fadeInHeaderLabel, fadeInCurveIcon);
         LayoutPlaylistFadeCurveIcon(transitionTimeHeaderLabel, fadeOutCurveIcon);
@@ -3162,37 +3178,14 @@ public partial class Form1 : Form, IMessageFilter
         }
     }
 
-    private static void WirePlaylistFadeCurveIconHover(PictureBox icon)
-    {
-        icon.MouseEnter += (_, _) =>
-            icon.BackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
-        icon.MouseLeave += (_, _) =>
-            icon.BackColor = UiColors.ForControlBack(UiColors.SectionHeaderBack);
-        icon.MouseDown += (_, e) =>
-        {
-            if (e.Button == MouseButtons.Left)
-            {
-                icon.BackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
-            }
-        };
-        icon.MouseUp += (_, _) =>
-        {
-            var local = icon.PointToClient(Control.MousePosition);
-            icon.BackColor = icon.ClientRectangle.Contains(local)
-                ? UiColors.ForControlBack(UiColors.TransportHoverBack)
-                : UiColors.ForControlBack(UiColors.SectionHeaderBack);
-        };
-    }
+    private static void WirePlaylistFadeCurveIconHover(PictureBox icon) =>
+        ControlHoverChrome.WireBackColor(
+            icon,
+            () => UiColors.ForControlBack(UiColors.SectionHeaderBack));
 
     private void UpdatePlaylistFadeCurveTips()
     {
-        var partNumber = _transitionSettingsEditPartNumber;
-        var fadeIn = partNumber is int inPart
-            ? ResolveFadeInCurve(inPart)
-            : _playlistFadeInCurve;
-        var fadeOut = partNumber is int outPart
-            ? ResolveFadeOutCurve(outPart)
-            : _playlistFadeOutCurve;
+        var (fadeIn, fadeOut) = ResolveEditingFadeCurves();
         TipService.Set(fadeInCurveIcon, UiStrings.LabelRegionFadeCurve(fadeIn));
         TipService.Set(fadeOutCurveIcon, UiStrings.LabelRegionFadeCurve(fadeOut));
     }
@@ -3752,10 +3745,14 @@ public partial class Form1 : Form, IMessageFilter
     /// 事前検証の結果が変わったときだけログへ出す（ポーリングで連打しない）。
     /// Wave 単体モードは条件達成／未達の両方を出す。それ以外は未達時のみ。
     /// </summary>
+    /// <summary>事前検証ログの重複抑止キー（結果が変わったときだけログする）。</summary>
+    private static string BuildPreflightLogKey(ExportPreflightResult preflight) =>
+        $"{preflight.CanExport}|{preflight.Reason}|{preflight.OutputDirectory}"
+        + $"|{preflight.TargetPath}|{preflight.ProjectFilePath}";
+
     private void LogExportPreflightIfChanged(ExportPreflightResult preflight)
     {
-        var key = $"{preflight.CanExport}|{preflight.Reason}|{preflight.OutputDirectory}"
-            + $"|{preflight.TargetPath}|{preflight.ProjectFilePath}";
+        var key = BuildPreflightLogKey(preflight);
         if (string.Equals(key, _lastLoggedPreflightKey, StringComparison.Ordinal))
         {
             return;
@@ -3844,20 +3841,28 @@ public partial class Form1 : Form, IMessageFilter
     // Coalesce hover recolors so fast mouse moves do not flood the UI thread.
     private void QueuePlaylistHoverColorRefresh()
     {
-        if (_playlistHoverColorRefreshQueued || IsDisposed)
+        if (_playlistHoverColorRefreshQueued || IsDisposed || !IsHandleCreated)
         {
             return;
         }
 
         _playlistHoverColorRefreshQueued = true;
-        BeginInvoke(() =>
+        try
         {
-            _playlistHoverColorRefreshQueued = false;
-            if (!IsDisposed)
+            BeginInvoke(() =>
             {
-                ApplyPlaylistSelectorColors();
-            }
-        });
+                _playlistHoverColorRefreshQueued = false;
+                if (!IsDisposed)
+                {
+                    ApplyPlaylistSelectorColors();
+                }
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            // 終了処理中に BeginInvoke が失敗してもフラグを固着させない。
+            _playlistHoverColorRefreshQueued = false;
+        }
     }
 
     private void ApplyPlaylistSelectorColors()
@@ -4423,6 +4428,37 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
+    /// [E] ショートカット: 再生中（またはシークバー位置）の Playlist の Play -E をトグルする。
+    /// 設定パネルの編集対象が別 Playlist でも、シーク／再生側を優先して書き換える。
+    /// </summary>
+    private void TogglePlayPostExitForCurrentPlaylist()
+    {
+        if (_loadedPreview is null)
+        {
+            return;
+        }
+
+        // プロジェクト既定値ではなく、実際に再生中／シーク位置の Playlist のみ対象。
+        var partNumber = ResolveClockPlaylistPart()?.Number
+            ?? TryGetOutputPartAtProgress(_smoothProgress)?.Number;
+        if (partNumber is not int number)
+        {
+            return;
+        }
+
+        var enabled = !ResolvePlayPostExit(number);
+        StorePlayPostExit(number, enabled);
+        PersistLastWaveSessionIfPossible();
+
+        // チェック表示をトグルした Playlist に合わせる（別パート表示のままだと見た目が変わらない）。
+        ShowTransitionSettingsForPart(number);
+        ApplyPlayExitLayerForCurrentPlayback();
+        WritePlaybackDiagnostic(
+            "playlist.play-post-exit-toggled-by-key",
+            new { playPostExit = enabled, part = number });
+    }
+
+    /// <summary>
     /// 現在再生中 Playlist の Play -E をエンジンへ反映する。
     /// </summary>
     private void ApplyPlayExitLayerForCurrentPlayback()
@@ -4672,6 +4708,7 @@ public partial class Form1 : Form, IMessageFilter
                 button.MouseDown += PlaylistGroupTarget_MouseDown;
                 button.MouseMove += PlaylistGroupTarget_MouseMove;
                 button.MouseUp += PlaylistGroupTarget_MouseUp;
+                button.MouseCaptureChanged += PlaylistGroupTarget_MouseCaptureChanged;
                 button.MouseEnter += PlaylistButton_MouseEnter;
                 button.MouseLeave += PlaylistButton_MouseLeave;
                 button.DragEnter += EditorTextBox_DragEnter;
@@ -4692,6 +4729,7 @@ public partial class Form1 : Form, IMessageFilter
                 swatch.MouseDown += PlaylistGroupTarget_MouseDown;
                 swatch.MouseMove += PlaylistGroupTarget_MouseMove;
                 swatch.MouseUp += PlaylistGroupTarget_MouseUp;
+                swatch.MouseCaptureChanged += PlaylistGroupTarget_MouseCaptureChanged;
                 swatch.MouseEnter += PlaylistButton_MouseEnter;
                 swatch.MouseLeave += PlaylistButton_MouseLeave;
                 swatch.DragEnter += EditorTextBox_DragEnter;
@@ -4790,13 +4828,18 @@ public partial class Form1 : Form, IMessageFilter
 
     private void EndPlaylistGroupPaint()
     {
+        var wasActive = _playlistGroupPaintActive;
         _playlistGroupPaintActive = false;
         _playlistGroupPaintErase = false;
         _playlistGroupPaintGroupId = null;
         _playlistGroupPaintLastPartNumber = null;
-        TipService.Resume();
+        if (wasActive)
+        {
+            TipService.Resume();
+        }
+
         // Sticky ID は Shift 押し続け中に残し、隙間を跨いだ再ドラッグでも同 ID を使う。
-        if (_loadedPreview is { } preview)
+        if (_loadedPreview is not null)
         {
             UpdatePlaylistDisplayNames(GetEffectiveOutputParts());
         }
@@ -4809,9 +4852,13 @@ public partial class Form1 : Form, IMessageFilter
 
     private void EndPlaylistDisablePaint()
     {
+        var wasActive = _playlistDisablePaintActive;
         _playlistDisablePaintActive = false;
         _playlistDisablePaintLastPartNumber = null;
-        TipService.Resume();
+        if (wasActive)
+        {
+            TipService.Resume();
+        }
     }
 
     private void ClearPlaylistPlaybackSelection()
@@ -5010,15 +5057,31 @@ public partial class Form1 : Form, IMessageFilter
 
     private void PlaylistGroupTarget_MouseUp(object? sender, MouseEventArgs e)
     {
+        FinishPlaylistPaintAtCursor();
+    }
+
+    /// <summary>
+    /// Capture が MouseUp なしで外れた場合でも塗り状態と Tips Suspend を解放する。
+    /// MouseUp より先に来た場合は最終塗りをここで行う。
+    /// </summary>
+    private void PlaylistGroupTarget_MouseCaptureChanged(object? sender, EventArgs e)
+    {
+        if (sender is not Control control || control.Capture)
+        {
+            return;
+        }
+
+        FinishPlaylistPaintAtCursor();
+    }
+
+    /// <summary>カーソル位置へ最終塗りを適用し、進行中のプレイリスト塗りを終了する。</summary>
+    private void FinishPlaylistPaintAtCursor()
+    {
         if (_playlistDisablePaintActive)
         {
             ApplyPlaylistDisablePaintAtCursor();
             EndPlaylistDisablePaint();
-            if (_suppressNextPlaylistClick && IsHandleCreated)
-            {
-                BeginInvoke(() => _suppressNextPlaylistClick = false);
-            }
-
+            ReleaseSuppressedPlaylistClick();
             return;
         }
 
@@ -5029,9 +5092,15 @@ public partial class Form1 : Form, IMessageFilter
 
         ApplyPlaylistGroupPaintAtCursor();
         EndPlaylistGroupPaint();
+        ReleaseSuppressedPlaylistClick();
+    }
 
-        // Button の Click は MouseUp の直後に発火する。ドラッグで Click が発火しない場合に
-        // 抑制状態を次回へ持ち越さないよう、現在の入力処理が終わった後で解除する。
+    /// <summary>
+    /// Button の Click は MouseUp の直後に発火する。ドラッグで Click が発火しない場合に
+    /// 抑制状態を次回へ持ち越さないよう、現在の入力処理が終わった後で解除する。
+    /// </summary>
+    private void ReleaseSuppressedPlaylistClick()
+    {
         if (_suppressNextPlaylistClick && IsHandleCreated)
         {
             BeginInvoke(() => _suppressNextPlaylistClick = false);
@@ -5155,9 +5224,7 @@ public partial class Form1 : Form, IMessageFilter
         {
             _audioPlayer.CancelPlaylistTransition();
             ClearPendingPlaylistUiTransition();
-            if (_audioPlayer.IsPlaying
-                && (_activeAutomaticPlaylistPartNumber == partNumber
-                    || _manualPlaylistPartNumber == partNumber))
+            if (_audioPlayer.IsPlaying)
             {
                 _audioPlayer.Stop();
                 UpdateTransportPlaybackState();
@@ -5373,15 +5440,7 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        var frameCount = preview.WavInfo.FrameCount;
-        var sample = (long)Math.Clamp(
-            Math.Floor(Math.Clamp(progress, 0d, 1d) * frameCount),
-            0d,
-            Math.Max(0L, frameCount - 1));
-        var partNumber = GetEffectiveOutputParts()
-            .Where(p => sample >= p.StartSampleOffset && sample < p.EndSampleOffset)
-            .Select(p => (int?)p.Number)
-            .FirstOrDefault();
+        var partNumber = TryGetOutputPartAtProgress(progress)?.Number;
 
         if (!_automaticPlaylistPlayback && _manualPlaylistPartNumber == partNumber)
         {
@@ -8024,6 +8083,7 @@ public partial class Form1 : Form, IMessageFilter
         var previousWavePaths = _sessionLoadedWavePaths;
         var loadMessage = isLastSessionLoad ? UiStrings.OverlayLoadingLastSession : UiStrings.OverlayLoading;
         // 起動中すりガラスが既にあればスナップショットは維持し、メッセージだけ差し替える。
+        _loadLockCount++;
         SetUiInteractionLocked(UiInteractionLock.Load, locked: true, loadMessage);
 
         WaveformPreviewData? preview = null;
@@ -8123,11 +8183,46 @@ public partial class Form1 : Form, IMessageFilter
         {
             if (!IsDisposed)
             {
-                SetUiInteractionLocked(UiInteractionLock.Load, locked: false);
+                // 読み込みが重なった場合、先に終わった側が動作中の読み込みのロックを外さないよう
+                // 所有数で管理し、最後の 1 本だけが解除する。
+                _loadLockCount = Math.Max(0, _loadLockCount - 1);
+                if (_loadLockCount == 0)
+                {
+                    SetUiInteractionLocked(UiInteractionLock.Load, locked: false);
+                }
             }
         }
 
         if (IsDisposed || exportGeneration != _exportGeneration || preview is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ApplyLoadedPreviewToUi(preview, previousWavePaths, rememberInputFiles, isLastSessionLoad);
+        }
+        catch (Exception ex)
+        {
+            // async void ハンドラへ例外が抜けるとプロセスが落ちる。UI 反映の失敗はログで報告する。
+            if (!IsDisposed)
+            {
+                AppendReport(
+                    $"{UiStrings.LogErrorHeader}{Environment.NewLine}"
+                    + $"{UiStrings.KeyMessage} {ex.Message}{Environment.NewLine}"
+                    + Environment.NewLine);
+            }
+        }
+    }
+
+    /// <summary>読み込んだプレビューを UI へ反映する（<see cref="ProcessDroppedFiles"/> の後段）。</summary>
+    private void ApplyLoadedPreviewToUi(
+        WaveformPreviewData preview,
+        IReadOnlyList<string> previousWavePaths,
+        bool rememberInputFiles,
+        bool isLastSessionLoad)
+    {
+        if (_previewSession is not { } previewSession)
         {
             return;
         }
@@ -8137,10 +8232,9 @@ public partial class Form1 : Form, IMessageFilter
             preview.SourcePath,
             preview.WavInfo,
             preview.Bars,
-            _previewSession.EffectiveMarkers,
-            preview.Cycles,
-            _previewSession.EffectiveRegions,
-            _previewSession.EffectiveOutputParts,
+            previewSession.EffectiveMarkers,
+            previewSession.EffectiveRegions,
+            previewSession.EffectiveOutputParts,
             preview.AllowsSessionMarkerEdit,
             preview.SourceSpans,
             sourceNameEditable: !preview.IsMultiWaveOnly);
@@ -8170,7 +8264,7 @@ public partial class Form1 : Form, IMessageFilter
         UpdateWaveOnlyExitSourceOptionsEnabled();
 
         UpdateTransportPosition();
-        PopulatePlaylistChoices(_previewSession.EffectiveOutputParts);
+        PopulatePlaylistChoices(previewSession.EffectiveOutputParts);
         // 復元するのは Reload ボタンと起動時の前回セッション読み込みだけ。
         // 手動ドロップは（同じ波形でも）「作業のやり直し」の意図とみなして復元しない。
         var isManualDrop = rememberInputFiles && !isLastSessionLoad;
@@ -8193,10 +8287,10 @@ public partial class Form1 : Form, IMessageFilter
                 + Environment.NewLine);
         }
 
-        if (_previewSession is { AllowsSessionMarkerEdit: true } waveOnlySession)
+        if (previewSession.AllowsSessionMarkerEdit)
         {
             // 復元済みのフェード／グループは Populate(clearSessionMemory: false) で残る。
-            ApplyWaveOnlySessionPresentation(waveOnlySession);
+            ApplyWaveOnlySessionPresentation(previewSession);
         }
 
         // 別波形なら空セッションでサイドカーを置き換え、以降も復元しない。
@@ -8209,8 +8303,8 @@ public partial class Form1 : Form, IMessageFilter
                 preview.WavInfo.FrameCount,
                 preview.WavInfo.SampleRate,
                 bars = preview.Bars.Count,
-                regions = _previewSession.EffectiveRegions.Count,
-                playlists = _previewSession.EffectiveOutputParts.Select(part => new
+                regions = previewSession.EffectiveRegions.Count,
+                playlists = previewSession.EffectiveOutputParts.Select(part => new
                 {
                     part.Number,
                     part.FileName,
@@ -8220,7 +8314,7 @@ public partial class Form1 : Form, IMessageFilter
             });
         UpdateExportButtonState();
 
-        var effectiveParts = _previewSession.EffectiveOutputParts;
+        var effectiveParts = previewSession.EffectiveOutputParts;
         if (effectiveParts.Count == 0)
         {
             return;
@@ -8241,8 +8335,7 @@ public partial class Form1 : Form, IMessageFilter
             + UiStrings.LogExportSaveTo(directory)
             + Environment.NewLine
             + Environment.NewLine);
-        _lastLoggedPreflightKey = $"{preflight.CanExport}|{preflight.Reason}|{preflight.OutputDirectory}"
-            + $"|{preflight.TargetPath}|{preflight.ProjectFilePath}";
+        _lastLoggedPreflightKey = BuildPreflightLogKey(preflight);
     }
 
     /// <summary>
@@ -8807,112 +8900,132 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        // 複数波形＋グループ時、-R 等の投影リージョンが古いと除外区間まで書き出され得る。
-        // スナップショット直前に共有／リージョンを確定させる。
-        EnsureExportSessionRegionsCurrent();
-
-        // クリック時点で接続・プロジェクト・選択・書き出し先を再検証（失敗時は WAV を書き始めない）
-        ExportPreflightResult preflight;
-        try
-        {
-            var result = await WaapiStartupProbe.RunAsync(_waapiSettings);
-            if (!IsDisposed)
-            {
-                ApplyWaapiProbeResult(result, logReport: false);
-                await TryRestoreKeptTargetAsync(logReport: true).ConfigureAwait(true);
-            }
-        }
-        catch (Exception ex)
-        {
-            AppendReport(
-                $"{UiStrings.LogExportPreflightHeader}{Environment.NewLine}"
-                + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
-                + UiStrings.LogWaapiStateFailed(ex.Message)
-                + Environment.NewLine
-                + Environment.NewLine);
-            UpdateExportButtonState();
-            ReleaseFocusToWaveform();
-            return;
-        }
-
-        if (IsDisposed)
-        {
-            return;
-        }
-
-        preflight = EvaluateExportPreflight();
-        UpdateExportButtonState();
-        if (!preflight.CanExport)
-        {
-            AppendReport(preflight.FormatLogMessage());
-            _lastLoggedPreflightKey = $"{preflight.CanExport}|{preflight.Reason}|{preflight.OutputDirectory}"
-                + $"|{preflight.TargetPath}|{preflight.ProjectFilePath}";
-            OwnerCenteredMessageBox.Show(
-                this,
-                preflight.Reason,
-                UiStrings.DialogExportTitle,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-            ReleaseFocusToWaveform();
-            return;
-        }
-
-        var outputDirectory = preflight.OutputDirectory;
-        var targetPath = preflight.TargetPath;
-
-        var exportGeneration = _exportGeneration;
-        var wwiseMarkers = _previewSession is { } session
-            ? session.WwiseMarkers.ToArray()
-            : preview.AllowsSessionMarkerEdit
-                ? []
-                : preview.Markers.ToArray();
-        var wwiseSnapshot = BuildPlaylistExportSnapshot(preview, wwiseMarkers);
-        if (wwiseSnapshot.Parts.Count == 0)
-        {
-            return;
-        }
-
-        StopPlaybackForExport();
-
+        // 事前検証の await 中に再クリック／Ctrl+Shift+E で二重 EXPORT が始まらないよう、
+        // 最初の await より前に busy を立てる（各 return 経路は下の finally で解除）。
         _exportBusy = true;
-        SetUiInteractionLocked(UiInteractionLock.Export, locked: true, UiStrings.OverlayExporting);
-        UpdateExportButtonState();
-
-        var exportSucceeded = false;
         try
         {
-            exportSucceeded = await RunWwiseImportAsync(
-                preview,
-                wwiseSnapshot,
-                exportGeneration,
-                outputDirectory,
-                targetPath);
-        }
-        finally
-        {
-            if (!IsDisposed)
-            {
-                _exportBusy = false;
-                SetUiInteractionLocked(UiInteractionLock.Export, locked: false);
-                UpdateExportButtonState();
-                ReleaseFocusToWaveform();
-            }
-        }
+            // 複数波形＋グループ時、-R 等の投影リージョンが古いと除外区間まで書き出され得る。
+            // スナップショット直前に共有／リージョンを確定させる。
+            EnsureExportSessionRegionsCurrent();
 
-        if (!IsDisposed && exportSucceeded && waapiStatusBar.AutoActiveChecked)
-        {
+            // クリック時点で接続・プロジェクト・選択・書き出し先を再検証（失敗時は WAV を書き始めない）
+            ExportPreflightResult preflight;
             try
             {
-                await ApplyAutoActiveAfterExportAsync().ConfigureAwait(true);
+                var result = await WaapiStartupProbe.RunAsync(_waapiSettings);
+                if (!IsDisposed)
+                {
+                    ApplyWaapiProbeResult(result, logReport: false);
+                    await TryRestoreKeptTargetAsync(logReport: true).ConfigureAwait(true);
+                }
             }
             catch (Exception ex)
             {
-                // async void の Export クリック経路へ例外を漏らすとプロセスが落ちる。
+                AppendReport(
+                    $"{UiStrings.LogExportPreflightHeader}{Environment.NewLine}"
+                    + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
+                    + UiStrings.LogWaapiStateFailed(ex.Message)
+                    + Environment.NewLine
+                    + Environment.NewLine);
+                UpdateExportButtonState();
+                ReleaseFocusToWaveform();
+                return;
+            }
+
+            if (IsDisposed)
+            {
+                return;
+            }
+
+            // 事前検証の await 中に読み込み直し等でプレビューが差し替わっていたら中止する。
+            if (!ReferenceEquals(_loadedPreview, preview))
+            {
+                return;
+            }
+
+            preflight = EvaluateExportPreflight();
+            UpdateExportButtonState();
+            if (!preflight.CanExport)
+            {
+                AppendReport(preflight.FormatLogMessage());
+                _lastLoggedPreflightKey = BuildPreflightLogKey(preflight);
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    preflight.Reason,
+                    UiStrings.DialogExportTitle,
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                ReleaseFocusToWaveform();
+                return;
+            }
+
+            var outputDirectory = preflight.OutputDirectory;
+            var targetPath = preflight.TargetPath;
+
+            var exportGeneration = _exportGeneration;
+            var wwiseMarkers = _previewSession is { } session
+                ? session.WwiseMarkers.ToArray()
+                : preview.AllowsSessionMarkerEdit
+                    ? []
+                    : preview.Markers.ToArray();
+            var wwiseSnapshot = BuildPlaylistExportSnapshot(preview, wwiseMarkers);
+            if (wwiseSnapshot.Parts.Count == 0)
+            {
+                return;
+            }
+
+            StopPlaybackForExport();
+
+            SetUiInteractionLocked(UiInteractionLock.Export, locked: true, UiStrings.OverlayExporting);
+            UpdateExportButtonState();
+
+            var exportSucceeded = false;
+            try
+            {
+                exportSucceeded = await RunWwiseImportAsync(
+                    preview,
+                    wwiseSnapshot,
+                    exportGeneration,
+                    outputDirectory,
+                    targetPath);
+            }
+            finally
+            {
                 if (!IsDisposed)
                 {
-                    AppendReport(
-                        $"{UiStrings.LogWwiseBringToFrontFailed(ex.Message)}{Environment.NewLine}");
+                    _exportBusy = false;
+                    SetUiInteractionLocked(UiInteractionLock.Export, locked: false);
+                    UpdateExportButtonState();
+                    ReleaseFocusToWaveform();
                 }
+            }
+
+            if (!IsDisposed && exportSucceeded && waapiStatusBar.AutoActiveChecked)
+            {
+                try
+                {
+                    await ApplyAutoActiveAfterExportAsync().ConfigureAwait(true);
+                }
+                catch (Exception ex)
+                {
+                    // async void の Export クリック経路へ例外を漏らすとプロセスが落ちる。
+                    if (!IsDisposed)
+                    {
+                        AppendReport(
+                            $"{UiStrings.LogWwiseBringToFrontFailed(ex.Message)}{Environment.NewLine}");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            // 事前検証段階での return／例外時に busy が残らないようにする
+            // （本編は内側の finally で解除済み。ここは残っている場合のみ）。
+            if (!IsDisposed && _exportBusy)
+            {
+                _exportBusy = false;
+                UpdateExportButtonState();
             }
         }
     }
@@ -9028,7 +9141,7 @@ public partial class Form1 : Form, IMessageFilter
         {
             ReportProgress(UiStrings.LogBuildingImportPlan);
             var containerNameOverride = preview.IsMultiWaveOnly
-                ? WwiseObjectNames.MakeMultiWaveContainerName()
+                ? WwiseObjectNames.MultiWaveContainerName
                 : null;
             plan = WwiseMusicPlanBuilder.Build(
                 BuildNamingSourcePath(preview.SourcePath),

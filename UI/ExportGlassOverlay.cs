@@ -117,6 +117,11 @@ internal sealed class ExportGlassOverlay : Control
 
         if (InvokeRequired)
         {
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
             BeginInvoke(() => SetMessage(baseText));
             return;
         }
@@ -144,6 +149,11 @@ internal sealed class ExportGlassOverlay : Control
 
         if (InvokeRequired)
         {
+            if (!IsHandleCreated)
+            {
+                return;
+            }
+
             BeginInvoke(() => AppendLog(text));
             return;
         }

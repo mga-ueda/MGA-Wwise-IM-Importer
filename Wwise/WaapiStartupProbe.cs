@@ -31,12 +31,12 @@ internal static class WaapiStartupProbe
                 var project = await client.CallAsync("ak.wwise.core.getProjectInfo", cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
                 projectText = FormatProject(project);
-                if (TryGetString(project, "name", out var name))
+                if (WaapiJson.TryGetString(project, "name", out var name))
                 {
                     projectName = name;
                 }
 
-                projectFilePath = ReadProjectFilePath(project);
+                projectFilePath = WaapiJson.ReadProjectFilePath(project);
             }
             catch
             {
@@ -100,8 +100,8 @@ internal static class WaapiStartupProbe
 
         // 複数選択時は先頭を作成先として扱う
         var first = objects[0];
-        TryGetString(first, "path", out var path);
-        TryGetString(first, "type", out var type);
+        WaapiJson.TryGetString(first, "path", out var path);
+        WaapiJson.TryGetString(first, "type", out var type);
         return (path, type);
     }
 
@@ -115,10 +115,10 @@ internal static class WaapiStartupProbe
 
     private static string FormatWwiseVersion(JsonElement info)
     {
-        var displayName = TryGetString(info, "displayName", out var name) ? name : UiStrings.LabelWwise;
+        var displayName = WaapiJson.TryGetString(info, "displayName", out var name) ? name : UiStrings.LabelWwise;
         if (info.TryGetProperty("version", out var version))
         {
-            if (TryGetString(version, "displayName", out var versionName))
+            if (WaapiJson.TryGetString(version, "displayName", out var versionName))
             {
                 return $"{displayName} {versionName}";
             }
@@ -163,37 +163,8 @@ internal static class WaapiStartupProbe
 
     private static string FormatProject(JsonElement project)
     {
-        var name = TryGetString(project, "name", out var n) ? n : UiStrings.LabelUnnamedProject;
-        var path = ReadProjectFilePath(project);
+        var name = WaapiJson.TryGetString(project, "name", out var n) ? n : UiStrings.LabelUnnamedProject;
+        var path = WaapiJson.ReadProjectFilePath(project);
         return path.Length > 0 ? $"{name} ({path})" : name;
-    }
-
-    private static string ReadProjectFilePath(JsonElement project)
-    {
-        if (TryGetString(project, "path", out var path))
-        {
-            return path;
-        }
-
-        if (TryGetString(project, "filePath", out var filePath))
-        {
-            return filePath;
-        }
-
-        return string.Empty;
-    }
-
-    private static bool TryGetString(JsonElement element, string propertyName, out string value)
-    {
-        value = string.Empty;
-        if (element.ValueKind != JsonValueKind.Object
-            || !element.TryGetProperty(propertyName, out var property)
-            || property.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        value = property.GetString() ?? string.Empty;
-        return value.Length > 0;
     }
 }

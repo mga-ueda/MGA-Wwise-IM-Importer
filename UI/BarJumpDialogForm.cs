@@ -173,7 +173,12 @@ internal sealed class BarJumpDialogForm : Form
     private void AcceptIfValid()
     {
         var text = _barNumberBox.Text.Trim();
-        if (!int.TryParse(text, out var bar) || bar < 1)
+        if (!int.TryParse(
+                text,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var bar)
+            || bar < 1)
         {
             _barNumberBox.Focus();
             _barNumberBox.SelectAll();

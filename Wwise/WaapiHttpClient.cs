@@ -60,7 +60,11 @@ internal sealed class WaapiHttpClient : IDisposable
             && document.RootElement.TryGetProperty("uri", out _))
         {
             // WAAPI エラー JSON（例: {"uri":"...","message":"...","details":{...}}）
-            throw new WaapiException(message.GetString() ?? body);
+            // message が文字列以外でも WaapiException 以外の例外にしない。
+            throw new WaapiException(
+                message.ValueKind == JsonValueKind.String
+                    ? message.GetString() ?? body
+                    : body);
         }
 
         return document.RootElement.Clone();

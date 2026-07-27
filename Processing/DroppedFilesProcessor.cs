@@ -20,10 +20,25 @@ internal static class DroppedFilesProcessor
 
     private static string ProcessCore(IEnumerable<string> paths, Action<WaveformPreviewData>? preview)
     {
-        var dropped = paths
-            .Select(path => Path.GetFullPath(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        // 不正なパス 1 件で全体（async void 呼び出し元まで）を落とさず、そのパスだけエラーにする。
+        var dropped = new List<string>();
+        var invalid = new List<(string Path, Exception Error)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            try
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (seen.Add(fullPath))
+                {
+                    dropped.Add(fullPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                invalid.Add((path, ex));
+            }
+        }
 
         var sb = new StringBuilder();
         sb.AppendLine(UiStrings.LogDroppedFilesHeader(dropped.Count));
@@ -33,6 +48,11 @@ internal static class DroppedFilesProcessor
         }
 
         sb.AppendLine();
+
+        foreach (var (path, error) in invalid)
+        {
+            AppendError(sb, path, error);
+        }
 
         var pairKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pairs = new List<(string WavPath, string XmlPath)>();
@@ -83,10 +103,18 @@ internal static class DroppedFilesProcessor
         // XML なし・WAV 2 本以上 → 複数波形モード（既存単体／XML 経路には混ぜない）
         if (TryGetMultiWaveOnlyPaths(pairs, out var multiWavPaths))
         {
-            var multiPreview = MultiWaveOnlyProcessor.TryBuild(multiWavPaths, sb);
-            if (multiPreview is not null)
+            try
             {
-                preview?.Invoke(multiPreview);
+                var multiPreview = MultiWaveOnlyProcessor.TryBuild(multiWavPaths, sb);
+                if (multiPreview is not null)
+                {
+                    preview?.Invoke(multiPreview);
+                }
+            }
+            catch (Exception ex)
+            {
+                // ピーク読取・連結準備の失敗を単体経路（ProcessPair）と同様にログへ落とす。
+                AppendError(sb, multiWavPaths[0], ex);
             }
 
             return sb.ToString();
@@ -213,7 +241,7 @@ internal static class DroppedFilesProcessor
                             UiStrings.LogWaveOnlySmplLoopSummary(
                                 smplBuild.AcceptedLoopCount,
                                 smplBuild.SkippedLoopCount));
-                        AppendDiscardedEmbeddedMarks(sb, smplBuild.DiscardedMarks);
+                        WaveOnlyModeProcessor.AppendDiscardedEmbeddedMarks(sb, smplBuild.DiscardedMarks);
                     }
 
                     regions = WaveOnlyModeProcessor.BuildRegionsFromMarkers(
@@ -233,7 +261,7 @@ internal static class DroppedFilesProcessor
                                 rename.ToComment));
                     }
 
-                    AppendWaveOnlyRegionSummary(sb, markers, outputParts.Count);
+                    WaveOnlyModeProcessor.AppendRegionSummary(sb, markers, outputParts.Count);
                 }
                 else
                 {
@@ -247,7 +275,7 @@ internal static class DroppedFilesProcessor
                 sb.AppendLine();
             }
 
-            var peaks = WavPeakReader.Read(wavInfo, peakCount: 2400);
+            var peaks = WavPeakReader.Read(wavInfo, peakCount: WavPeakReader.DefaultOverviewPeakCount);
             preview?.Invoke(new WaveformPreviewData(
                 peaks,
                 wavPath,
@@ -310,67 +338,6 @@ internal static class DroppedFilesProcessor
         catch (Exception ex)
         {
             AppendError(sb, wavPath, ex);
-        }
-    }
-
-    private static void AppendWaveOnlyRegionSummary(
-        StringBuilder sb,
-        IReadOnlyList<WaveformMarkerMark> markers,
-        int outputPartCount)
-    {
-        var loopRegionCount = markers.Count == 2
-            ? 1
-            : markers.Count(marker =>
-                WaveOnlyModeProcessor.IsLoopRelatedComment(marker.Comment));
-        if (loopRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyLoopRegions(loopRegionCount));
-        }
-
-        var removeRegionCount = markers.Count(marker =>
-            WaveOnlyModeProcessor.IsRemoveOnlyComment(marker.Comment));
-        if (removeRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyRemoveRegions(removeRegionCount));
-        }
-
-        var exitRegionCount = markers.Count(marker =>
-            WaveOnlyModeProcessor.IsExitOnlyComment(marker.Comment));
-        if (exitRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyExitRegions(exitRegionCount));
-        }
-
-        var anacrusisRegionCount = markers.Count(marker =>
-            WaveOnlyModeProcessor.IsAnacrusisOnlyComment(marker.Comment));
-        if (anacrusisRegionCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyAnacrusisRegions(anacrusisRegionCount));
-        }
-
-        if (outputPartCount > 0)
-        {
-            sb.AppendLine(UiStrings.LogWaveOnlyOutputParts(outputPartCount));
-        }
-    }
-
-    private static void AppendDiscardedEmbeddedMarks(
-        StringBuilder sb,
-        IReadOnlyList<WaveOnlyModeProcessor.DiscardedEmbeddedMark> discardedMarks)
-    {
-        if (discardedMarks.Count == 0)
-        {
-            return;
-        }
-
-        sb.AppendLine(UiStrings.LogWaveOnlyDiscardedEmbeddedSummary(discardedMarks.Count));
-        foreach (var mark in discardedMarks)
-        {
-            sb.AppendLine(
-                UiStrings.LogWaveOnlyDiscardedEmbeddedItem(
-                    mark.Kind,
-                    mark.SampleOffset,
-                    mark.Comment));
         }
     }
 

@@ -271,6 +271,11 @@ internal static class TipService
         var value = string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
         if (_display.InvokeRequired)
         {
+            if (!_display.IsHandleCreated)
+            {
+                return;
+            }
+
             _display.BeginInvoke(() => ApplyDisplayText(value));
             return;
         }

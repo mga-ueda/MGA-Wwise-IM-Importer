@@ -32,13 +32,13 @@ internal static class WavSegmentWriter
         using var source = File.OpenRead(sourcePath);
         using var reader = new BinaryReader(source, Encoding.ASCII, leaveOpen: true);
 
-        if (ReadFourCc(reader) != "RIFF")
+        if (WavRiff.ReadFourCc(reader) != "RIFF")
         {
             throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
         }
 
         _ = reader.ReadUInt32();
-        if (ReadFourCc(reader) != "WAVE")
+        if (WavRiff.ReadFourCc(reader) != "WAVE")
         {
             throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
         }
@@ -49,7 +49,7 @@ internal static class WavSegmentWriter
 
         while (source.Position + 8 <= source.Length)
         {
-            var id = ReadFourCc(reader);
+            var id = WavRiff.ReadFourCc(reader);
             var size = reader.ReadUInt32();
             var chunkDataStart = source.Position;
             if (chunkDataStart + size > source.Length)
@@ -91,15 +91,20 @@ internal static class WavSegmentWriter
         }
 
         var segmentByteLength = checked((int)(endByte - startByte));
-        var contentSize = 4
+        // int.MaxValue 近傍のセグメント長でパディング・ヘッダ加算がラップしないよう long で計算する。
+        var contentSize = 4L
             + 8 + fmtData.Length + (fmtData.Length & 1)
             + 8 + segmentByteLength + (segmentByteLength & 1);
+        if (contentSize > int.MaxValue)
+        {
+            throw new InvalidDataException(UiStrings.ErrChunkSizeInvalid("data"));
+        }
 
         using var dest = File.Create(destinationPath);
         using var writer = new BinaryWriter(dest, Encoding.ASCII, leaveOpen: true);
 
         writer.Write(Encoding.ASCII.GetBytes("RIFF"));
-        writer.Write(contentSize);
+        writer.Write((int)contentSize);
         writer.Write(Encoding.ASCII.GetBytes("WAVE"));
 
         WriteChunk(writer, "fmt ", fmtData);
@@ -144,8 +149,4 @@ internal static class WavSegmentWriter
         }
     }
 
-    private static string ReadFourCc(BinaryReader reader)
-    {
-        return Encoding.ASCII.GetString(reader.ReadBytes(4));
-    }
 }

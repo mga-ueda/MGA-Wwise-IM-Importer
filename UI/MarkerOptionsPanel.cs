@@ -366,13 +366,27 @@ internal sealed class MarkerOptionsPanel : UserControl
 
         ApplyMoreOptionsVisibility();
         ApplyTips();
-        UiStrings.LanguageChanged += (_, _) =>
+        _languageChangedHandler = (_, _) =>
         {
             if (!IsDisposed)
             {
                 ApplyLocalizedLabels();
             }
         };
+        UiStrings.LanguageChanged += _languageChangedHandler;
+    }
+
+    /// <summary>静的イベントの購読解除用（解除しないとコントロールが静的イベントに残り続ける）。</summary>
+    private readonly EventHandler _languageChangedHandler;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            UiStrings.LanguageChanged -= _languageChangedHandler;
+        }
+
+        base.Dispose(disposing);
     }
 
     /// <summary>言語切替時に、パネル内の全ラベル・チェックボックス・見出し・ラジオ・プレビューを再設定する。</summary>
@@ -790,6 +804,12 @@ internal sealed class MarkerOptionsPanel : UserControl
         textBox.Enter += (_, _) => TextEditingChanged?.Invoke(this, true);
         textBox.Leave += (_, _) =>
         {
+            // ハンドル破棄後の Leave（フォーム終了時など）では BeginInvoke 自体が例外になる。
+            if (IsDisposed || !IsHandleCreated)
+            {
+                return;
+            }
+
             // 同パネル内の別 TextBox へ移る場合は抑止を維持する。
             BeginInvoke(() =>
             {
@@ -1017,7 +1037,11 @@ internal sealed class MarkerOptionsPanel : UserControl
 
     private static bool TryParseStreamMs(string text, out int milliseconds)
     {
-        if (int.TryParse(text.Trim(), out milliseconds)
+        if (int.TryParse(
+                text.Trim(),
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out milliseconds)
             && milliseconds >= StreamMsMin
             && milliseconds <= StreamMsMax)
         {
@@ -1045,7 +1069,11 @@ internal sealed class MarkerOptionsPanel : UserControl
             return true;
         }
 
-        return int.TryParse(_digitsTextBox.Text, out digits)
+        return int.TryParse(
+                _digitsTextBox.Text,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out digits)
             && digits >= MarkerSettings.CommentDigitsMin
             && digits <= MarkerSettings.CommentDigitsMax;
     }

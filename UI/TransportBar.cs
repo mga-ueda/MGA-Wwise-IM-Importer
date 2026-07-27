@@ -1,4 +1,4 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -118,9 +118,19 @@ internal sealed class TransportBar : UserControl
 
         _commandRepeatTimer.Tick += (_, _) => RepeatHeldCommand();
         ApplyColors();
-        UiStrings.LanguageChanged += (_, _) => ApplyLocalizedTips();
+        _languageChangedHandler = (_, _) =>
+        {
+            if (!IsDisposed)
+            {
+                ApplyLocalizedTips();
+            }
+        };
+        UiStrings.LanguageChanged += _languageChangedHandler;
         TightenVerticalLayout();
     }
+
+    /// <summary>静的イベントの購読解除用（解除しないとコントロールが静的イベントに残り続ける）。</summary>
+    private readonly EventHandler _languageChangedHandler;
 
     public event EventHandler<TransportCommand>? CommandInvoked;
     public event EventHandler? CommandHoldEnded;
@@ -550,6 +560,7 @@ internal sealed class TransportBar : UserControl
     {
         if (disposing)
         {
+            UiStrings.LanguageChanged -= _languageChangedHandler;
             _commandRepeatTimer.Dispose();
         }
 
@@ -693,7 +704,6 @@ internal enum TransportIcon
     Copy,
     Download,
     Folder,
-    Save,
     Delete,
     Lock,
     Unlock,
@@ -1032,7 +1042,7 @@ internal sealed class TransportIconButton : Button
                 g.DrawLines(pen, [new PointF(12, 16), new PointF(17, 21), new PointF(22, 16)]);
                 g.DrawLine(pen, 9, 26, 25, 26);
                 break;
-            // Folder / Save / Delete は 16×16（x 9..25, y 10..26）の正方形グリフに揃える。
+            // Folder / Delete は 16×16（x 9..25, y 10..26）の正方形グリフに揃える。
             case TransportIcon.Folder:
                 g.DrawLines(pen, [
                     new PointF(9, 12),
@@ -1045,19 +1055,6 @@ internal sealed class TransportIconButton : Button
                     new PointF(9, 12),
                 ]);
                 g.DrawLine(pen, 9, 15, 25, 15);
-                break;
-            case TransportIcon.Save:
-                // フロッピーディスク
-                g.DrawLines(pen, [
-                    new PointF(9, 10),
-                    new PointF(22, 10),
-                    new PointF(25, 13),
-                    new PointF(25, 26),
-                    new PointF(9, 26),
-                    new PointF(9, 10),
-                ]);
-                g.DrawRectangle(pen, 13, 10, 8, 5);
-                g.DrawRectangle(pen, 12, 19, 10, 7);
                 break;
             case TransportIcon.Delete:
                 // ゴミ箱

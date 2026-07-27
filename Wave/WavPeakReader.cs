@@ -9,6 +9,9 @@ namespace MgaWwiseIMImporter.Wave;
 /// </summary>
 internal static class WavPeakReader
 {
+    /// <summary>波形概要表示向けの既定ピークバケット数。</summary>
+    public const int DefaultOverviewPeakCount = 2400;
+
     public static WavPeakData Read(WavFileInfo info, int peakCount)
     {
         if (info.FrameCount <= 0)
@@ -70,7 +73,6 @@ internal static class WavPeakReader
         }
 
         var buckets = (int)Math.Min(peakCount, rangeFrames);
-        var channels = info.Channels;
         var bytesPerSample = info.BitsPerSample / 8;
         if (bytesPerSample <= 0)
         {
@@ -468,20 +470,20 @@ internal static class WavPeakReader
         dataSize = 0;
 
         stream.Position = 0;
-        if (ReadFourCc(reader) != "RIFF")
+        if (WavRiff.ReadFourCc(reader) != "RIFF")
         {
             return false;
         }
 
         _ = reader.ReadUInt32();
-        if (ReadFourCc(reader) != "WAVE")
+        if (WavRiff.ReadFourCc(reader) != "WAVE")
         {
             return false;
         }
 
         while (stream.Position + 8 <= stream.Length)
         {
-            var chunkId = ReadFourCc(reader);
+            var chunkId = WavRiff.ReadFourCc(reader);
             var chunkSize = reader.ReadUInt32();
             var chunkDataStart = stream.Position;
 
@@ -620,10 +622,6 @@ internal static class WavPeakReader
         return new WavPeakData(mins, maxs, totalFrames, sampleRate);
     }
 
-    private static string ReadFourCc(BinaryReader reader)
-    {
-        return Encoding.ASCII.GetString(reader.ReadBytes(4));
-    }
 }
 
 internal sealed class WavPeakData

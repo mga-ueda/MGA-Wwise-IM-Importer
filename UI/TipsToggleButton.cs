@@ -1,4 +1,4 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -7,36 +7,16 @@ namespace MgaWwiseIMImporter.UI;
 /// 見た目は <see cref="SettingsGearButton"/> と揃えた薄い枠付きの正方形。
 /// 自身の Tips は全体オフ時も常に表示する。
 /// </summary>
-internal sealed class TipsToggleButton : Button
+internal sealed class TipsToggleButton : SquareToolbarButton
 {
-    private bool _hovered;
-    private bool _pressed;
     private bool _checked = true;
 
     public TipsToggleButton()
     {
-        AccessibleRole = AccessibleRole.PushButton;
-        FlatStyle = FlatStyle.Flat;
-        FlatAppearance.BorderSize = 0;
-        Size = new Size(24, 24);
         Margin = new Padding(0, 0, 4, 0);
-        Padding = Padding.Empty;
-        TabStop = false;
-        Cursor = Cursors.Hand;
-        UseVisualStyleBackColor = false;
-        SetStyle(
-            ControlStyles.AllPaintingInWmPaint
-            | ControlStyles.OptimizedDoubleBuffer
-            | ControlStyles.UserPaint
-            | ControlStyles.ResizeRedraw,
-            true);
-        SetStyle(ControlStyles.Selectable, false);
         ApplyColors();
         RefreshAppearance();
     }
-
-    public Color HoverBackColor { get; set; }
-    public Color PressedBackColor { get; set; }
 
     /// <summary>Tips 枠表示が有効なら true。</summary>
     public bool Checked
@@ -61,76 +41,15 @@ internal sealed class TipsToggleButton : Button
         Invalidate();
     }
 
-    public void ApplyColors()
-    {
-        BackColor = UiColors.ForControlBack(UiColors.ProjectBarBack);
-        ForeColor = UiColors.LogButtonFore;
-        HoverBackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
-        PressedBackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
-        Invalidate();
-    }
-
-    /// <summary>
-    /// <see cref="AutoScaleMode.Font"/> は縦横倍率が異なるため、正方形を維持する。
-    /// </summary>
-    protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
-    {
-        var keepSquare = Width == Height;
-        base.ScaleControl(factor, specified);
-        if (keepSquare && Width != Height)
-        {
-            var side = Math.Min(Width, Height);
-            Size = new Size(side, side);
-        }
-    }
-
-    protected override void OnMouseEnter(EventArgs e)
-    {
-        _hovered = true;
-        Invalidate();
-        base.OnMouseEnter(e);
-    }
-
-    protected override void OnMouseLeave(EventArgs e)
-    {
-        _hovered = false;
-        _pressed = false;
-        Invalidate();
-        base.OnMouseLeave(e);
-    }
-
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        _pressed = e.Button == MouseButtons.Left;
-        Invalidate();
-        base.OnMouseDown(e);
-    }
-
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        _pressed = false;
-        Invalidate();
-        base.OnMouseUp(e);
-    }
-
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-        g.Clear(BackColor);
-
-        var fill = _pressed
-            ? PressedBackColor
-            : _hovered
-                ? HoverBackColor
-                : BackColor;
-        using (var fillBrush = new SolidBrush(fill))
-        {
-            g.FillRectangle(fillBrush, ClientRectangle);
-        }
+        PaintFillBackground(g);
 
         // オフ時はアイコンをグレーアウトするだけ。
+        var fill = ResolveFillColor();
         var iconColor = _checked
             ? ForeColor
             : Color.FromArgb(128, ForeColor);

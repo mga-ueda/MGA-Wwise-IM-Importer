@@ -509,10 +509,8 @@ internal static class WaapiMusicImporter
 
     /// <summary>
     /// Any → Playlist トランジションの Destination 参照を setReference で結ぶ。
-    /// 作成時の @DestinationContextObject で足りる場合もあるが、Reference は空のままのことがある。
-    /// </summary>
-    /// <summary>
-    /// DestinationContextObject は Reference のため、ネスト作成だけでは空になり得る。
+    /// DestinationContextObject は Reference のため、ネスト作成だけでは空になり得る
+    /// （作成時の @DestinationContextObject で足りる場合もある）。
     /// ルール名はすべて Transition のため、Destination 参照／種別で対象を特定する。
     /// </summary>
     private static async Task BindTransitionDestinationsAsync(
@@ -1137,7 +1135,7 @@ internal static class WaapiMusicImporter
                 .ConfigureAwait(false);
             var stateGroupId = await QuerySingleReturnStringAsync(
                     client,
-                    $"$ \"{stateGroupPath}\"",
+                    $"$ \"{stateGroupPath.Replace("\"", "\\\"", StringComparison.Ordinal)}\"",
                     "id",
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -1149,7 +1147,7 @@ internal static class WaapiMusicImporter
 
             var statesWwuPath = await QuerySingleReturnStringAsync(
                     client,
-                    $"$ \"{stateGroupPath}\"",
+                    $"$ \"{stateGroupPath.Replace("\"", "\\\"", StringComparison.Ordinal)}\"",
                     "filePath",
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -1364,7 +1362,7 @@ internal static class WaapiMusicImporter
             "ak.wwise.ui.commands.execute",
             new Dictionary<string, object?>
             {
-                ["command"] = "FindInProjectExplorerSyncGroup1",
+                ["command"] = WaapiSelection.FindInProjectExplorerCommand,
                 ["objects"] = new[] { objectPath },
             },
             cancellationToken: cancellationToken);
@@ -2249,7 +2247,7 @@ internal static class WaapiMusicImporter
         {
             transitionWwuPath = await QuerySingleReturnStringAsync(
                     client,
-                    $"$ \"{musicRootPath}\"",
+                    $"$ \"{musicRootPath.Replace("\"", "\\\"", StringComparison.Ordinal)}\"",
                     "filePath",
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -3416,6 +3414,7 @@ internal static class WaapiMusicImporter
     /// <summary>
     /// プロジェクトが完全に閉じるまで待つ。
     /// クローズ進行中は ak.wwise.locked、完了後は「プロジェクト未ロード」系エラーか空結果になる。
+    /// 期限内に閉じきらない場合は例外（黙って WWU 直接編集へ進むとプロジェクト破損の危険がある）。
     /// </summary>
     private static async Task WaitForProjectClosedAsync(WaapiHttpClient client)
     {
@@ -3452,6 +3451,8 @@ internal static class WaapiMusicImporter
 
             await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
         }
+
+        throw new InvalidOperationException(UiStrings.ErrProjectCloseTimeout);
     }
 
     /// <summary>

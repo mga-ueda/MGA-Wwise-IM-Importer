@@ -613,7 +613,7 @@ internal sealed class ProjectSettingsStore
             profile.ExitSourceAt = exitMode;
         }
 
-        profile.PlayPostExit = ReadBool(values, "PlayPostExit", profile.PlayPostExit);
+        profile.PlayPostExit = IniFile.ReadBool(values, "PlayPostExit", profile.PlayPostExit);
 
         if (values.TryGetValue("GridOverride", out var gridText)
             && Enum.TryParse<MarkerGridOverrideMode>(gridText, ignoreCase: true, out var gridMode))
@@ -630,9 +630,9 @@ internal sealed class ProjectSettingsStore
                 MarkerSettings.CommentDigitsMax);
         }
 
-        profile.CommentZeroPad = ReadBool(values, "CommentZeroPad", profile.CommentZeroPad);
-        profile.CommentResetPerPart = ReadBool(values, "CommentResetPerPart", profile.CommentResetPerPart);
-        profile.CompactFileNumbers = ReadBool(values, "CompactFileNumbers", profile.CompactFileNumbers);
+        profile.CommentZeroPad = IniFile.ReadBool(values, "CommentZeroPad", profile.CommentZeroPad);
+        profile.CommentResetPerPart = IniFile.ReadBool(values, "CommentResetPerPart", profile.CommentResetPerPart);
+        profile.CompactFileNumbers = IniFile.ReadBool(values, "CompactFileNumbers", profile.CompactFileNumbers);
 
         if (values.TryGetValue("CommentPrefix", out var prefix))
         {
@@ -658,8 +658,8 @@ internal sealed class ProjectSettingsStore
             profile.OutputDirectory = output;
         }
 
-        profile.StreamEnabled = ReadBool(values, "StreamEnabled", defaultValue: true);
-        profile.AutoActive = ReadBool(values, "AutoActive", defaultValue: true);
+        profile.StreamEnabled = IniFile.ReadBool(values, "StreamEnabled", defaultValue: true);
+        profile.AutoActive = IniFile.ReadBool(values, "AutoActive", defaultValue: true);
 
         if (values.TryGetValue("LookAheadMs", out var lookAheadText)
             && int.TryParse(lookAheadText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lookAheadMs))
@@ -673,17 +673,17 @@ internal sealed class ProjectSettingsStore
             profile.PrefetchLengthMs = Math.Clamp(prefetchMs, 0, 9999);
         }
 
-        profile.LoudnessPreserveGroupBalance = ReadBool(
+        profile.LoudnessPreserveGroupBalance = IniFile.ReadBool(
             values,
             "LoudnessPreserveGroupBalance",
             defaultValue: false);
 
-        profile.MoreOptionsExpanded = ReadBool(
+        profile.MoreOptionsExpanded = IniFile.ReadBool(
             values,
             "MoreOptionsExpanded",
             defaultValue: true);
 
-        profile.KeepLastSession = ReadBool(
+        profile.KeepLastSession = IniFile.ReadBool(
             values,
             "KeepLastSession",
             defaultValue: true);
@@ -697,7 +697,7 @@ internal sealed class ProjectSettingsStore
             profile.LastWavePaths = lastWaves.Trim().Trim('"');
         }
 
-        profile.KeepTarget = ReadBool(
+        profile.KeepTarget = IniFile.ReadBool(
             values,
             "KeepTarget",
             defaultValue: false);
@@ -758,21 +758,4 @@ internal sealed class ProjectSettingsStore
         return "Project." + safe;
     }
 
-    private static bool ReadBool(
-        Dictionary<string, string> values,
-        string key,
-        bool defaultValue)
-    {
-        if (!values.TryGetValue(key, out var text))
-        {
-            return defaultValue;
-        }
-
-        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
-        {
-            return number != 0;
-        }
-
-        return bool.TryParse(text, out var flag) ? flag : defaultValue;
-    }
 }

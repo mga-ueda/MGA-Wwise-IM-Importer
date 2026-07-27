@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.UI;
+﻿namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// エディタ下の WAAPI / Wwise 接続ステータス表示。
@@ -108,7 +108,7 @@ internal sealed class WaapiStatusBar : Panel
         ApplyColors();
         ApplyTips();
         SetPending();
-        UiStrings.LanguageChanged += (_, _) =>
+        _languageChangedHandler = (_, _) =>
         {
             if (IsDisposed)
             {
@@ -121,7 +121,11 @@ internal sealed class WaapiStatusBar : Panel
             ApplyTips();
             LayoutLabels();
         };
+        UiStrings.LanguageChanged += _languageChangedHandler;
     }
+
+    /// <summary>静的イベントの購読解除用（解除しないとコントロールが静的イベントに残り続ける）。</summary>
+    private readonly EventHandler _languageChangedHandler;
 
     /// <summary>Keep Target（鍵アイコン）の変更。</summary>
     public event EventHandler? KeepTargetChanged;
@@ -180,6 +184,7 @@ internal sealed class WaapiStatusBar : Panel
     {
         if (disposing)
         {
+            UiStrings.LanguageChanged -= _languageChangedHandler;
             _badgeFont.Dispose();
         }
 

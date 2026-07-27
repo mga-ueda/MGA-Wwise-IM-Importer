@@ -663,7 +663,7 @@ internal static class WwiseMusicPlanBuilder
     }
 
     /// <summary>グループ内 State 名（0→A, 1→B, …）。</summary>
-    internal static IReadOnlyList<string> BuildGroupStateNames(int count)
+    private static IReadOnlyList<string> BuildGroupStateNames(int count)
     {
         if (count <= 0)
         {
@@ -892,7 +892,7 @@ internal static class WwiseMusicPlanBuilder
             : $"{segmentBase}_{IndexToLetters(index)}";
 
     /// <summary>0→a, 1→b, …, 25→z, 26→aa。</summary>
-    internal static string IndexToLetters(int index)
+    private static string IndexToLetters(int index)
     {
         var sb = new System.Text.StringBuilder();
         var n = index;
