@@ -501,6 +501,42 @@ internal sealed class WaveAudioPlayer : IDisposable
         Trace("playlist.cancel-transition");
     }
 
+    /// <summary>
+    /// 重ね再生を維持したまま、クロックと全上乗せを同一相対オフセットへシークする。
+    /// <see cref="ClearPlaylistPlayback"/> は呼ばない（上乗せボイスを消さない）。
+    /// </summary>
+    /// <param name="relativeSample">各 Playlist 開始からの相対サンプル位置。</param>
+    /// <param name="clockProgress">シーク後のクロック絶対進捗（0〜1）。</param>
+    public bool TrySeekPlaylistLayersToRelative(long relativeSample, out double clockProgress)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        clockProgress = 0d;
+        if (_provider is null || _reader is null || FrameCount <= 0)
+        {
+            return false;
+        }
+
+        if (!_provider.TrySeekPlaylistLayersToRelative(
+                relativeSample,
+                FindPlanAtSample,
+                out var clockSample))
+        {
+            Trace($"playlist.layer-seek-relative rejected relative={relativeSample}");
+            return false;
+        }
+
+        clockProgress = Math.Clamp(clockSample / (double)FrameCount, 0d, 1d);
+        if (!_isPlaying)
+        {
+            _discardOutputBufferBeforePlay = true;
+        }
+
+        Trace(
+            $"playlist.layer-seek-relative relative={relativeSample}"
+            + $" clockSample={clockSample} clockProgress={clockProgress:R}");
+        return true;
+    }
+
     /// <summary>Form1 のポーリング用 Playlist 遷移状態。</summary>
     public bool TryGetPlaylistTransitionState(out PlaylistTransitionState state)
     {
@@ -1713,6 +1749,81 @@ internal sealed class WaveAudioPlayer : IDisposable
                     ResetPreRollFadeInNoLock();
                 }
                 _diagnostic($"provider.playlist-cancel current={currentSample} hadPending={hadPending} hadFade={hadFade}");
+            }
+        }
+
+        /// <summary>
+        /// クロック／上乗せの相対位置をそろえたままシークする。ボイスは維持する。
+        /// </summary>
+        public bool TrySeekPlaylistLayersToRelative(
+            long relativeSample,
+            Func<long, LoopPlaybackPlan?> findPlan,
+            out long clockSample)
+        {
+            clockSample = 0;
+            lock (_readGate)
+            {
+                long clockStart;
+                long clockEnd;
+                lock (_gate)
+                {
+                    if (_playlistStartSample is not long start
+                        || _playlistEndSample is not long end
+                        || end <= start)
+                    {
+                        return false;
+                    }
+
+                    clockStart = start;
+                    clockEnd = end;
+
+                    // 遷移／Exit は位置ジャンプと両立しないので止める。上乗せ本体は残す。
+                    _pendingPlaylistTransition = null;
+                    _playlistFadePlaying = false;
+                    _playlistExitFadePlaying = false;
+                    _playlistPreRollPlaying = false;
+                    ResetPreRollFadeInNoLock();
+                    ResetMainFadeInNoLock();
+                    _exitPlaying = false;
+                }
+
+                var safeRelative = Math.Max(0L, relativeSample);
+                var clockSpan = clockEnd - clockStart;
+                var clockOffset = Math.Min(safeRelative, Math.Max(0L, clockSpan - 1));
+                clockSample = clockStart + clockOffset;
+                SeekToSample(_source, clockSample);
+                var clockPlan = findPlan(clockSample);
+
+                lock (_gate)
+                {
+                    _activePlan = clockPlan;
+                    foreach (var voice in _overlayVoices)
+                    {
+                        if (!voice.Active)
+                        {
+                            continue;
+                        }
+
+                        var partSpan = voice.PartEndSample - voice.PartStartSample;
+                        if (partSpan <= 0)
+                        {
+                            continue;
+                        }
+
+                        var overlayOffset = Math.Min(safeRelative, Math.Max(0L, partSpan - 1));
+                        var targetSample = voice.PartStartSample + overlayOffset;
+                        SeekToSample(voice.Reader, targetSample);
+                        voice.LoopPlan = findPlan(targetSample);
+                        voice.ExitPlaying = false;
+                        voice.ExitStartSample = 0;
+                        voice.ExitEndSample = 0;
+                    }
+                }
+
+                _diagnostic(
+                    $"provider.layer-seek-relative relative={safeRelative}"
+                    + $" clock={clockSample} start={clockStart} end={clockEnd}");
+                return true;
             }
         }
 
