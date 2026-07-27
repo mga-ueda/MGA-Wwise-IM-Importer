@@ -244,11 +244,13 @@ internal static class UiStrings
         "{0}{1}"
         + "[Shift]+クリック／ドラッグ: グループ化（既存グループも新しい ID で上書き可）{1}"
         + "[Ctrl]+クリック／ドラッグ: グループ解除{1}"
-        + "[Ctrl+Shift]+クリック／ドラッグ: 無効化／再有効化",
+        + "[Ctrl+Shift]+クリック／ドラッグ: 無効化／再有効化{1}"
+        + "[Alt]+クリック: グループ内で重ね再生（再クリックで個別停止）",
         "{0}{1}"
         + "[Shift]+click/drag: group (can overwrite an existing group with a new ID){1}"
         + "[Ctrl]+click/drag: ungroup{1}"
-        + "[Ctrl+Shift]+click/drag: disable / re-enable",
+        + "[Ctrl+Shift]+click/drag: disable / re-enable{1}"
+        + "[Alt]+click: layer playback within a group (click again to stop that layer)",
         playlistName,
         Environment.NewLine);
 
