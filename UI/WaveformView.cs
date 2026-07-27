@@ -2454,24 +2454,105 @@ internal sealed class WaveformView : Control
         }
 
         // Alt+ドラッグ: 一つ前のマーカーも同じ差分だけプレビュー移動する。
+        // プレビュー自体をペア移動可能範囲に制限済みなので、単純な差分でよい。
         if ((ModifierKeys & Keys.Alt) != 0
             && TryGetPreviousMarkerSample(_markerDragFromSample, out var previousSample)
             && sampleOffset == previousSample)
         {
             var delta = preview - _markerDragFromSample;
-            return ClampMarkerSample(previousSample + delta);
+            return previousSample + delta;
         }
 
         return sampleOffset;
     }
 
+    /// <summary>
+    /// ドラッグ中の到達サンプルを同一 Playlist 内に収める。
+    /// Alt ペア移動時は、一つ前マーカーが止まった方向へ主マーカーも進めない。
+    /// </summary>
+    private long ClampMarkerDragPreviewSample(long desiredSampleOffset)
+    {
+        desiredSampleOffset = ClampMarkerSample(desiredSampleOffset);
+        if (_peaks is null || _peaks.FrameCount <= 0)
+        {
+            return desiredSampleOffset;
+        }
+
+        if (!TryGetHostOutputPartRange(
+                _markerDragFromSample,
+                out var rangeMin,
+                out var rangeMax))
+        {
+            rangeMin = 0;
+            rangeMax = _peaks.FrameCount - 1;
+        }
+
+        desiredSampleOffset = Math.Clamp(desiredSampleOffset, rangeMin, rangeMax);
+
+        if ((ModifierKeys & Keys.Alt) == 0
+            || !TryGetPreviousMarkerSample(_markerDragFromSample, out var previousSample))
+        {
+            return desiredSampleOffset;
+        }
+
+        var occupied = new List<long>(_markers.Count);
+        foreach (var marker in _markers)
+        {
+            occupied.Add(marker.SampleOffset);
+        }
+
+        return WaveformPreviewSession.ClampPairedMarkerDestination(
+            _markerDragFromSample,
+            previousSample,
+            desiredSampleOffset,
+            rangeMin,
+            rangeMax,
+            occupied);
+    }
+
+    private bool TryGetHostOutputPartRange(
+        long sampleOffset,
+        out long rangeMinInclusive,
+        out long rangeMaxInclusive)
+    {
+        rangeMinInclusive = 0;
+        rangeMaxInclusive = 0;
+        foreach (var part in _outputParts)
+        {
+            if (sampleOffset < part.StartSampleOffset
+                || sampleOffset >= part.EndSampleOffset
+                || part.EndSampleOffset <= part.StartSampleOffset)
+            {
+                continue;
+            }
+
+            rangeMinInclusive = part.StartSampleOffset;
+            rangeMaxInclusive = part.EndSampleOffset - 1;
+            return rangeMaxInclusive >= rangeMinInclusive;
+        }
+
+        return false;
+    }
+
     private bool TryGetPreviousMarkerSample(long sampleOffset, out long previousSample)
     {
         previousSample = 0;
+        var limitToPlaylist = TryGetHostOutputPartRange(
+            sampleOffset,
+            out var rangeMin,
+            out var rangeMax);
+
         long? best = null;
         foreach (var marker in _markers)
         {
             if (marker.IsSharedProjection || marker.SampleOffset >= sampleOffset)
+            {
+                continue;
+            }
+
+            // 同一 Playlist 内の前マーカーだけをペア移動対象にする。
+            if (limitToPlaylist
+                && (marker.SampleOffset < rangeMin || marker.SampleOffset > rangeMax))
             {
                 continue;
             }
@@ -2971,6 +3052,7 @@ internal sealed class WaveformView : Control
                 return;
             }
 
+            sampleOffset = ClampMarkerDragPreviewSample(sampleOffset);
             if (_markerDragPreviewSample == sampleOffset)
             {
                 return;
@@ -3690,8 +3772,8 @@ internal sealed class WaveformView : Control
 
         var frameCount = _peaks.FrameCount;
         var delta = preview - _markerDragFromSample;
-        var draggedSample = ClampMarkerSample(preview);
-        var pairedSample = ClampMarkerSample(previousSample + delta);
+        var draggedSample = preview;
+        var pairedSample = previousSample + delta;
 
         using var pen = new Pen(Color.FromArgb(150, UiColors.MarkerTriangle), 1f);
         DrawMarkerPositionGuideLine(g, timeline, draggedSample, frameCount, pen);

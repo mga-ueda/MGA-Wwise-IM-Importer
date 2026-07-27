@@ -9891,12 +9891,21 @@ public partial class Form1 : Form, IMessageFilter
 
         if (e.ShiftPreviousMarker)
         {
+            var toSample = session.ClampWaveOnlyMarkerMoveWithPrevious(
+                e.FromSampleOffset,
+                e.ToSampleOffset);
+            if (toSample == e.FromSampleOffset)
+            {
+                waveformView.Invalidate();
+                return;
+            }
+
             if (!TryMutateWaveOnlyMarkers(
                     current => current.TryMoveWaveOnlyMarkerWithPrevious(
                         e.FromSampleOffset,
-                        e.ToSampleOffset)))
+                        toSample)))
             {
-                if (session.HasWaveOnlyMarkerAt(e.ToSampleOffset))
+                if (session.HasWaveOnlyMarkerAt(toSample))
                 {
                     AppendReport(UiStrings.LogWaveOnlyMarkerDuplicate + Environment.NewLine);
                 }
@@ -9904,10 +9913,35 @@ public partial class Form1 : Form, IMessageFilter
                 waveformView.Invalidate();
                 return;
             }
+
+            waveformView.SetSelectedMarkerSampleOffset(toSample);
+            WritePlaybackDiagnostic(
+                "marker.session-moved",
+                new
+                {
+                    from = e.FromSampleOffset,
+                    to = toSample,
+                    shiftPrevious = true,
+                    effectiveCount = session.EffectiveMarkers.Count,
+                    loopRegions = session.EffectiveRegions.Count(region =>
+                        region.NameSuffix.Equals(
+                            WaveformRegionBuilder.LoopLeftSuffix,
+                            StringComparison.OrdinalIgnoreCase)),
+                });
+            return;
         }
         else
         {
-            if (session.HasWaveOnlyMarkerAt(e.ToSampleOffset))
+            var toSample = session.ClampWaveOnlyMarkerMove(
+                e.FromSampleOffset,
+                e.ToSampleOffset);
+            if (toSample == e.FromSampleOffset)
+            {
+                waveformView.Invalidate();
+                return;
+            }
+
+            if (session.HasWaveOnlyMarkerAt(toSample))
             {
                 AppendReport(UiStrings.LogWaveOnlyMarkerDuplicate + Environment.NewLine);
                 waveformView.Invalidate();
@@ -9917,27 +9951,28 @@ public partial class Form1 : Form, IMessageFilter
             if (!TryMutateWaveOnlyMarkers(
                     current => current.TryMoveWaveOnlyMarker(
                         e.FromSampleOffset,
-                        e.ToSampleOffset)))
+                        toSample)))
             {
                 waveformView.Invalidate();
                 return;
             }
-        }
 
-        waveformView.SetSelectedMarkerSampleOffset(e.ToSampleOffset);
-        WritePlaybackDiagnostic(
-            "marker.session-moved",
-            new
-            {
-                from = e.FromSampleOffset,
-                to = e.ToSampleOffset,
-                shiftPrevious = e.ShiftPreviousMarker,
-                effectiveCount = session.EffectiveMarkers.Count,
-                loopRegions = session.EffectiveRegions.Count(region =>
-                    region.NameSuffix.Equals(
-                        WaveformRegionBuilder.LoopLeftSuffix,
-                        StringComparison.OrdinalIgnoreCase)),
-            });
+            waveformView.SetSelectedMarkerSampleOffset(toSample);
+            WritePlaybackDiagnostic(
+                "marker.session-moved",
+                new
+                {
+                    from = e.FromSampleOffset,
+                    to = toSample,
+                    shiftPrevious = false,
+                    effectiveCount = session.EffectiveMarkers.Count,
+                    loopRegions = session.EffectiveRegions.Count(region =>
+                        region.NameSuffix.Equals(
+                            WaveformRegionBuilder.LoopLeftSuffix,
+                            StringComparison.OrdinalIgnoreCase)),
+                });
+            return;
+        }
     }
 
     private bool TryDeleteSelectedWaveOnlyMarker()
@@ -10151,6 +10186,12 @@ public partial class Form1 : Form, IMessageFilter
 
         if (shiftPrevious)
         {
+            toSample = session.ClampWaveOnlyMarkerMoveWithPrevious(fromSample, toSample);
+            if (toSample == fromSample)
+            {
+                return true;
+            }
+
             if (!TryMutateWaveOnlyMarkers(
                     current => current.TryMoveWaveOnlyMarkerWithPrevious(fromSample, toSample),
                     persistSession: false))
@@ -10165,6 +10206,12 @@ public partial class Form1 : Form, IMessageFilter
         }
         else
         {
+            toSample = session.ClampWaveOnlyMarkerMove(fromSample, toSample);
+            if (toSample == fromSample)
+            {
+                return true;
+            }
+
             if (session.HasWaveOnlyMarkerAt(toSample))
             {
                 AppendReport(UiStrings.LogWaveOnlyMarkerDuplicate + Environment.NewLine);

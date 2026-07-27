@@ -401,6 +401,7 @@ internal sealed class WaveformPreviewSession
 
     /// <summary>
     /// Wave 単体モードの埋め込みマーカーをアプリ上だけ移動する（WAV 非書き込み）。
+    /// 移動先は同一 Playlist（出力パート）内に制限する。
     /// </summary>
     public bool TryMoveWaveOnlyMarker(long fromSampleOffset, long toSampleOffset)
     {
@@ -418,12 +419,8 @@ internal sealed class WaveformPreviewSession
             }
         }
 
+        toSampleOffset = ClampWaveOnlyMarkerMove(fromSampleOffset, toSampleOffset);
         if (fromSampleOffset == toSampleOffset)
-        {
-            return false;
-        }
-
-        if (toSampleOffset < 0 || toSampleOffset >= Preview.WavInfo.FrameCount)
         {
             return false;
         }
@@ -452,8 +449,39 @@ internal sealed class WaveformPreviewSession
     }
 
     /// <summary>
+    /// 単独マーカー移動の到達サンプルを、同一 Playlist 内かつフレーム内に収める。
+    /// </summary>
+    public long ClampWaveOnlyMarkerMove(long fromSampleOffset, long desiredToSampleOffset)
+    {
+        if (_waveOnlyMarkers is null || Preview.WavInfo.FrameCount <= 0)
+        {
+            return fromSampleOffset;
+        }
+
+        if (Preview.IsMultiWaveOnly
+            && !TryResolveSharedMarkerSample(fromSampleOffset, out fromSampleOffset))
+        {
+            return fromSampleOffset;
+        }
+
+        if (Preview.IsMultiWaveOnly
+            && !TryResolveSharedMarkerSample(desiredToSampleOffset, out desiredToSampleOffset))
+        {
+            // 解決できない到達点は、範囲クランプだけ行う。
+        }
+
+        if (!TryGetMarkerMoveRange(fromSampleOffset, out var rangeMin, out var rangeMax))
+        {
+            rangeMin = 0;
+            rangeMax = Preview.WavInfo.FrameCount - 1;
+        }
+
+        return Math.Clamp(desiredToSampleOffset, rangeMin, rangeMax);
+    }
+
+    /// <summary>
     /// 指定マーカーと、その一つ前のマーカーを同じサンプル差分だけ移動する。
-    /// 前マーカーが無い／範囲外／衝突するときは false。
+    /// 前マーカーが無いときは単独移動。範囲外／衝突する差分は可能な限りに切り詰める。
     /// </summary>
     public bool TryMoveWaveOnlyMarkerWithPrevious(long fromSampleOffset, long toSampleOffset)
     {
@@ -471,89 +499,43 @@ internal sealed class WaveformPreviewSession
             }
         }
 
+        if (!TryFindPreviousWaveOnlyMarker(
+                fromSampleOffset,
+                out var previousIndex,
+                out var previousSample))
+        {
+            return TryMoveWaveOnlyMarker(fromSampleOffset, toSampleOffset);
+        }
+
+        if (!TryGetMarkerMoveRange(fromSampleOffset, out var rangeMin, out var rangeMax))
+        {
+            rangeMin = 0;
+            rangeMax = Preview.WavInfo.FrameCount - 1;
+        }
+
+        var occupied = new long[_waveOnlyMarkers.Count];
+        for (var i = 0; i < _waveOnlyMarkers.Count; i++)
+        {
+            occupied[i] = _waveOnlyMarkers[i].SampleOffset;
+        }
+
+        toSampleOffset = ClampPairedMarkerDestination(
+            fromSampleOffset,
+            previousSample,
+            toSampleOffset,
+            rangeMin,
+            rangeMax,
+            occupied);
+
         var delta = toSampleOffset - fromSampleOffset;
         if (delta == 0)
         {
             return false;
         }
 
-        var frameCount = Preview.WavInfo.FrameCount;
-        if (toSampleOffset < 0 || toSampleOffset >= frameCount)
-        {
-            return false;
-        }
-
+        var prevTo = previousSample + delta;
         var fromIndex = _waveOnlyMarkers.FindIndex(marker => marker.SampleOffset == fromSampleOffset);
         if (fromIndex < 0)
-        {
-            return false;
-        }
-
-        long? previousSample = null;
-        var previousIndex = -1;
-        WaveformOutputPart? fromPart = null;
-        if (Preview.IsMultiWaveOnly)
-        {
-            fromPart = EffectiveOutputParts
-                .Where(part =>
-                    fromSampleOffset >= part.StartSampleOffset
-                    && fromSampleOffset < part.EndSampleOffset)
-                .Select(part => (WaveformOutputPart?)part)
-                .FirstOrDefault();
-        }
-
-        for (var i = 0; i < _waveOnlyMarkers.Count; i++)
-        {
-            var sample = _waveOnlyMarkers[i].SampleOffset;
-            if (sample >= fromSampleOffset)
-            {
-                continue;
-            }
-
-            // 複数波形: 同じ Playlist（基準側）内の前マーカーだけを連動対象にする。
-            if (fromPart is { } part)
-            {
-                if (sample < part.StartSampleOffset || sample >= part.EndSampleOffset)
-                {
-                    continue;
-                }
-
-                if (!IsAuthoritativeUserMarkerSample(sample))
-                {
-                    continue;
-                }
-            }
-
-            if (previousSample is null || sample > previousSample.Value)
-            {
-                previousSample = sample;
-                previousIndex = i;
-            }
-        }
-
-        if (previousSample is not { } prevFrom || previousIndex < 0)
-        {
-            return TryMoveWaveOnlyMarker(fromSampleOffset, toSampleOffset);
-        }
-
-        var prevTo = prevFrom + delta;
-        if (prevTo < 0 || prevTo >= frameCount)
-        {
-            return false;
-        }
-
-        if (_waveOnlyMarkers.Any(marker =>
-                marker.SampleOffset == toSampleOffset
-                && marker.SampleOffset != fromSampleOffset
-                && marker.SampleOffset != prevFrom))
-        {
-            return false;
-        }
-
-        if (_waveOnlyMarkers.Any(marker =>
-                marker.SampleOffset == prevTo
-                && marker.SampleOffset != fromSampleOffset
-                && marker.SampleOffset != prevFrom))
         {
             return false;
         }
@@ -574,6 +556,214 @@ internal sealed class WaveformPreviewSession
         RebuildMarkerSnapshots();
         RebuildWaveOnlyRegions();
         return true;
+    }
+
+    /// <summary>
+    /// Alt／Ctrl+Alt ペア移動で、一つ前マーカーが動ける範囲に到達サンプルを制限する。
+    /// 前マーカーが無ければ <paramref name="desiredToSampleOffset"/> をフレーム内に収めて返す。
+    /// </summary>
+    public long ClampWaveOnlyMarkerMoveWithPrevious(long fromSampleOffset, long desiredToSampleOffset)
+    {
+        if (_waveOnlyMarkers is null || Preview.WavInfo.FrameCount <= 0)
+        {
+            return fromSampleOffset;
+        }
+
+        if (Preview.IsMultiWaveOnly)
+        {
+            if (!TryResolveSharedMarkerSample(fromSampleOffset, out fromSampleOffset)
+                || !TryResolveSharedMarkerSample(desiredToSampleOffset, out desiredToSampleOffset))
+            {
+                return fromSampleOffset;
+            }
+        }
+
+        if (!TryFindPreviousWaveOnlyMarker(fromSampleOffset, out _, out var previousSample))
+        {
+            return ClampWaveOnlyMarkerMove(fromSampleOffset, desiredToSampleOffset);
+        }
+
+        if (!TryGetMarkerMoveRange(fromSampleOffset, out var rangeMin, out var rangeMax))
+        {
+            rangeMin = 0;
+            rangeMax = Preview.WavInfo.FrameCount - 1;
+        }
+
+        var occupied = new long[_waveOnlyMarkers.Count];
+        for (var i = 0; i < _waveOnlyMarkers.Count; i++)
+        {
+            occupied[i] = _waveOnlyMarkers[i].SampleOffset;
+        }
+
+        return ClampPairedMarkerDestination(
+            fromSampleOffset,
+            previousSample,
+            desiredToSampleOffset,
+            rangeMin,
+            rangeMax,
+            occupied);
+    }
+
+    private bool TryFindPreviousWaveOnlyMarker(
+        long fromSampleOffset,
+        out int previousIndex,
+        out long previousSample)
+    {
+        previousIndex = -1;
+        previousSample = 0;
+        if (_waveOnlyMarkers is null)
+        {
+            return false;
+        }
+
+        // 同一 Playlist 内の前マーカーだけを連動対象にする（単体／複数波形とも）。
+        TryGetHostOutputPart(fromSampleOffset, out var fromPart);
+
+        long? best = null;
+        var bestIndex = -1;
+        for (var i = 0; i < _waveOnlyMarkers.Count; i++)
+        {
+            var sample = _waveOnlyMarkers[i].SampleOffset;
+            if (sample >= fromSampleOffset)
+            {
+                continue;
+            }
+
+            if (fromPart is { } part)
+            {
+                if (sample < part.StartSampleOffset || sample >= part.EndSampleOffset)
+                {
+                    continue;
+                }
+
+                if (Preview.IsMultiWaveOnly && !IsAuthoritativeUserMarkerSample(sample))
+                {
+                    continue;
+                }
+            }
+
+            if (best is null || sample > best.Value)
+            {
+                best = sample;
+                bestIndex = i;
+            }
+        }
+
+        if (best is not { } found || bestIndex < 0)
+        {
+            return false;
+        }
+
+        previousSample = found;
+        previousIndex = bestIndex;
+        return true;
+    }
+
+    /// <summary>
+    /// マーカー移動の許容範囲（同一 Playlist の [start, end) を inclusive 上限へ変換）。
+    /// Playlist が取れないときは false。
+    /// </summary>
+    private bool TryGetMarkerMoveRange(
+        long sampleOffset,
+        out long rangeMinInclusive,
+        out long rangeMaxInclusive)
+    {
+        rangeMinInclusive = 0;
+        rangeMaxInclusive = 0;
+        if (!TryGetHostOutputPart(sampleOffset, out var part)
+            || part.EndSampleOffset <= part.StartSampleOffset)
+        {
+            return false;
+        }
+
+        rangeMinInclusive = part.StartSampleOffset;
+        rangeMaxInclusive = part.EndSampleOffset - 1;
+        return rangeMaxInclusive >= rangeMinInclusive;
+    }
+
+    private bool TryGetHostOutputPart(long sampleOffset, out WaveformOutputPart part)
+    {
+        foreach (var candidate in EffectiveOutputParts)
+        {
+            if (sampleOffset >= candidate.StartSampleOffset
+                && sampleOffset < candidate.EndSampleOffset)
+            {
+                part = candidate;
+                return true;
+            }
+        }
+
+        part = default!;
+        return false;
+    }
+
+    /// <summary>
+    /// 主マーカーと一つ前マーカーを同量移動するときの到達位置を、
+    /// Playlist 範囲・他マーカー衝突で止める。
+    /// </summary>
+    internal static long ClampPairedMarkerDestination(
+        long fromSampleOffset,
+        long previousSampleOffset,
+        long desiredToSampleOffset,
+        long rangeMinInclusive,
+        long rangeMaxInclusive,
+        IReadOnlyList<long> occupiedSampleOffsets)
+    {
+        if (rangeMaxInclusive < rangeMinInclusive)
+        {
+            return fromSampleOffset;
+        }
+
+        desiredToSampleOffset = Math.Clamp(
+            desiredToSampleOffset,
+            rangeMinInclusive,
+            rangeMaxInclusive);
+        var delta = desiredToSampleOffset - fromSampleOffset;
+        if (delta == 0)
+        {
+            return fromSampleOffset;
+        }
+
+        // 両方とも同一 Playlist 内に収める。
+        var minDelta = Math.Max(
+            rangeMinInclusive - previousSampleOffset,
+            rangeMinInclusive - fromSampleOffset);
+        var maxDelta = Math.Min(
+            rangeMaxInclusive - previousSampleOffset,
+            rangeMaxInclusive - fromSampleOffset);
+
+        foreach (var occupied in occupiedSampleOffsets)
+        {
+            if (occupied == fromSampleOffset || occupied == previousSampleOffset)
+            {
+                continue;
+            }
+
+            if (occupied < previousSampleOffset)
+            {
+                // 前マーカーが左へ進むとき、直前のマーカーの右隣で止める。
+                minDelta = Math.Max(minDelta, occupied - previousSampleOffset + 1);
+            }
+            else if (occupied > previousSampleOffset && occupied < fromSampleOffset)
+            {
+                // ペア間のマーカーをまたがない。
+                maxDelta = Math.Min(maxDelta, occupied - previousSampleOffset - 1);
+                minDelta = Math.Max(minDelta, occupied - fromSampleOffset + 1);
+            }
+            else if (occupied > fromSampleOffset)
+            {
+                // 主マーカーが右へ進むとき、次のマーカーの左隣で止める。
+                maxDelta = Math.Min(maxDelta, occupied - fromSampleOffset - 1);
+            }
+        }
+
+        if (minDelta > maxDelta)
+        {
+            return fromSampleOffset;
+        }
+
+        delta = Math.Clamp(delta, minDelta, maxDelta);
+        return fromSampleOffset + delta;
     }
 
     /// <summary>
