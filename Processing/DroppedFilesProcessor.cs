@@ -10,15 +10,24 @@ namespace MgaWwiseIMImporter.Processing;
 /// </summary>
 internal static class DroppedFilesProcessor
 {
-    public static string Process(IEnumerable<string> paths, out WaveformPreviewData? preview)
+    public static string Process(IEnumerable<string> paths, out WaveformPreviewData? preview) =>
+        Process(paths, out preview, expectedFormat: null);
+
+    public static string Process(
+        IEnumerable<string> paths,
+        out WaveformPreviewData? preview,
+        ExpectedWaveformFormat? expectedFormat)
     {
         WaveformPreviewData? lastPreview = null;
-        var report = ProcessCore(paths, p => lastPreview = p);
+        var report = ProcessCore(paths, p => lastPreview = p, expectedFormat);
         preview = lastPreview;
         return report;
     }
 
-    private static string ProcessCore(IEnumerable<string> paths, Action<WaveformPreviewData>? preview)
+    private static string ProcessCore(
+        IEnumerable<string> paths,
+        Action<WaveformPreviewData>? preview,
+        ExpectedWaveformFormat? expectedFormat)
     {
         // 不正なパス 1 件で全体（async void 呼び出し元まで）を落とさず、そのパスだけエラーにする。
         var dropped = new List<string>();
@@ -105,7 +114,7 @@ internal static class DroppedFilesProcessor
         {
             try
             {
-                var multiPreview = MultiWaveOnlyProcessor.TryBuild(multiWavPaths, sb);
+                var multiPreview = MultiWaveOnlyProcessor.TryBuild(multiWavPaths, sb, expectedFormat);
                 if (multiPreview is not null)
                 {
                     preview?.Invoke(multiPreview);
@@ -127,7 +136,7 @@ internal static class DroppedFilesProcessor
 
         foreach (var (wavPath, xmlPath) in pairs)
         {
-            ProcessPair(sb, wavPath, xmlPath, preview);
+            ProcessPair(sb, wavPath, xmlPath, preview, expectedFormat);
         }
 
         if (warnMultiplePairs && keptWavPath is not null)
@@ -207,7 +216,8 @@ internal static class DroppedFilesProcessor
         StringBuilder sb,
         string wavPath,
         string xmlPath,
-        Action<WaveformPreviewData>? preview)
+        Action<WaveformPreviewData>? preview,
+        ExpectedWaveformFormat? expectedFormat)
     {
         var wavExists = File.Exists(wavPath);
         var xmlExists = File.Exists(xmlPath);
@@ -225,7 +235,7 @@ internal static class DroppedFilesProcessor
         try
         {
             var wavInfo = WavFileInfo.Read(wavPath);
-            sb.AppendLine(wavInfo.ToDisplayText());
+            sb.AppendLine(wavInfo.ToDisplayText(expectedFormat));
 
             IReadOnlyList<WaveformBarMark> bars = [];
             IReadOnlyList<WaveformMarkerMark> markers = [];

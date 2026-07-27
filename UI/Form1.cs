@@ -2585,6 +2585,7 @@ public partial class Form1 : Form, IMessageFilter
     {
         waveformView.DefaultFadeInCurve = _appSettings.DefaultWaveformFadeInCurve;
         waveformView.DefaultFadeOutCurve = _appSettings.DefaultWaveformFadeOutCurve;
+        waveformView.SetExpectedWaveformFormat(_appSettings.ToExpectedWaveformFormat());
     }
 
     /// <summary>
@@ -7445,7 +7446,8 @@ public partial class Form1 : Form, IMessageFilter
             _appSettings.DefaultWaveformFadeInCurve,
             _appSettings.DefaultWaveformFadeOutCurve,
             _appSettings.DefaultPlaylistFadeInCurve,
-            _appSettings.DefaultPlaylistFadeOutCurve)
+            _appSettings.DefaultPlaylistFadeOutCurve,
+            _appSettings.ToExpectedWaveformFormat())
         {
             // メインが最前面でもダイアログが背面に回らないようにする
             TopMost = TopMost,
@@ -7489,6 +7491,9 @@ public partial class Form1 : Form, IMessageFilter
         {
             AutosaveCurrentProject();
         }
+
+        _appSettings.SaveExpectedWaveformFormat(dialog.SelectedExpectedFormat);
+        waveformView.SetExpectedWaveformFormat(dialog.SelectedExpectedFormat);
 
         ReleaseFocusToWaveform();
     }
@@ -8473,9 +8478,10 @@ public partial class Form1 : Form, IMessageFilter
             waveformView.CommitDarkFrame();
 
             // 巨大 WAV のピーク走査で UI を止めないよう、解析は背景スレッドで行う
+            var expectedFormat = _appSettings.ToExpectedWaveformFormat();
             var (report, previewData) = await Task.Run(() =>
             {
-                var text = DroppedFilesProcessor.Process(fileList, out var processed);
+                var text = DroppedFilesProcessor.Process(fileList, out var processed, expectedFormat);
                 return (text, processed);
             });
             preview = previewData;
@@ -8600,6 +8606,7 @@ public partial class Form1 : Form, IMessageFilter
             preview.AllowsSessionMarkerEdit,
             preview.SourceSpans,
             sourceNameEditable: !preview.IsMultiWaveOnly);
+        waveformView.SetExpectedWaveformFormat(_appSettings.ToExpectedWaveformFormat());
         if (preview.IsMultiWaveOnly)
         {
             waveformView.SetSourceDisplayName(WwiseObjectNames.MultiWaveContainerName);
@@ -11516,7 +11523,10 @@ public partial class Form1 : Form, IMessageFilter
         if (t.StartsWith("Message : マーカー名を変更しました:", StringComparison.Ordinal)
             || t.StartsWith("Message : Marker renamed:", StringComparison.OrdinalIgnoreCase)
             || t.StartsWith("Message : 新しいバージョンがあります:", StringComparison.Ordinal)
-            || t.StartsWith("Message : Update available:", StringComparison.OrdinalIgnoreCase))
+            || t.StartsWith("Message : Update available:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Message : 規定フォーマット", StringComparison.Ordinal)
+            || t.StartsWith("Message : Wave format differs from expected", StringComparison.OrdinalIgnoreCase)
+            || t.Contains(UiStrings.LogWaveFormatOffSpecSuffix, StringComparison.Ordinal))
         {
             return UiColors.LogWarning;
         }

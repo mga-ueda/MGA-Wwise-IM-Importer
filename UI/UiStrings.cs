@@ -64,8 +64,8 @@ internal static class UiStrings
         "Current: English. Click to switch to Japanese.");
 
     public static string TipAudioSettings => Get(
-        "音声出力とフェードカーブの既定値を設定します。",
-        "Configure audio output and default fade curves.");
+        "音声出力・フェードカーブ既定・規定波形フォーマットを設定します。",
+        "Configure audio output, default fade curves, and the expected waveform format.");
 
     public static string AccessibleAudioSettingsButton => Get(
         "設定",
@@ -78,6 +78,38 @@ internal static class UiStrings
     public static string LabelFadeCurveDefaults => Get(
         "フェードカーブ既定",
         "Default Fade Curves");
+
+    public static string LabelExpectedWaveformFormat => Get(
+        "規定波形フォーマット",
+        "Expected Waveform Format");
+
+    public static string LabelExpectedSampleRateHz => Get(
+        "Sample Rate (Hz)",
+        "Sample Rate (Hz)");
+
+    public static string LabelExpectedBitDepth => Get(
+        "Bit Depth",
+        "Bit Depth");
+
+    public static string LabelExpectedChannels => Get(
+        "Channels",
+        "Channels");
+
+    public static string TipExpectedWaveformFormat => Get(
+        "ドロップした WAV がこの規定と一致しないとき、波形ビューとログを警告色で示します。"
+        + " 数値は手入力です（既定 48000 / 24 / 2）。",
+        "When a dropped WAV differs from this expected format, the waveform view and log use the warning color."
+        + " Enter values manually (default 48000 / 24 / 2).");
+
+    public static string LogWaveFormatOffSpecSuffix => Get(
+        "[規定外]",
+        "[off-spec]");
+
+    public static string LogWaveFormatOffSpec(string expected, string actual) => Format(
+        "Message : 規定フォーマット（{0}）と異なります: {1}",
+        "Message : Wave format differs from expected ({0}): {1}",
+        expected,
+        actual);
 
     public static string LabelDefaultWaveformFadeIn => Get(
         "波形フェードイン",
@@ -2617,6 +2649,7 @@ internal static class UiStrings
     public static string LabelChannels => Get("Channels       :", "Channels       :");
     public static string LabelSampleRate => Get("Sample Rate    :", "Sample Rate    :");
     public static string LabelBitDepth => Get("Bit Depth      :", "Bit Depth      :");
+    public static string LabelWaveFormatCompact => Get("Wave Format    :", "Wave Format    :");
     public static string LabelBlockAlign => Get("Block Align    :", "Block Align    :");
     public static string LabelByteRate => Get("Byte Rate      :", "Byte Rate      :");
     public static string LabelDataSize => Get("Data Size      :", "Data Size      :");

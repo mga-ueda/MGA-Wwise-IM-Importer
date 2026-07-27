@@ -11,7 +11,8 @@ internal static class MultiWaveOnlyProcessor
 {
     public static WaveformPreviewData? TryBuild(
         IReadOnlyList<string> wavPaths,
-        StringBuilder sb)
+        StringBuilder sb,
+        ExpectedWaveformFormat? expectedFormat = null)
     {
         if (wavPaths.Count < 2)
         {
@@ -37,7 +38,7 @@ internal static class MultiWaveOnlyProcessor
             {
                 var info = WavFileInfo.Read(wavPath);
                 infos.Add(info);
-                sb.AppendLine(info.ToDisplayText());
+                sb.AppendLine(info.ToDisplayText(expectedFormat));
             }
             catch (Exception ex)
             {

@@ -117,16 +117,31 @@ internal sealed class WavFileInfo
         };
     }
 
-    public string ToDisplayText()
+    public string ToDisplayText(ExpectedWaveformFormat? expectedFormat = null)
     {
+        var offSpec = expectedFormat is { } expected && !expected.Matches(this);
+        var suffix = offSpec ? $"  {UiStrings.LogWaveFormatOffSpecSuffix}" : string.Empty;
+        var expectedChannels = expectedFormat?.Channels;
+        var expectedRate = expectedFormat?.SampleRateHz;
+        var expectedBits = expectedFormat?.BitsPerSample;
+
         var sb = new StringBuilder();
         sb.AppendLine(UiStrings.LogWaveHeader);
         sb.AppendLine($"{UiStrings.LabelWavPath} {Path}");
         sb.AppendLine($"{UiStrings.LabelFileSize} {FileSizeBytes:N0} bytes");
         sb.AppendLine($"{UiStrings.LabelFormat} {AudioFormatName} ({AudioFormat})");
-        sb.AppendLine($"{UiStrings.LabelChannels} {Channels}");
-        sb.AppendLine($"{UiStrings.LabelSampleRate} {SampleRate} Hz");
-        sb.AppendLine($"{UiStrings.LabelBitDepth} {BitsPerSample} bit");
+        sb.AppendLine(
+            $"{UiStrings.LabelChannels} {Channels}"
+            + (expectedChannels is ushort ch && Channels != ch ? suffix : string.Empty));
+        sb.AppendLine(
+            $"{UiStrings.LabelSampleRate} {SampleRate} Hz"
+            + (expectedRate is uint rate && SampleRate != rate ? suffix : string.Empty));
+        sb.AppendLine(
+            $"{UiStrings.LabelBitDepth} {BitsPerSample} bit"
+            + (expectedBits is ushort bits && BitsPerSample != bits ? suffix : string.Empty));
+        sb.AppendLine(
+            $"{UiStrings.LabelWaveFormatCompact} {ExpectedWaveformFormat.FormatCompact(this)}"
+            + (offSpec ? suffix : string.Empty));
         sb.AppendLine($"{UiStrings.LabelBlockAlign} {BlockAlign} bytes");
         sb.AppendLine($"{UiStrings.LabelByteRate} {ByteRate:N0} bytes/sec");
         sb.AppendLine($"{UiStrings.LabelDataSize} {DataSizeBytes:N0} bytes");
@@ -134,6 +149,15 @@ internal sealed class WavFileInfo
         sb.AppendLine($"{UiStrings.LabelDuration} {FormatDuration(Duration)}");
         sb.AppendLine($"{UiStrings.LabelIXml} {(HasIXml ? UiStrings.BoolYes : UiStrings.BoolNo)}");
         sb.AppendLine($"{UiStrings.LabelTimeReference} {TimeReferenceSamples:N0} samples");
+        if (offSpec && expectedFormat is { } expectedShown)
+        {
+            sb.AppendLine(UiStrings.LogWarningHeader);
+            sb.AppendLine(
+                UiStrings.LogWaveFormatOffSpec(
+                    expectedShown.ToCompactText(),
+                    ExpectedWaveformFormat.FormatCompact(this)));
+        }
+
         return sb.ToString();
     }
 

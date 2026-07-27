@@ -49,7 +49,22 @@ internal sealed class AppSettings
     public RegionFadeCurveKind DefaultPlaylistFadeOutCurve { get; set; } =
         RegionEdgeFade.BuiltinPlaylistFadeOutCurve;
 
+    /// <summary>規定 Sample Rate（Hz。既定 48000）。</summary>
+    public uint ExpectedSampleRateHz { get; set; } = ExpectedWaveformFormat.Default.SampleRateHz;
+
+    /// <summary>規定 Bit Depth（既定 24）。</summary>
+    public ushort ExpectedBitsPerSample { get; set; } = ExpectedWaveformFormat.Default.BitsPerSample;
+
+    /// <summary>規定チャンネル数（既定 2）。</summary>
+    public ushort ExpectedChannels { get; set; } = ExpectedWaveformFormat.Default.Channels;
+
     public AudioOutputSettings ToAudioOutputSettings() => new(AudioApi, AudioDeviceId ?? string.Empty);
+
+    public ExpectedWaveformFormat ToExpectedWaveformFormat() =>
+        ExpectedWaveformFormat.Normalize(
+            (int)ExpectedSampleRateHz,
+            ExpectedBitsPerSample,
+            ExpectedChannels);
 
     public static AppSettings Load()
     {
@@ -115,6 +130,18 @@ internal sealed class AppSettings
         Save();
     }
 
+    public void SaveExpectedWaveformFormat(ExpectedWaveformFormat format)
+    {
+        var normalized = ExpectedWaveformFormat.Normalize(
+            (int)format.SampleRateHz,
+            format.BitsPerSample,
+            format.Channels);
+        ExpectedSampleRateHz = normalized.SampleRateHz;
+        ExpectedBitsPerSample = normalized.BitsPerSample;
+        ExpectedChannels = normalized.Channels;
+        Save();
+    }
+
     private Dictionary<string, string> ToDictionary() => new(StringComparer.OrdinalIgnoreCase)
     {
         ["AlwaysOnTop"] = AlwaysOnTop ? "1" : "0",
@@ -128,6 +155,9 @@ internal sealed class AppSettings
         ["DefaultWaveformFadeOutCurve"] = DefaultWaveformFadeOutCurve.ToString(),
         ["DefaultPlaylistFadeInCurve"] = DefaultPlaylistFadeInCurve.ToString(),
         ["DefaultPlaylistFadeOutCurve"] = DefaultPlaylistFadeOutCurve.ToString(),
+        ["ExpectedSampleRateHz"] = ExpectedSampleRateHz.ToString(CultureInfo.InvariantCulture),
+        ["ExpectedBitsPerSample"] = ExpectedBitsPerSample.ToString(CultureInfo.InvariantCulture),
+        ["ExpectedChannels"] = ExpectedChannels.ToString(CultureInfo.InvariantCulture),
     };
 
     private static AppSettings Parse(Dictionary<string, string> values) => new()
@@ -165,6 +195,18 @@ internal sealed class AppSettings
             values,
             "DefaultPlaylistFadeOutCurve",
             RegionEdgeFade.BuiltinPlaylistFadeOutCurve),
+        ExpectedSampleRateHz = ParseExpectedUInt(
+            values,
+            "ExpectedSampleRateHz",
+            ExpectedWaveformFormat.Default.SampleRateHz),
+        ExpectedBitsPerSample = (ushort)ParseExpectedUInt(
+            values,
+            "ExpectedBitsPerSample",
+            ExpectedWaveformFormat.Default.BitsPerSample),
+        ExpectedChannels = (ushort)ParseExpectedUInt(
+            values,
+            "ExpectedChannels",
+            ExpectedWaveformFormat.Default.Channels),
     };
 
     private static bool HasKnownKeys(Dictionary<string, string> values) =>
@@ -178,7 +220,30 @@ internal sealed class AppSettings
         || values.ContainsKey("DefaultWaveformFadeInCurve")
         || values.ContainsKey("DefaultWaveformFadeOutCurve")
         || values.ContainsKey("DefaultPlaylistFadeInCurve")
-        || values.ContainsKey("DefaultPlaylistFadeOutCurve");
+        || values.ContainsKey("DefaultPlaylistFadeOutCurve")
+        || values.ContainsKey("ExpectedSampleRateHz")
+        || values.ContainsKey("ExpectedBitsPerSample")
+        || values.ContainsKey("ExpectedChannels");
+
+    private static uint ParseExpectedUInt(
+        Dictionary<string, string> values,
+        string key,
+        uint fallback)
+    {
+        if (!values.TryGetValue(key, out var text)
+            || !uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        {
+            return fallback;
+        }
+
+        return key switch
+        {
+            "ExpectedSampleRateHz" => ExpectedWaveformFormat.Normalize((int)value, 24, 2).SampleRateHz,
+            "ExpectedBitsPerSample" => ExpectedWaveformFormat.Normalize(48_000, (int)value, 2).BitsPerSample,
+            "ExpectedChannels" => ExpectedWaveformFormat.Normalize(48_000, 24, (int)value).Channels,
+            _ => value,
+        };
+    }
 
     private static RegionFadeCurveKind ParseFadeCurve(
         Dictionary<string, string> values,

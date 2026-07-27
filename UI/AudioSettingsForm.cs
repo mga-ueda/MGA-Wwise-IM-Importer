@@ -1,9 +1,10 @@
-﻿using MgaWwiseIMImporter.Wave;
+﻿using System.Globalization;
+using MgaWwiseIMImporter.Wave;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// 再生出力とフェードカーブ既定値の設定ダイアログ。
+/// 再生出力・フェードカーブ既定・規定波形フォーマットの設定ダイアログ。
 /// </summary>
 internal sealed class AudioSettingsForm : Form
 {
@@ -16,6 +17,13 @@ internal sealed class AudioSettingsForm : Form
     private readonly FadeCurveRow _waveformFadeOutRow;
     private readonly FadeCurveRow _playlistFadeInRow;
     private readonly FadeCurveRow _playlistFadeOutRow;
+    private readonly SectionHeaderLabel _expectedFormatHeader;
+    private readonly Label _expectedSampleRateLabel;
+    private readonly Label _expectedBitDepthLabel;
+    private readonly Label _expectedChannelsLabel;
+    private readonly TextBox _expectedSampleRateTextBox;
+    private readonly TextBox _expectedBitDepthTextBox;
+    private readonly TextBox _expectedChannelsTextBox;
     private readonly RoundedButton _okButton;
     private readonly RoundedButton _cancelButton;
     private ContextMenuStrip? _fadeCurveMenu;
@@ -31,14 +39,18 @@ internal sealed class AudioSettingsForm : Form
 
     public RegionFadeCurveKind PlaylistFadeOutCurve => _playlistFadeOutRow.Curve;
 
+    public ExpectedWaveformFormat SelectedExpectedFormat { get; private set; }
+
     public AudioSettingsForm(
         AudioOutputSettings current,
         RegionFadeCurveKind waveformFadeIn,
         RegionFadeCurveKind waveformFadeOut,
         RegionFadeCurveKind playlistFadeIn,
-        RegionFadeCurveKind playlistFadeOut)
+        RegionFadeCurveKind playlistFadeOut,
+        ExpectedWaveformFormat expectedFormat)
     {
         SelectedSettings = current;
+        SelectedExpectedFormat = expectedFormat;
 
         Text = UiStrings.DialogSettingsTitle;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -163,10 +175,83 @@ internal sealed class AudioSettingsForm : Form
             playlistFadeOut,
             isFadeIn: false);
 
+        var expectedHeaderY = rowY + rowHeight + sectionGap;
+        _expectedFormatHeader = new SectionHeaderLabel
+        {
+            Location = new Point(left, expectedHeaderY),
+            Size = new Size(fieldWidth, fadeHeaderHeight),
+            Text = UiStrings.LabelExpectedWaveformFormat,
+            Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold),
+            ForeColor = UiColors.PrimaryFore,
+            BackColor = BackColor,
+            BarColor = UiColors.ForControlBack(UiColors.SectionHeaderBack),
+            BarMarginTop = 3,
+            BarMarginBottom = 3,
+            Padding = new Padding(S(10), 0, S(4), 0),
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
+        TipService.Set(_expectedFormatHeader, UiStrings.TipExpectedWaveformFormat);
+
+        const int expectedBoxWidth = 108;
+        const int expectedLabelGap = 10;
+        var expectedLabelWidth = fieldWidth - expectedBoxWidth - expectedLabelGap;
+        var expectedRowY = expectedHeaderY + fadeHeaderHeight + S(4);
+
+        _expectedSampleRateLabel = CreateExpectedFieldLabel(
+            left,
+            expectedRowY,
+            expectedLabelWidth,
+            rowHeight,
+            UiStrings.LabelExpectedSampleRateHz);
+        _expectedSampleRateTextBox = CreateExpectedNumberTextBox(
+            left + expectedLabelWidth + expectedLabelGap,
+            expectedRowY,
+            expectedBoxWidth,
+            rowHeight,
+            maxLength: 6);
+        expectedRowY += rowHeight + rowGap;
+
+        _expectedBitDepthLabel = CreateExpectedFieldLabel(
+            left,
+            expectedRowY,
+            expectedLabelWidth,
+            rowHeight,
+            UiStrings.LabelExpectedBitDepth);
+        _expectedBitDepthTextBox = CreateExpectedNumberTextBox(
+            left + expectedLabelWidth + expectedLabelGap,
+            expectedRowY,
+            expectedBoxWidth,
+            rowHeight,
+            maxLength: 2);
+        expectedRowY += rowHeight + rowGap;
+
+        _expectedChannelsLabel = CreateExpectedFieldLabel(
+            left,
+            expectedRowY,
+            expectedLabelWidth,
+            rowHeight,
+            UiStrings.LabelExpectedChannels);
+        _expectedChannelsTextBox = CreateExpectedNumberTextBox(
+            left + expectedLabelWidth + expectedLabelGap,
+            expectedRowY,
+            expectedBoxWidth,
+            rowHeight,
+            maxLength: 2);
+
+        _expectedSampleRateTextBox.Text = expectedFormat.SampleRateHz.ToString(CultureInfo.InvariantCulture);
+        _expectedBitDepthTextBox.Text = expectedFormat.BitsPerSample.ToString(CultureInfo.InvariantCulture);
+        _expectedChannelsTextBox.Text = expectedFormat.Channels.ToString(CultureInfo.InvariantCulture);
+        TipService.Set(_expectedSampleRateLabel, UiStrings.TipExpectedWaveformFormat);
+        TipService.Set(_expectedBitDepthLabel, UiStrings.TipExpectedWaveformFormat);
+        TipService.Set(_expectedChannelsLabel, UiStrings.TipExpectedWaveformFormat);
+        TipService.Set(_expectedSampleRateTextBox, UiStrings.TipExpectedWaveformFormat);
+        TipService.Set(_expectedBitDepthTextBox, UiStrings.TipExpectedWaveformFormat);
+        TipService.Set(_expectedChannelsTextBox, UiStrings.TipExpectedWaveformFormat);
+
         const int buttonWidth = 108;
         const int buttonHeight = 34;
         const int buttonGap = 12;
-        var buttonY = rowY + rowHeight + sectionGap;
+        var buttonY = expectedRowY + rowHeight + sectionGap;
         var cancelX = left + fieldWidth - buttonWidth;
         var okX = cancelX - buttonGap - buttonWidth;
 
@@ -188,6 +273,13 @@ internal sealed class AudioSettingsForm : Form
         Controls.Add(_waveformFadeOutRow.Host);
         Controls.Add(_playlistFadeInRow.Host);
         Controls.Add(_playlistFadeOutRow.Host);
+        Controls.Add(_expectedFormatHeader);
+        Controls.Add(_expectedSampleRateLabel);
+        Controls.Add(_expectedBitDepthLabel);
+        Controls.Add(_expectedChannelsLabel);
+        Controls.Add(_expectedSampleRateTextBox);
+        Controls.Add(_expectedBitDepthTextBox);
+        Controls.Add(_expectedChannelsTextBox);
         Controls.Add(_okButton);
         Controls.Add(_cancelButton);
 
@@ -250,6 +342,77 @@ internal sealed class AudioSettingsForm : Form
         host.Controls.Add(icon);
         return row;
     }
+
+    private Label CreateExpectedFieldLabel(int x, int y, int width, int height, string text) => new()
+    {
+        AutoSize = false,
+        Location = new Point(x, y),
+        Size = new Size(width, height),
+        Text = text,
+        TextAlign = ContentAlignment.MiddleLeft,
+        ForeColor = UiColors.PrimaryFore,
+        BackColor = BackColor,
+    };
+
+    private TextBox CreateExpectedNumberTextBox(int x, int y, int width, int rowHeight, int maxLength)
+    {
+        var textBox = new TextBox
+        {
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = Font,
+            Size = new Size(width, 26),
+            TextAlign = HorizontalAlignment.Center,
+            MaxLength = maxLength,
+            BackColor = UiColors.ForControlBack(UiColors.ProjectBarInputBack),
+            ForeColor = UiColors.ProjectBarInputFore,
+        };
+        textBox.Location = new Point(x, y + Math.Max(0, (rowHeight - textBox.Height) / 2));
+        textBox.KeyPress += ExpectedNumberTextBox_KeyPress;
+        textBox.Leave += ExpectedNumberTextBox_Leave;
+        return textBox;
+    }
+
+    private static void ExpectedNumberTextBox_KeyPress(object? sender, KeyPressEventArgs e)
+    {
+        if (char.IsControl(e.KeyChar) || char.IsDigit(e.KeyChar))
+        {
+            return;
+        }
+
+        e.Handled = true;
+    }
+
+    private void ExpectedNumberTextBox_Leave(object? sender, EventArgs e)
+    {
+        if (sender is not TextBox textBox)
+        {
+            return;
+        }
+
+        var format = ReadExpectedFormatFromFields();
+        _expectedSampleRateTextBox.Text = format.SampleRateHz.ToString(CultureInfo.InvariantCulture);
+        _expectedBitDepthTextBox.Text = format.BitsPerSample.ToString(CultureInfo.InvariantCulture);
+        _expectedChannelsTextBox.Text = format.Channels.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private ExpectedWaveformFormat ReadExpectedFormatFromFields()
+    {
+        var rate = TryParsePositiveInt(
+            _expectedSampleRateTextBox.Text,
+            (int)SelectedExpectedFormat.SampleRateHz);
+        var bits = TryParsePositiveInt(
+            _expectedBitDepthTextBox.Text,
+            SelectedExpectedFormat.BitsPerSample);
+        var channels = TryParsePositiveInt(
+            _expectedChannelsTextBox.Text,
+            SelectedExpectedFormat.Channels);
+        return ExpectedWaveformFormat.Normalize(rate, bits, channels);
+    }
+
+    private static int TryParsePositiveInt(string? text, int fallback) =>
+        int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) && value > 0
+            ? value
+            : fallback;
 
     private static void WireFadeCurveIconHover(PictureBox icon) =>
         ControlHoverChrome.WireBackColor(
@@ -388,6 +551,7 @@ internal sealed class AudioSettingsForm : Form
         }
 
         SelectedSettings = new AudioOutputSettings(api, deviceId);
+        SelectedExpectedFormat = ReadExpectedFormatFromFields();
     }
 
     private void SelectApi(AudioOutputApi api)

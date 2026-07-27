@@ -88,6 +88,7 @@ internal sealed class WaveformView : Control
     private WavFileInfo? _wavInfo;
     private string _sourcePath = string.Empty;
     private IReadOnlyList<WaveformSourceSpan> _sourceSpans = [];
+    private ExpectedWaveformFormat _expectedWaveformFormat = ExpectedWaveformFormat.Default;
     private string _sourceDisplayName = string.Empty;
     private bool _sourceNameEditable = true;
     private TextBox? _sourceNameEditor;
@@ -310,6 +311,22 @@ internal sealed class WaveformView : Control
         _holdScaffold = false;
         Invalidate();
         TimeViewChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>規定波形フォーマットを設定し、Playlist 左下の表示色を更新する。</summary>
+    public void SetExpectedWaveformFormat(ExpectedWaveformFormat format)
+    {
+        var normalized = ExpectedWaveformFormat.Normalize(
+            (int)format.SampleRateHz,
+            format.BitsPerSample,
+            format.Channels);
+        if (_expectedWaveformFormat.Equals(normalized))
+        {
+            return;
+        }
+
+        _expectedWaveformFormat = normalized;
+        RebuildPresentationLayers(clearDetailPeaks: false);
     }
 
     public void SetMarkers(IReadOnlyList<WaveformMarkerMark> markers)
@@ -3754,6 +3771,8 @@ internal sealed class WaveformView : Control
         DrawAltMarkerPairDragGuides(g, timeline);
         DrawMouseGuide(g, timeline);
         DrawPlaylistGroupNameLaneOverlays(g);
+        // フォーマット表示は最前面（グループ色・-R・シークバーより上）。
+        DrawPlaylistFormatLabelsTopmost(g);
     }
 
     /// <summary>
@@ -5523,6 +5542,146 @@ internal sealed class WaveformView : Control
         }
 
         DrawTimedNameLane(g, wave, playlistLane, items, FontStyle.Bold, UiColors.MusicPlaylistLaneBg);
+    }
+
+    /// <summary>
+    /// 各 Playlist 区間の波形左下へ "48kHz 24bit 2ch" を最前面描画する。
+    /// 規定フォーマットと異なる場合は警告色。影ではなく黒縁。
+    /// 幅に収まらないときは横圧縮せずフォントサイズを下げる。
+    /// </summary>
+    private void DrawPlaylistFormatLabelsTopmost(Graphics g)
+    {
+        if (_peaks is null
+            || _peaks.IsEmpty
+            || _peaks.FrameCount <= 0
+            || _outputParts.Count == 0)
+        {
+            return;
+        }
+
+        var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var (_, _, wave, _, _, _) = GetLayout(content, g);
+        if (wave.Width <= 0 || wave.Height <= 0)
+        {
+            return;
+        }
+
+        var frameCount = _peaks.FrameCount;
+        // 波形ビュー共通の Yu Gothic UI（ボールドなし）。
+        const FontStyle fontStyle = FontStyle.Regular;
+        var idealFontSize = Font.Size;
+        const float minFontSize = 0.5f;
+        const float leftPad = 4f;
+        const float bottomPad = 3f;
+
+        using var normalBrush = new SolidBrush(UiColors.OutputPartFg);
+        using var warningBrush = new SolidBrush(UiColors.LogWarning);
+        using var outlineBrush = new SolidBrush(Color.Black);
+
+        foreach (var part in _outputParts)
+        {
+            if (_disabledPlaylistPartNumbers.Contains(part.Number))
+            {
+                continue;
+            }
+
+            if (ResolvePartWavInfo(part) is not { } wavInfo)
+            {
+                continue;
+            }
+
+            var a0 = SampleToAbsolute(part.StartSampleOffset, frameCount);
+            var a1 = SampleToAbsolute(part.EndSampleOffset, frameCount);
+            if (!TryMapAbsoluteRange(a0, a1, wave, out var x0, out var x1))
+            {
+                continue;
+            }
+
+            var slotWidth = Math.Max(1f, x1 - x0);
+            if (slotWidth < 8f)
+            {
+                continue;
+            }
+
+            var text = ExpectedWaveformFormat.FormatCompact(wavInfo);
+            var available = Math.Max(1f, slotWidth - leftPad);
+            var fontSize = idealFontSize;
+            using (var probe = new Font(Font.FontFamily, idealFontSize, fontStyle))
+            {
+                var idealWidth = g.MeasureString(text, probe).Width;
+                if (idealWidth > available && idealWidth > 0.01f)
+                {
+                    fontSize = Math.Max(minFontSize, idealFontSize * available / idealWidth);
+                }
+            }
+
+            // 測定誤差でまだはみ出す場合はさらに縮小
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                using var measureFont = new Font(Font.FontFamily, fontSize, fontStyle);
+                var measured = g.MeasureString(text, measureFont).Width;
+                if (measured <= available || measured <= 0.01f)
+                {
+                    break;
+                }
+
+                fontSize = Math.Max(minFontSize, fontSize * available / measured);
+            }
+
+            using var labelFont = new Font(Font.FontFamily, fontSize, fontStyle);
+            var labelHeight = labelFont.GetHeight(g);
+            var y = wave.Bottom - labelHeight - bottomPad;
+            if (y < wave.Top)
+            {
+                y = wave.Top;
+            }
+
+            var x = x0 + leftPad;
+            var fill = _expectedWaveformFormat.Matches(wavInfo) ? normalBrush : warningBrush;
+            DrawOutlinedString(g, text, labelFont, fill, outlineBrush, x, y);
+        }
+    }
+
+    /// <summary>黒縁＋本体色で文字列を描く（影は使わない）。</summary>
+    private static void DrawOutlinedString(
+        Graphics g,
+        string text,
+        Font font,
+        Brush fill,
+        Brush outline,
+        float x,
+        float y)
+    {
+        for (var dx = -1; dx <= 1; dx++)
+        {
+            for (var dy = -1; dy <= 1; dy++)
+            {
+                if (dx == 0 && dy == 0)
+                {
+                    continue;
+                }
+
+                g.DrawString(text, font, outline, x + dx, y + dy);
+            }
+        }
+
+        g.DrawString(text, font, fill, x, y);
+    }
+
+    private WavFileInfo? ResolvePartWavInfo(WaveformOutputPart part)
+    {
+        if (!string.IsNullOrEmpty(part.SourcePath) && _sourceSpans.Count > 0)
+        {
+            foreach (var span in _sourceSpans)
+            {
+                if (string.Equals(span.Path, part.SourcePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return span.WavInfo;
+                }
+            }
+        }
+
+        return _wavInfo;
     }
 
     private void DrawSegmentNameLabels(Graphics g, Rectangle wave, Rectangle segmentLane)
