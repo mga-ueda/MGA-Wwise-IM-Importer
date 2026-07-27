@@ -842,6 +842,19 @@ internal static class UiStrings
         "[Z] 波形表示エリアの高さを切替（1倍→2倍→3倍）",
         "[Z] Cycle waveform height (1×→2×→3×)");
 
+    public static string TipTransportMetronome => Get(
+        "[C] メトロノームのオン／オフ（音符またはテンポ。波形再生の拍に同期。テンポ／拍子があるとき）"
+        + Environment.NewLine
+        + "ホイール … 音量（最大〜10%、10% 刻み。既定 30%。アプリ設定に保存）",
+        "[C] Toggle metronome (note or tempo; synced to waveform playback beats when tempo / time signature is available)"
+        + Environment.NewLine
+        + "Wheel … volume (max to 10%, 10% steps; default 30%; saved in app settings)");
+
+    public static string TipMetronomeVolume(int percent) => Format(
+        "メトロノーム音量 {0}%",
+        "Metronome volume {0}%",
+        percent);
+
     public static string TipForTransportCommand(
         TransportCommand command,
         bool waveOnlyViewStep = false,

@@ -120,6 +120,9 @@ public partial class Form1 : Form, IMessageFilter
     private const int WaapiConnectedPollMs = 1500;
     private const int WaapiDisconnectedPollMs = 3000;
     private readonly WaveAudioPlayer _audioPlayer = new();
+    private readonly MetronomePlayer? _metronomePlayer = MetronomePlayer.TryCreate();
+    private readonly object _metronomeVolumeTipSource = new();
+    private readonly System.Windows.Forms.Timer _metronomeVolumeTipTimer = new() { Interval = 1000 };
     private readonly System.Windows.Forms.Timer _playheadTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer _playlistBlinkTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer _playlistTransitionGlowTimer = new() { Interval = 16 };
@@ -320,6 +323,22 @@ public partial class Form1 : Form, IMessageFilter
         _waveformHostBaseHeight = Math.Max(1, waveformHostPanel.Height);
         WireRightSideContentHost();
         transportBar.CommandHoldEnded += TransportBar_CommandHoldEnded;
+        transportBar.MetronomeInvoked += (_, _) => TryToggleMetronome();
+        _metronomeVolumeTipTimer.Tick += (_, _) =>
+        {
+            _metronomeVolumeTipTimer.Stop();
+            TipService.Clear(_metronomeVolumeTipSource);
+            transportBar.RestoreMetronomeTipIfHovered();
+        };
+        if (_metronomePlayer is not null)
+        {
+            _audioPlayer.SetMetronomeClicks(
+                _metronomePlayer.HighSamples,
+                _metronomePlayer.LowSamples,
+                _metronomePlayer.SampleRate);
+            ApplyMetronomeVolumeFromSettings();
+        }
+
         UiStrings.SetLanguage(_appSettings.UiLanguage);
         ApplyLocalizedUiText();
         UiStrings.LanguageChanged += (_, _) =>
@@ -1395,7 +1414,11 @@ public partial class Form1 : Form, IMessageFilter
         _exportOverlay?.HideOverlay();
         _exportOverlay?.Dispose();
         _exportOverlay = null;
+        _metronomeVolumeTipTimer.Stop();
+        TipService.Clear(_metronomeVolumeTipSource);
         _audioPlayer.Dispose();
+        _metronomePlayer?.Dispose();
+        _metronomeVolumeTipTimer.Dispose();
         _waapiSelectionTimer.Dispose();
         _playheadTimer.Dispose();
         _playlistBlinkTimer.Dispose();
@@ -1668,8 +1691,15 @@ public partial class Form1 : Form, IMessageFilter
             return true;
         }
 
-        if ((keyData == Keys.C
-                || keyData == Keys.OemPeriod
+        if (keyData == Keys.C && !IsTextEntryFocusActive())
+        {
+            if (TryToggleMetronome())
+            {
+                return true;
+            }
+        }
+
+        if ((keyData == Keys.OemPeriod
                 || keyData == Keys.Decimal)
             && !IsTextEntryFocusActive())
         {
@@ -2572,6 +2602,7 @@ public partial class Form1 : Form, IMessageFilter
             TipService.Enabled = _appSettings.ShowTips;
             tipsToggleButton.Checked = _appSettings.ShowTips;
             _audioPlayer.ApplyOutputSettings(_appSettings.ToAudioOutputSettings());
+            ApplyMetronomeVolumeFromSettings();
             ApplyWaveformFadeCurveDefaults();
             ApplyWaveformHeightScale(adjustFormHeight: false);
         }
@@ -3562,6 +3593,7 @@ public partial class Form1 : Form, IMessageFilter
         _exportGeneration++;
         _playheadTimer.Stop();
         _audioPlayer.Clear();
+        ApplyMetronomeBarsFromPreview(null);
         waveformView.ClearPreview();
         _loadedPreview = null;
         _previewSession = null;
@@ -8615,6 +8647,7 @@ public partial class Form1 : Form, IMessageFilter
         waveformView.SetPlayhead(0, recordTrail: false);
 
         _loadedPreview = preview;
+        ApplyMetronomeBarsFromPreview(preview);
         var loadedWavePaths = LastWaveSessionState.GetLoadedWavePaths(preview);
         // 初回（直前なし）はサイドカー復元可。直前があり別セットなら破棄のまま復元しない。
         var sameAsPreviousWave = previousWavePaths.Count == 0
@@ -10004,6 +10037,97 @@ public partial class Form1 : Form, IMessageFilter
     private void UpdateTransportPlaybackState()
     {
         transportBar.IsPlaying = _audioPlayer.IsPlaying;
+    }
+
+    /// <summary>
+    /// XML 由来のテンポ／拍子があるとき、メトロノームのオン／オフを切り替える（既定オフ）。
+    /// オン時は再生ヘッドの拍に同期してクリックする。
+    /// </summary>
+    private bool TryToggleMetronome()
+    {
+        if (_uiInteractionLocks != UiInteractionLock.None
+            || _metronomePlayer is null
+            || !HasTransportBarNavigation())
+        {
+            return false;
+        }
+
+        transportBar.IsMetronomeEnabled = !transportBar.IsMetronomeEnabled;
+        _audioPlayer.SetMetronomeEnabled(transportBar.IsMetronomeEnabled);
+        transportBar.PulseMetronomeFeedback();
+        ReleaseFocusToWaveform();
+        return true;
+    }
+
+    /// <summary>
+    /// 音符＋テンポ上のホイールでメトロノーム音量を変える（下限 10%〜最大、10% 刻み。アプリ設定に保存）。
+    /// </summary>
+    private bool TryAdjustMetronomeVolume(int wheelDelta)
+    {
+        if (_uiInteractionLocks != UiInteractionLock.None
+            || _metronomePlayer is null
+            || !HasTransportBarNavigation())
+        {
+            return false;
+        }
+
+        if (!_metronomePlayer.TryAdjustVolume(wheelDelta))
+        {
+            ShowMetronomeVolumeTip();
+            return true;
+        }
+
+        _appSettings.SaveMetronomeVolume(_metronomePlayer.Volume);
+        _audioPlayer.SetMetronomeVolume(_metronomePlayer.Volume);
+        transportBar.PulseMetronomeFeedback();
+        // 変更後の音量をすぐ確認できるよう 1 クリック鳴らす（確認用は別経路）。
+        _metronomePlayer.PlayClick(accent: true);
+        ShowMetronomeVolumeTip();
+        return true;
+    }
+
+    private void ApplyMetronomeVolumeFromSettings()
+    {
+        var volume = AppSettings.NormalizeMetronomeVolume(_appSettings.MetronomeVolume);
+        _appSettings.MetronomeVolume = volume;
+        if (_metronomePlayer is not null)
+        {
+            _metronomePlayer.Volume = volume;
+        }
+
+        _audioPlayer.SetMetronomeVolume(volume);
+    }
+
+    private void ShowMetronomeVolumeTip()
+    {
+        if (_metronomePlayer is null)
+        {
+            return;
+        }
+
+        var percent = (int)Math.Round(_metronomePlayer.Volume * 100d);
+        TipService.Show(
+            UiStrings.TipMetronomeVolume(percent),
+            _metronomeVolumeTipSource);
+        _metronomeVolumeTipTimer.Stop();
+        _metronomeVolumeTipTimer.Start();
+    }
+
+    private void ApplyMetronomeBarsFromPreview(WaveformPreviewData? preview)
+    {
+        if (preview is { Bars.Count: > 0 })
+        {
+            _audioPlayer.SetMetronomeBars(preview.Bars);
+            return;
+        }
+
+        _audioPlayer.SetMetronomeBars([]);
+        if (transportBar.IsMetronomeEnabled)
+        {
+            transportBar.IsMetronomeEnabled = false;
+        }
+
+        _audioPlayer.SetMetronomeEnabled(false);
     }
 
     private void UpdateTransportPosition()
@@ -11639,42 +11763,53 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        if (m.Msg == wmMouseWheel && !IsDisposed && waveformView is { IsDisposed: false })
+        if (m.Msg == wmMouseWheel && !IsDisposed)
         {
             var screenPoint = Control.MousePosition;
-            var waveScreen = waveformView.RectangleToScreen(waveformView.ClientRectangle);
-            if (waveScreen.Contains(screenPoint))
-            {
-                // high word of wParam is signed wheel delta
-                var wheelDelta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
-                if ((ModifierKeys & Keys.Control) == Keys.Control)
-                {
-                    waveformView.ZoomAmpByWheel(wheelDelta);
-                    transportBar.PulseCommandFeedback(
-                        wheelDelta > 0
-                            ? TransportCommand.AmpZoomIn
-                            : TransportCommand.AmpZoomOut);
-                }
-                else if ((ModifierKeys & Keys.Shift) == Keys.Shift)
-                {
-                    waveformView.PanTimeByWheel(wheelDelta);
-                    transportBar.PulseCommandFeedback(
-                        wheelDelta > 0
-                            ? TransportCommand.PreviousPage
-                            : TransportCommand.NextPage);
-                }
-                else
-                {
-                    var client = waveformView.PointToClient(screenPoint);
-                    waveformView.ZoomTimeByWheel(wheelDelta, client.X);
-                    transportBar.PulseCommandFeedback(
-                        wheelDelta > 0
-                            ? TransportCommand.TimeZoomIn
-                            : TransportCommand.TimeZoomOut);
-                }
+            var wheelDelta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
 
+            if (transportBar is { IsDisposed: false }
+                && transportBar.IsMetronomeHitAtScreenPoint(screenPoint)
+                && TryAdjustMetronomeVolume(wheelDelta))
+            {
                 m.Result = IntPtr.Zero;
                 return;
+            }
+
+            if (waveformView is { IsDisposed: false })
+            {
+                var waveScreen = waveformView.RectangleToScreen(waveformView.ClientRectangle);
+                if (waveScreen.Contains(screenPoint))
+                {
+                    if ((ModifierKeys & Keys.Control) == Keys.Control)
+                    {
+                        waveformView.ZoomAmpByWheel(wheelDelta);
+                        transportBar.PulseCommandFeedback(
+                            wheelDelta > 0
+                                ? TransportCommand.AmpZoomIn
+                                : TransportCommand.AmpZoomOut);
+                    }
+                    else if ((ModifierKeys & Keys.Shift) == Keys.Shift)
+                    {
+                        waveformView.PanTimeByWheel(wheelDelta);
+                        transportBar.PulseCommandFeedback(
+                            wheelDelta > 0
+                                ? TransportCommand.PreviousPage
+                                : TransportCommand.NextPage);
+                    }
+                    else
+                    {
+                        var client = waveformView.PointToClient(screenPoint);
+                        waveformView.ZoomTimeByWheel(wheelDelta, client.X);
+                        transportBar.PulseCommandFeedback(
+                            wheelDelta > 0
+                                ? TransportCommand.TimeZoomIn
+                                : TransportCommand.TimeZoomOut);
+                    }
+
+                    m.Result = IntPtr.Zero;
+                    return;
+                }
             }
         }
 

@@ -49,6 +49,12 @@ internal sealed class WaveAudioPlayer : IDisposable
     private LoopPlaybackPlan[] _loopPlans = [];
     private LoopPlaybackPlan? _activePlan;
     private AudioOutputSettings _outputSettings = AudioOutputSettings.Default;
+    private float[] _metronomeHigh = [];
+    private float[] _metronomeLow = [];
+    private int _metronomeClickSampleRate;
+    private bool _metronomeEnabled;
+    private float _metronomeVolume = MetronomePlayer.DefaultVolume;
+    private IReadOnlyList<WaveformBarMark> _metronomeBars = [];
 
     public event EventHandler? PlaybackEnded;
     public event EventHandler<string>? Diagnostic;
@@ -844,7 +850,81 @@ internal sealed class WaveAudioPlayer : IDisposable
             message => Trace(message));
         _provider.SetPlayExitLayer(_playExitLayer);
         PushActivePlanToProvider();
+        ApplyMetronomeToProvider();
         InitOutputDevice();
+    }
+
+    /// <summary>メトロノームクリック波形（ソース SR）を登録する。再生側で出力 SR へリサンプルする。</summary>
+    public void SetMetronomeClicks(IReadOnlyList<float> high, IReadOnlyList<float> low, int sampleRate)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (sampleRate <= 0)
+        {
+            _metronomeHigh = [];
+            _metronomeLow = [];
+            _metronomeClickSampleRate = 0;
+        }
+        else
+        {
+            _metronomeHigh = MetronomePlayer.ResampleMono(high, sampleRate, sampleRate);
+            _metronomeLow = MetronomePlayer.ResampleMono(low, sampleRate, sampleRate);
+            _metronomeClickSampleRate = sampleRate;
+        }
+
+        ApplyMetronomeToProvider();
+    }
+
+    public void SetMetronomeEnabled(bool enabled)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _metronomeEnabled = enabled;
+        _provider?.SetMetronomeEnabled(enabled);
+    }
+
+    public void SetMetronomeVolume(float volume)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _metronomeVolume = Math.Clamp(volume, MetronomePlayer.MinVolume, MetronomePlayer.MaxVolume);
+        _provider?.SetMetronomeVolume(_metronomeVolume);
+    }
+
+    public void SetMetronomeBars(IReadOnlyList<WaveformBarMark> bars)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _metronomeBars = bars ?? [];
+        _provider?.SetMetronomeBars(_metronomeBars);
+    }
+
+    private void ApplyMetronomeToProvider()
+    {
+        if (_provider is null)
+        {
+            return;
+        }
+
+        if (_metronomeClickSampleRate <= 0
+            || _metronomeHigh.Length == 0
+            || _metronomeLow.Length == 0)
+        {
+            _provider.SetMetronomeClicks([], []);
+        }
+        else
+        {
+            var targetRate = _provider.WaveFormat.SampleRate;
+            var high = MetronomePlayer.ResampleMono(
+                _metronomeHigh,
+                _metronomeClickSampleRate,
+                targetRate);
+            var low = MetronomePlayer.ResampleMono(
+                _metronomeLow,
+                _metronomeClickSampleRate,
+                targetRate);
+            _provider.SetMetronomeClicks(high, low);
+        }
+
+        _provider.SetMetronomeVolume(_metronomeVolume);
+        _provider.SetMetronomeBars(_metronomeBars);
+        _provider.SetMetronomeEnabled(_metronomeEnabled);
     }
 
     /// <summary>
@@ -1403,6 +1483,22 @@ internal sealed class WaveAudioPlayer : IDisposable
         private long _monitorWriteCount;
         private readonly object _monitorGate = new();
 
+        private bool _metronomeEnabled;
+        private float _metronomeVolume = MetronomePlayer.DefaultVolume;
+        private IReadOnlyList<WaveformBarMark> _metronomeBars = [];
+        private float[] _metronomeHigh = [];
+        private float[] _metronomeLow = [];
+        private float[]? _metronomeActiveClick;
+        private int _metronomeClickPos = -1;
+        private long _metronomeLastAbsSample = -1;
+        private long? _metronomeArmedBeatKey;
+        private long _metronomeCachedBarStart = -1;
+        private long _metronomeCachedBarEnd = -1;
+        private int _metronomeCachedBarNumber;
+        private double _metronomeCachedBpm;
+        private int _metronomeCachedNumerator;
+        private int _metronomeCachedDenominator;
+
         public StereoFloatWaveProvider(
             WaveFileReader source,
             WaveFileReader exitSource,
@@ -1487,6 +1583,63 @@ internal sealed class WaveAudioPlayer : IDisposable
         }
 
         public void ResetOutputPeak() => Volatile.Write(ref _outputPeak, 0f);
+
+        public void SetMetronomeClicks(float[] high, float[] low)
+        {
+            lock (_readGate)
+            {
+                lock (_gate)
+                {
+                    _metronomeHigh = high ?? [];
+                    _metronomeLow = low ?? [];
+                    _metronomeActiveClick = null;
+                    _metronomeClickPos = -1;
+                }
+            }
+        }
+
+        public void SetMetronomeEnabled(bool enabled)
+        {
+            lock (_readGate)
+            {
+                lock (_gate)
+                {
+                    _metronomeEnabled = enabled;
+                    _metronomeActiveClick = null;
+                    _metronomeClickPos = -1;
+                    _metronomeLastAbsSample = -1;
+                    _metronomeArmedBeatKey = null;
+                    _metronomeCachedBarStart = -1;
+                    _metronomeCachedBarEnd = -1;
+                }
+            }
+        }
+
+        public void SetMetronomeVolume(float volume)
+        {
+            lock (_gate)
+            {
+                _metronomeVolume = Math.Clamp(
+                    volume,
+                    MetronomePlayer.MinVolume,
+                    MetronomePlayer.MaxVolume);
+            }
+        }
+
+        public void SetMetronomeBars(IReadOnlyList<WaveformBarMark> bars)
+        {
+            lock (_readGate)
+            {
+                lock (_gate)
+                {
+                    _metronomeBars = bars ?? [];
+                    _metronomeArmedBeatKey = null;
+                    _metronomeLastAbsSample = -1;
+                    _metronomeCachedBarStart = -1;
+                    _metronomeCachedBarEnd = -1;
+                }
+            }
+        }
 
         public long CurrentMainSample
         {
@@ -2731,15 +2884,39 @@ internal sealed class WaveAudioPlayer : IDisposable
                 Array.Clear(_overlayMixFloat, 0, gotFrames * 8);
                 MixOverlayPlaylistVoices(_overlayMixFloat, gotFrames);
 
+                bool metronomeEnabled;
+                float metronomeVolume;
+                IReadOnlyList<WaveformBarMark> metronomeBars;
+                float[] metronomeHigh;
+                float[] metronomeLow;
+                lock (_gate)
+                {
+                    metronomeEnabled = _metronomeEnabled;
+                    metronomeVolume = _metronomeVolume;
+                    metronomeBars = _metronomeBars;
+                    metronomeHigh = _metronomeHigh;
+                    metronomeLow = _metronomeLow;
+                }
+
                 // 加算ミックス（簡易クリップ）。-R 区間はタイムラインを進めつつ無音にする。
+                // メトロノームは除外区間でも再生サンプル位置に同期して重ねる。
                 for (var i = 0; i < gotFrames; i++)
                 {
+                    var absSample = samplePos + i;
+                    var metro = NextMetronomeSample(
+                        absSample,
+                        metronomeEnabled,
+                        metronomeVolume,
+                        metronomeBars,
+                        metronomeHigh,
+                        metronomeLow);
+
                     float outputL;
                     float outputR;
-                    if (IsExcludedSample(samplePos + i, excludedRanges))
+                    if (IsExcludedSample(absSample, excludedRanges))
                     {
-                        outputL = 0f;
-                        outputR = 0f;
+                        outputL = metro;
+                        outputR = metro;
                     }
                     else
                     {
@@ -2753,8 +2930,8 @@ internal sealed class WaveAudioPlayer : IDisposable
                         var preRollR = BitConverter.ToSingle(_playlistPreRollFloat, i * 8 + 4);
                         var overlayL = BitConverter.ToSingle(_overlayMixFloat, i * 8);
                         var overlayR = BitConverter.ToSingle(_overlayMixFloat, i * 8 + 4);
-                        outputL = ClampSample(mainL + exitL + fadeL + preRollL + overlayL);
-                        outputR = ClampSample(mainR + exitR + fadeR + preRollR + overlayR);
+                        outputL = ClampSample(mainL + exitL + fadeL + preRollL + overlayL + metro);
+                        outputR = ClampSample(mainR + exitR + fadeR + preRollR + overlayR + metro);
                     }
 
                     outputPeak = Math.Max(
@@ -2775,6 +2952,193 @@ internal sealed class WaveAudioPlayer : IDisposable
 
             Volatile.Write(ref _outputPeak, outputPeak);
             return totalFrames * 8;
+        }
+
+        /// <summary>
+        /// 再生サンプル位置の拍境界で High／Low をアームし、進行中クリックの 1 サンプルを返す。
+        /// 呼び出しは <see cref="ReadCore"/>（<_readGate>）上のみ。
+        /// </summary>
+        private float NextMetronomeSample(
+            long absSample,
+            bool enabled,
+            float volume,
+            IReadOnlyList<WaveformBarMark> bars,
+            float[] high,
+            float[] low)
+        {
+            if (!enabled || bars.Count == 0 || high.Length == 0 || low.Length == 0)
+            {
+                _metronomeActiveClick = null;
+                _metronomeClickPos = -1;
+                _metronomeArmedBeatKey = null;
+                _metronomeLastAbsSample = -1;
+                return 0f;
+            }
+
+            if (TryResolveMusicalBeatAtSample(
+                    bars,
+                    absSample,
+                    out var barNumber,
+                    out var beat,
+                    out var bpm,
+                    out var denominator)
+                && beat >= 1
+                && bpm > 0d
+                && denominator > 0)
+            {
+                var beatKey = ((long)barNumber << 16) | (uint)beat;
+                if (_metronomeArmedBeatKey is not long lastKey)
+                {
+                    _metronomeArmedBeatKey = beatKey;
+                    _metronomeLastAbsSample = absSample;
+                }
+                else if (beatKey != lastKey)
+                {
+                    var sampleDelta = absSample - _metronomeLastAbsSample;
+                    var beatSamples = Math.Max(
+                        1L,
+                        (long)Math.Round(
+                            60d / bpm * (4d / denominator) * WaveFormat.SampleRate));
+                    _metronomeLastAbsSample = absSample;
+                    _metronomeArmedBeatKey = beatKey;
+                    // 前方への大きなジャンプ（シーク等）はクリックしない。ループ折り返しは鳴らす。
+                    if (sampleDelta <= beatSamples * 2L)
+                    {
+                        _metronomeActiveClick = beat == 1 ? high : low;
+                        _metronomeClickPos = 0;
+                    }
+                }
+                else
+                {
+                    _metronomeLastAbsSample = absSample;
+                }
+            }
+
+            if (_metronomeActiveClick is not { Length: > 0 } click
+                || _metronomeClickPos < 0
+                || _metronomeClickPos >= click.Length)
+            {
+                _metronomeActiveClick = null;
+                _metronomeClickPos = -1;
+                return 0f;
+            }
+
+            var sample = click[_metronomeClickPos] * volume;
+            _metronomeClickPos++;
+            if (_metronomeClickPos >= click.Length)
+            {
+                _metronomeActiveClick = null;
+                _metronomeClickPos = -1;
+            }
+
+            return sample;
+        }
+
+        private bool TryResolveMusicalBeatAtSample(
+            IReadOnlyList<WaveformBarMark> bars,
+            long positionSample,
+            out int barNumber,
+            out int beat,
+            out double bpm,
+            out int denominator)
+        {
+            barNumber = 0;
+            beat = 1;
+            bpm = 0d;
+            denominator = 0;
+
+            var frameCount = _sourceBlockAlign <= 0 ? 0L : _source.Length / _sourceBlockAlign;
+            if (frameCount <= 0 || bars.Count == 0)
+            {
+                return false;
+            }
+
+            positionSample = Math.Clamp(positionSample, 0L, frameCount - 1);
+
+            if (_metronomeCachedBarStart >= 0
+                && positionSample >= _metronomeCachedBarStart
+                && positionSample < _metronomeCachedBarEnd
+                && _metronomeCachedNumerator > 0
+                && _metronomeCachedBpm > 0d
+                && _metronomeCachedDenominator > 0)
+            {
+                var barLengthSamples = Math.Max(
+                    1L,
+                    _metronomeCachedBarEnd - _metronomeCachedBarStart);
+                var offsetInBar = positionSample - _metronomeCachedBarStart;
+                var beatPosition = offsetInBar / (double)barLengthSamples * _metronomeCachedNumerator;
+                var beatZeroBased = Math.Min(
+                    _metronomeCachedNumerator - 1,
+                    Math.Max(0, (int)Math.Floor(beatPosition)));
+                barNumber = _metronomeCachedBarNumber;
+                beat = beatZeroBased + 1;
+                bpm = _metronomeCachedBpm;
+                denominator = _metronomeCachedDenominator;
+                return true;
+            }
+
+            WaveformBarMark? activeBar = null;
+            WaveformBarMark? activeState = null;
+            WaveformBarMark? nextBar = null;
+            foreach (var mark in bars)
+            {
+                if (mark.SampleOffset <= positionSample)
+                {
+                    activeState = mark;
+                    if (!mark.IsTempoChangeOnly)
+                    {
+                        activeBar = mark;
+                    }
+
+                    continue;
+                }
+
+                if (!mark.IsTempoChangeOnly)
+                {
+                    nextBar = mark;
+                    break;
+                }
+            }
+
+            activeBar ??= bars.FirstOrDefault(mark => !mark.IsTempoChangeOnly);
+            activeState ??= activeBar;
+            if (activeBar is not { } bar || activeState is not { } state)
+            {
+                return false;
+            }
+
+            var estimatedBarSamples = state.Bpm > 0d && state.Denominator > 0
+                ? (long)Math.Round(
+                    60d / state.Bpm
+                    * state.Numerator
+                    * 4d / state.Denominator
+                    * WaveFormat.SampleRate)
+                : frameCount - bar.SampleOffset;
+            var barEndSample = nextBar?.SampleOffset
+                ?? Math.Min(frameCount, bar.SampleOffset + Math.Max(1L, estimatedBarSamples));
+            var resolvedBarLengthSamples = Math.Max(1L, barEndSample - bar.SampleOffset);
+            var offsetInResolvedBar = Math.Clamp(
+                positionSample - bar.SampleOffset,
+                0L,
+                resolvedBarLengthSamples - 1);
+            var resolvedBeatPosition =
+                offsetInResolvedBar / (double)resolvedBarLengthSamples * Math.Max(1, state.Numerator);
+            var resolvedBeatZeroBased = Math.Min(
+                Math.Max(0, state.Numerator - 1),
+                Math.Max(0, (int)Math.Floor(resolvedBeatPosition)));
+
+            _metronomeCachedBarStart = bar.SampleOffset;
+            _metronomeCachedBarEnd = barEndSample;
+            _metronomeCachedBarNumber = Math.Max(0, bar.BarNumber);
+            _metronomeCachedBpm = state.Bpm;
+            _metronomeCachedNumerator = Math.Max(1, state.Numerator);
+            _metronomeCachedDenominator = state.Denominator;
+
+            barNumber = _metronomeCachedBarNumber;
+            beat = resolvedBeatZeroBased + 1;
+            bpm = state.Bpm;
+            denominator = state.Denominator;
+            return true;
         }
 
         private void PushMonitorSamples(byte[] buffer, int offset, int frames)

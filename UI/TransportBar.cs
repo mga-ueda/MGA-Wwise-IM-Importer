@@ -76,6 +76,7 @@ internal sealed class TransportBar : UserControl
         _groups.WrapContents = false;
         Controls.Add(_groups);
         _groups.Controls.Add(_positionDisplay);
+        _positionDisplay.MetronomeInvoked += (_, _) => MetronomeInvoked?.Invoke(this, EventArgs.Empty);
 
         _playButton = AddGroup(
             () => UiStrings.LabelTransportGroup,
@@ -134,6 +135,7 @@ internal sealed class TransportBar : UserControl
 
     public event EventHandler<TransportCommand>? CommandInvoked;
     public event EventHandler? CommandHoldEnded;
+    public event EventHandler? MetronomeInvoked;
 
     /// <summary>NAVIGATION / ZOOM ボタンがマウスで押下中か。</summary>
     public bool IsCommandHeld => _heldCommand.HasValue;
@@ -158,6 +160,27 @@ internal sealed class TransportBar : UserControl
     {
         _positionDisplay.Position = position;
     }
+
+    /// <summary>位置表示に載っている最新のテンポ／拍子／時刻。</summary>
+    public TransportPositionInfo? CurrentPosition => _positionDisplay.Position;
+
+    /// <summary>メトロノームのオン／オフ（既定オフ。テンポ／拍子が無いときは常にオフ）。</summary>
+    public bool IsMetronomeEnabled
+    {
+        get => _positionDisplay.IsMetronomeEnabled;
+        set => _positionDisplay.IsMetronomeEnabled = value;
+    }
+
+    /// <summary>画面座標が音符＋テンポの操作領域上なら true。</summary>
+    public bool IsMetronomeHitAtScreenPoint(Point screenPoint) =>
+        _positionDisplay.IsMetronomeHitAtScreenPoint(screenPoint);
+
+    /// <summary>ホバー中なら静的メトロノーム Tips を再表示する。</summary>
+    public void RestoreMetronomeTipIfHovered() =>
+        _positionDisplay.RestoreMetronomeTipIfHovered();
+
+    /// <summary>メトロノームボタンのキーボード操作表示を点灯して直ちにフェードする。</summary>
+    public void PulseMetronomeFeedback() => _positionDisplay.PulseMetronomeFeedback();
 
     /// <summary>
     /// 小節ジャンプ／小節または表示ステップ／Playlist ナビの有効状態。
@@ -226,6 +249,7 @@ internal sealed class TransportBar : UserControl
         }
 
         _positionDisplay.AccessibleName = UiStrings.AccessibleTransportPositionDisplay;
+        _positionDisplay.ApplyLocalizedTips();
         TightenVerticalLayout();
     }
 
@@ -570,7 +594,12 @@ internal sealed class TransportBar : UserControl
 
 internal sealed class TransportPositionDisplay : Control
 {
+    /// <summary>音符＋テンポ数値を囲むヒット領域の幅（描画座標は従来どおり）。</summary>
+    private const int MetronomeHitWidth = 54;
+
+    private readonly TransportMetronomeButton _metronomeButton = new();
     private TransportPositionInfo? _position;
+    private bool _metronomeEnabled;
 
     public TransportPositionDisplay()
     {
@@ -586,6 +615,36 @@ internal sealed class TransportPositionDisplay : Control
             | ControlStyles.OptimizedDoubleBuffer
             | ControlStyles.UserPaint,
             true);
+
+        _metronomeButton.Location = new Point(0, 0);
+        _metronomeButton.Size = new Size(MetronomeHitWidth, 30);
+        _metronomeButton.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom;
+        _metronomeButton.Font = Font;
+        _metronomeButton.Click += (_, _) => MetronomeInvoked?.Invoke(this, EventArgs.Empty);
+        Controls.Add(_metronomeButton);
+        ApplyLocalizedTips();
+        SyncMetronomeButtonContent();
+    }
+
+    public event EventHandler? MetronomeInvoked;
+
+    /// <summary>メトロノームのオン／オフ。利用不可時は false に落とす。</summary>
+    public bool IsMetronomeEnabled
+    {
+        get => _metronomeEnabled;
+        set
+        {
+            var next = value && _metronomeButton.Enabled;
+            if (_metronomeEnabled == next)
+            {
+                _metronomeButton.IsActive = next;
+                return;
+            }
+
+            _metronomeEnabled = next;
+            _metronomeButton.IsActive = next;
+            Invalidate();
+        }
     }
 
     public TransportPositionInfo? Position
@@ -599,6 +658,18 @@ internal sealed class TransportPositionDisplay : Control
             }
 
             _position = value;
+            var available = value is { HasMusicalPosition: true };
+            if (_metronomeButton.Enabled != available)
+            {
+                _metronomeButton.Enabled = available;
+            }
+
+            if (!available && _metronomeEnabled)
+            {
+                IsMetronomeEnabled = false;
+            }
+
+            SyncMetronomeButtonContent();
             Invalidate();
         }
     }
@@ -607,7 +678,46 @@ internal sealed class TransportPositionDisplay : Control
     {
         BackColor = UiColors.ForControlBack(UiColors.TransportBack);
         ForeColor = UiColors.TransportFore;
+        _metronomeButton.ApplyColors();
+        SyncMetronomeButtonContent();
         Invalidate();
+    }
+
+    public void ApplyLocalizedTips()
+    {
+        var tip = UiStrings.TipTransportMetronome;
+        _metronomeButton.AccessibleName = tip;
+        TipService.Set(_metronomeButton, tip);
+    }
+
+    public void PulseMetronomeFeedback()
+    {
+        _metronomeButton.BeginShortcutFeedback();
+        _metronomeButton.EndShortcutFeedback();
+    }
+
+    /// <summary>画面座標が音符＋テンポ領域上で、かつメトロノーム操作が可能なとき true。</summary>
+    public bool IsMetronomeHitAtScreenPoint(Point screenPoint) =>
+        _metronomeButton is { IsDisposed: false, Enabled: true, Visible: true }
+        && _metronomeButton.RectangleToScreen(_metronomeButton.ClientRectangle).Contains(screenPoint);
+
+    /// <summary>音量 Tips 消去後、まだホバー中なら通常 Tips を戻す。</summary>
+    public void RestoreMetronomeTipIfHovered()
+    {
+        if (!IsMetronomeHitAtScreenPoint(Control.MousePosition))
+        {
+            return;
+        }
+
+        TipService.Show(UiStrings.TipTransportMetronome, _metronomeButton);
+    }
+
+    private void SyncMetronomeButtonContent()
+    {
+        var hasMusical = _position is { HasMusicalPosition: true };
+        _metronomeButton.BpmText = hasMusical && _position is { } p
+            ? Math.Round(p.Bpm).ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : "---";
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -621,9 +731,6 @@ internal sealed class TransportPositionDisplay : Control
         var musicalFore = hasMusical ? ForeColor : UiColors.TransportDisabledFore;
         var timeFore = position is not null ? ForeColor : UiColors.TransportDisabledFore;
 
-        var bpm = hasMusical && position is { } p
-            ? Math.Round(p.Bpm).ToString(System.Globalization.CultureInfo.InvariantCulture)
-            : "---";
         var signature = hasMusical && position is { } signaturePosition
             ? $"{signaturePosition.Numerator}/{signaturePosition.Denominator}"
             : "--/--";
@@ -634,20 +741,19 @@ internal sealed class TransportPositionDisplay : Control
         var hours = Math.Max(0L, (long)elapsed.TotalHours);
         var time = $"{hours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}.{elapsed.Milliseconds:000}";
 
-        using var iconPen = new Pen(musicalFore, 1.6f)
-        {
-            StartCap = LineCap.Round,
-            EndCap = LineCap.Round,
-            LineJoin = LineJoin.Round,
-        };
-        using var iconBrush = new SolidBrush(musicalFore);
-
-        var iconTop = Math.Max(0f, (Height - 30f) / 2f);
-        DrawQuarterNote(g, iconPen, iconBrush, 5, iconTop + 7f);
-        DrawText(g, bpm, new Rectangle(22, 0, 32, Height), musicalFore);
+        // BPM はメトロノームヒット領域側で描画（ホバー／クリック範囲を音符＋テンポで共有）。
         DrawText(g, signature, new Rectangle(64, 0, 38, Height), musicalFore);
         DrawText(g, musicalPosition, new Rectangle(107, 0, 74, Height), musicalFore);
         DrawText(g, time, new Rectangle(186, 0, 124, Height), timeFore);
+    }
+
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        if (_metronomeButton.Height != Height || _metronomeButton.Width != MetronomeHitWidth)
+        {
+            _metronomeButton.SetBounds(0, 0, MetronomeHitWidth, Height);
+        }
     }
 
     protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
@@ -670,13 +776,247 @@ internal sealed class TransportPositionDisplay : Control
             | TextFormatFlags.NoPrefix
             | TextFormatFlags.SingleLine);
     }
+}
+
+/// <summary>
+/// 音符＋テンポ数値を囲むメトロノーム操作領域。
+/// 見た目の座標は従来どおり、ヒット／ホバー範囲だけをまとめる。
+/// </summary>
+internal sealed class TransportMetronomeButton : Button
+{
+    private const double ShortcutFadeDurationMs = 180d;
+    private const int BpmTextLeft = 22;
+    private const int BpmTextWidth = 32;
+    private readonly System.Windows.Forms.Timer _shortcutFadeTimer = new() { Interval = 16 };
+    private bool _hovered;
+    private bool _pressed;
+    private bool _isActive;
+    private string _bpmText = "---";
+    private double _shortcutFeedbackLevel;
+    private long _shortcutFadeStartTickMs;
+
+    public TransportMetronomeButton()
+    {
+        AccessibleRole = AccessibleRole.PushButton;
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        Size = new Size(54, 30);
+        TabStop = false;
+        UseVisualStyleBackColor = false;
+        Cursor = Cursors.Hand;
+        SetStyle(
+            ControlStyles.AllPaintingInWmPaint
+            | ControlStyles.OptimizedDoubleBuffer
+            | ControlStyles.UserPaint,
+            true);
+        SetStyle(ControlStyles.Selectable, false);
+        _shortcutFadeTimer.Tick += (_, _) => UpdateShortcutFeedbackFade();
+        ApplyColors();
+        Enabled = false;
+    }
+
+    public Color HoverBackColor { get; set; }
+    public Color PressedBackColor { get; set; }
+    public Color ActiveForeColor { get; set; }
+
+    public string BpmText
+    {
+        get => _bpmText;
+        set
+        {
+            var next = value ?? "---";
+            if (_bpmText == next)
+            {
+                return;
+            }
+
+            _bpmText = next;
+            Invalidate();
+        }
+    }
+
+    /// <summary>メトロノームがオンのとき true（シアン表示）。</summary>
+    public bool IsActive
+    {
+        get => _isActive;
+        set
+        {
+            if (_isActive == value)
+            {
+                return;
+            }
+
+            _isActive = value;
+            Invalidate();
+        }
+    }
+
+    public void ApplyColors()
+    {
+        BackColor = UiColors.ForControlBack(UiColors.TransportBack);
+        ForeColor = UiColors.TransportFore;
+        HoverBackColor = UiColors.ForControlBack(UiColors.TransportHoverBack);
+        PressedBackColor = UiColors.ForControlBack(UiColors.TransportPressedBack);
+        ActiveForeColor = UiColors.ForControlBack(UiColors.SeekCyan);
+        Invalidate();
+    }
+
+    public void BeginShortcutFeedback()
+    {
+        if (!Enabled)
+        {
+            return;
+        }
+
+        _shortcutFadeTimer.Stop();
+        _shortcutFeedbackLevel = 1d;
+        Invalidate();
+    }
+
+    public void EndShortcutFeedback()
+    {
+        if (_shortcutFeedbackLevel <= 0d)
+        {
+            return;
+        }
+
+        _shortcutFadeStartTickMs = Environment.TickCount64;
+        _shortcutFadeTimer.Start();
+    }
+
+    protected override void OnEnabledChanged(EventArgs e)
+    {
+        if (!Enabled)
+        {
+            _hovered = false;
+            _pressed = false;
+            _shortcutFeedbackLevel = 0d;
+            _shortcutFadeTimer.Stop();
+            Cursor = Cursors.Default;
+        }
+        else
+        {
+            Cursor = Cursors.Hand;
+        }
+
+        Invalidate();
+        base.OnEnabledChanged(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _shortcutFadeTimer.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        _hovered = true;
+        Invalidate();
+        base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        _hovered = false;
+        _pressed = false;
+        Invalidate();
+        base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        _pressed = e.Button == MouseButtons.Left;
+        Invalidate();
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        _pressed = false;
+        Invalidate();
+        base.OnMouseUp(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(BackColor);
+
+        var hoverLevel = Enabled
+            ? (_hovered ? 1d : _shortcutFeedbackLevel)
+            : 0d;
+        var back = _pressed
+            ? PressedBackColor
+            : BlendColor(BackColor, HoverBackColor, hoverLevel);
+        if (_pressed || hoverLevel > 0d)
+        {
+            var hoverBounds = new Rectangle(1, 3, Width - 2, Height - 6);
+            using var hoverBrush = new SolidBrush(back);
+            g.FillRectangle(hoverBrush, hoverBounds);
+        }
+
+        var fore = !Enabled
+            ? UiColors.TransportDisabledFore
+            : _isActive
+                ? ActiveForeColor
+                : ForeColor;
+        using var iconPen = new Pen(fore, 1.6f)
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round,
+        };
+        using var iconBrush = new SolidBrush(fore);
+        var iconTop = Math.Max(0f, (Height - 30f) / 2f);
+        DrawQuarterNote(g, iconPen, iconBrush, 5, iconTop + 7f);
+        TextRenderer.DrawText(
+            g,
+            _bpmText,
+            Font,
+            new Rectangle(BpmTextLeft, 0, BpmTextWidth, Height),
+            fore,
+            TextFormatFlags.Left
+            | TextFormatFlags.VerticalCenter
+            | TextFormatFlags.NoPadding
+            | TextFormatFlags.NoPrefix
+            | TextFormatFlags.SingleLine);
+    }
+
+    private void UpdateShortcutFeedbackFade()
+    {
+        var elapsed = Math.Max(0L, Environment.TickCount64 - _shortcutFadeStartTickMs);
+        var progress = Math.Clamp(elapsed / ShortcutFadeDurationMs, 0d, 1d);
+        _shortcutFeedbackLevel = 1d - progress;
+        if (progress >= 1d)
+        {
+            _shortcutFadeTimer.Stop();
+            _shortcutFeedbackLevel = 0d;
+        }
+
+        Invalidate();
+    }
+
+    private static Color BlendColor(Color from, Color to, double amount)
+    {
+        amount = Math.Clamp(amount, 0d, 1d);
+        return Color.FromArgb(
+            (int)Math.Round(from.A + (to.A - from.A) * amount),
+            (int)Math.Round(from.R + (to.R - from.R) * amount),
+            (int)Math.Round(from.G + (to.G - from.G) * amount),
+            (int)Math.Round(from.B + (to.B - from.B) * amount));
+    }
 
     private static void DrawQuarterNote(Graphics g, Pen pen, Brush brush, float x, float y)
     {
         g.FillEllipse(brush, x, y + 11, 7, 5);
         g.DrawLine(pen, x + 6, y + 12, x + 6, y);
     }
-
 }
 
 internal enum TransportIcon

@@ -56,6 +56,12 @@
     <EmbeddedResource Include="Assets\Fonts\UDEVGothic-Regular.ttf">
       <LogicalName>MgaWwiseIMImporter.Fonts.UDEVGothic-Regular.ttf</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Assets\Wave\High.wav">
+      <LogicalName>MgaWwiseIMImporter.Wave.High.wav</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\Wave\Low.wav">
+      <LogicalName>MgaWwiseIMImporter.Wave.Low.wav</LogicalName>
+    </EmbeddedResource>
     <!-- SIL OFL 1.1: 埋め込み可。著作権表示とライセンスはユーザーが容易に読める形で同梱する。 -->
     <None Update="Assets\Fonts\LICENSE-UDEV-GOTHIC.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

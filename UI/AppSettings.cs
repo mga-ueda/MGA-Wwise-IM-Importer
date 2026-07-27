@@ -58,6 +58,9 @@ internal sealed class AppSettings
     /// <summary>規定チャンネル数（既定 2）。</summary>
     public ushort ExpectedChannels { get; set; } = ExpectedWaveformFormat.Default.Channels;
 
+    /// <summary>メトロノーム音量（0.1〜1.0。既定 0.3）。</summary>
+    public float MetronomeVolume { get; set; } = MetronomePlayer.DefaultVolume;
+
     public AudioOutputSettings ToAudioOutputSettings() => new(AudioApi, AudioDeviceId ?? string.Empty);
 
     public ExpectedWaveformFormat ToExpectedWaveformFormat() =>
@@ -142,6 +145,12 @@ internal sealed class AppSettings
         Save();
     }
 
+    public void SaveMetronomeVolume(float volume)
+    {
+        MetronomeVolume = NormalizeMetronomeVolume(volume);
+        Save();
+    }
+
     private Dictionary<string, string> ToDictionary() => new(StringComparer.OrdinalIgnoreCase)
     {
         ["AlwaysOnTop"] = AlwaysOnTop ? "1" : "0",
@@ -158,6 +167,7 @@ internal sealed class AppSettings
         ["ExpectedSampleRateHz"] = ExpectedSampleRateHz.ToString(CultureInfo.InvariantCulture),
         ["ExpectedBitsPerSample"] = ExpectedBitsPerSample.ToString(CultureInfo.InvariantCulture),
         ["ExpectedChannels"] = ExpectedChannels.ToString(CultureInfo.InvariantCulture),
+        ["MetronomeVolume"] = MetronomeVolume.ToString("0.###", CultureInfo.InvariantCulture),
     };
 
     private static AppSettings Parse(Dictionary<string, string> values) => new()
@@ -207,6 +217,9 @@ internal sealed class AppSettings
             values,
             "ExpectedChannels",
             ExpectedWaveformFormat.Default.Channels),
+        MetronomeVolume = values.TryGetValue("MetronomeVolume", out var metroVolumeText)
+            ? NormalizeMetronomeVolume(metroVolumeText)
+            : MetronomePlayer.DefaultVolume,
     };
 
     private static bool HasKnownKeys(Dictionary<string, string> values) =>
@@ -223,7 +236,8 @@ internal sealed class AppSettings
         || values.ContainsKey("DefaultPlaylistFadeOutCurve")
         || values.ContainsKey("ExpectedSampleRateHz")
         || values.ContainsKey("ExpectedBitsPerSample")
-        || values.ContainsKey("ExpectedChannels");
+        || values.ContainsKey("ExpectedChannels")
+        || values.ContainsKey("MetronomeVolume");
 
     private static uint ParseExpectedUInt(
         Dictionary<string, string> values,
@@ -257,6 +271,30 @@ internal sealed class AppSettings
     /// <summary>波形高さ倍率を 1〜3 に正規化する。</summary>
     public static int NormalizeWaveformHeightScale(int scale) =>
         scale is >= 1 and <= 3 ? scale : 1;
+
+    /// <summary>メトロノーム音量を 0.1〜1.0（10% 刻み）に正規化する。</summary>
+    public static float NormalizeMetronomeVolume(float volume)
+    {
+        var clamped = Math.Clamp(volume, MetronomePlayer.MinVolume, MetronomePlayer.MaxVolume);
+        var stepped = MathF.Round(clamped / MetronomePlayer.VolumeStep) * MetronomePlayer.VolumeStep;
+        return Math.Clamp(stepped, MetronomePlayer.MinVolume, MetronomePlayer.MaxVolume);
+    }
+
+    private static float NormalizeMetronomeVolume(string? text)
+    {
+        if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var volume))
+        {
+            // 10〜100 の整数パーセントで書かれていた場合も許容する。
+            if (volume > MetronomePlayer.MaxVolume && volume <= 100f)
+            {
+                volume /= 100f;
+            }
+
+            return NormalizeMetronomeVolume(volume);
+        }
+
+        return MetronomePlayer.DefaultVolume;
+    }
 
     private static int NormalizeWaveformHeightScale(string? text)
     {
