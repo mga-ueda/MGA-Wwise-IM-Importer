@@ -273,9 +273,9 @@ internal static class UiStrings
         + Environment.NewLine
         + "[←] / [→]: シークバーを 1px 移動"
         + Environment.NewLine
-        + "[Alt]+[←] / [→]: シーク位置のマーカーを 1px 移動（シークも連動）"
+        + "[Alt]+[←] / [→]: シーク位置のマーカーを 1px 移動（+[Shift] で 3px、シークも連動）"
         + Environment.NewLine
-        + "[Ctrl+Alt]+[←] / [→]: シーク位置のマーカー＋一つ前を 1px 同時移動"
+        + "[Ctrl+Alt]+[←] / [→]: シーク位置のマーカー＋一つ前を 1px 同時移動（+[Shift] で 3px）"
         + Environment.NewLine
         + "▼／コメントをダブルクリック: コメントを編集"
         + Environment.NewLine
@@ -302,9 +302,9 @@ internal static class UiStrings
         + Environment.NewLine
         + "[←] / [→]: nudge seek bar by 1px"
         + Environment.NewLine
-        + "[Alt]+[←] / [→]: nudge marker at seek by 1px (seek follows)"
+        + "[Alt]+[←] / [→]: nudge marker at seek by 1px (+[Shift] for 3px; seek follows)"
         + Environment.NewLine
-        + "[Ctrl+Alt]+[←] / [→]: nudge marker at seek and the previous one by 1px"
+        + "[Ctrl+Alt]+[←] / [→]: nudge marker at seek and the previous one by 1px (+[Shift] for 3px)"
         + Environment.NewLine
         + "Double-click ▼ / comment: edit comment"
         + Environment.NewLine

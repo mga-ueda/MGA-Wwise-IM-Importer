@@ -59,6 +59,15 @@ public partial class Form1 : Form, IMessageFilter
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    private const int VkLeft = 0x25;
+    private const int VkRight = 0x27;
+    private const int VkShift = 0x10;
+    private const int VkControl = 0x11;
+    private const int VkMenu = 0x12;
+
     private const int EmSetRect = 0x00B3;
     private const int WmSetRedraw = 0x000B;
 
@@ -115,6 +124,7 @@ public partial class Form1 : Form, IMessageFilter
     private readonly System.Windows.Forms.Timer _playlistBlinkTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer _playlistTransitionGlowTimer = new() { Interval = 16 };
     private readonly System.Windows.Forms.Timer _waveformScrollTimer = new() { Interval = 16 };
+    private readonly System.Windows.Forms.Timer _markerNudgeTimer = new();
     private readonly System.Windows.Forms.Timer _waapiSelectionTimer = new() { Interval = WaapiConnectedPollMs };
     private double _smoothProgress;
     private double _anchorProgress;
@@ -242,6 +252,9 @@ public partial class Form1 : Form, IMessageFilter
     private double? _pendingWaveformScrollStart;
     /// <summary>Alt+矢印でのマーカー連続移動中は Persist を遅延する。</summary>
     private bool _pendingWaveOnlySessionPersist;
+    /// <summary>Alt+←/→ 押し続け中の移動方向。タイマーで修飾キーを都度参照する。</summary>
+    private Keys _markerNudgeDirection = Keys.None;
+    private bool _markerNudgeRepeatStarted;
 
     /// <summary>パート番号 → グループ ID（Last Session へ永続化）。</summary>
     private readonly Dictionary<int, int> _playlistPartGroupIds = new();
@@ -424,6 +437,7 @@ public partial class Form1 : Form, IMessageFilter
         _playheadTimer.Tick += (_, _) => UpdatePlayhead();
         _playlistBlinkTimer.Tick += (_, _) => UpdatePendingPlaylistBlink();
         _playlistTransitionGlowTimer.Tick += (_, _) => UpdatePlaylistTransitionGlow();
+        _markerNudgeTimer.Tick += (_, _) => TickWaveOnlyMarkerNudgeHold();
         logAreaPanel.Resize += (_, _) => UpdatePlaylistSelectorWidth();
         logEditorPanel.Resize += (_, _) => PositionLogButtons();
         PositionLogButtons();
@@ -1374,6 +1388,7 @@ public partial class Form1 : Form, IMessageFilter
         _playlistBlinkTimer.Stop();
         _playlistTransitionGlowTimer.Stop();
         _waveformScrollTimer.Stop();
+        StopWaveOnlyMarkerNudgeHold(flushPersist: true);
         _exportOverlay?.HideOverlay();
         _exportOverlay?.Dispose();
         _exportOverlay = null;
@@ -1383,6 +1398,7 @@ public partial class Form1 : Form, IMessageFilter
         _playlistBlinkTimer.Dispose();
         _playlistTransitionGlowTimer.Dispose();
         _waveformScrollTimer.Dispose();
+        _markerNudgeTimer.Dispose();
         WindowSettings.FromForm(this).Save();
         // 終了時は Active 名だけ記憶する（作業状態のオートセーブはしない）。
         if (!_creatingNewProject && _projectStore.ContainsName(_loadedProjectName))
@@ -1471,20 +1487,10 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         var keyCode = keyData & Keys.KeyCode;
+        // Alt+←/→ は押し続けタイマーで扱う（途中で Shift を足してもオートリピートが途切れない）。
         if (keyCode is Keys.Left or Keys.Right
-            && (keyData & Keys.Control) == Keys.Control
             && (keyData & Keys.Alt) == Keys.Alt
-            && (keyData & Keys.Shift) == 0
-            && TryNudgeWaveOnlyMarkerAtPlayheadByPixel(keyCode, shiftPrevious: true))
-        {
-            return true;
-        }
-
-        if (keyCode is Keys.Left or Keys.Right
-            && (keyData & Keys.Control) == 0
-            && (keyData & Keys.Alt) == Keys.Alt
-            && (keyData & Keys.Shift) == 0
-            && TryNudgeWaveOnlyMarkerAtPlayheadByPixel(keyCode, shiftPrevious: false))
+            && TryBeginWaveOnlyMarkerNudgeHold(keyCode))
         {
             return true;
         }
@@ -1577,9 +1583,14 @@ public partial class Form1 : Form, IMessageFilter
             e.Handled = true;
         }
 
-        if (e.KeyCode is Keys.Left or Keys.Right)
+        if (e.KeyCode is Keys.Left or Keys.Right or Keys.Menu or Keys.LMenu or Keys.RMenu)
         {
-            FlushPendingWaveOnlySessionPersist();
+            // Shift 追加などで OS が一時的に KeyUp を出しても、実キーが押されていれば継続する。
+            if ((!IsAsyncKeyDown(VkLeft) && !IsAsyncKeyDown(VkRight))
+                || !IsAsyncKeyDown(VkMenu))
+            {
+                StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+            }
         }
 
         base.OnKeyUp(e);
@@ -1589,7 +1600,7 @@ public partial class Form1 : Form, IMessageFilter
     {
         ClearPlaylistGroupPaintStickyId();
         EndActiveTransportShortcutFeedback();
-        FlushPendingWaveOnlySessionPersist();
+        StopWaveOnlyMarkerNudgeHold(flushPersist: true);
         base.OnDeactivate(e);
     }
 
@@ -10260,13 +10271,22 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>
     /// Wave 単体／複数波形で、再生位置にちょうどマーカーがあるとき
     /// Alt+←/→ で 1px 移動する。Ctrl+Alt なら一つ前のマーカーも同量移動する。
+    /// <paramref name="pixelStep"/> で倍率（例: Alt+Shift は 3px）。
     /// シークバーも同じだけ動かし、連続移動できるようにする。
     /// </summary>
-    private bool TryNudgeWaveOnlyMarkerAtPlayheadByPixel(Keys keyCode, bool shiftPrevious = false)
+    private bool TryNudgeWaveOnlyMarkerAtPlayheadByPixel(
+        Keys keyCode,
+        bool shiftPrevious = false,
+        int pixelStep = 1)
     {
         if (keyCode is not (Keys.Left or Keys.Right))
         {
             return false;
+        }
+
+        if (pixelStep < 1)
+        {
+            pixelStep = 1;
         }
 
         if (_uiInteractionLocks != UiInteractionLock.None
@@ -10292,15 +10312,16 @@ public partial class Form1 : Form, IMessageFilter
 
         var timelineWidth = Math.Max(1, waveformView.TimelineContentWidth);
         var progressDelta = (keyCode == Keys.Left ? -1 : 1)
+            * pixelStep
             * (waveformView.TimeViewSpan / timelineWidth);
         var nextProgress = Math.Clamp(_smoothProgress + progressDelta, 0d, 1d);
         var toSample = (long)Math.Round(nextProgress * frameCount);
         toSample = Math.Clamp(toSample, 0L, frameCount - 1);
 
-        // ズームインで 1px が 1 サンプル未満のときは最低 1 サンプル動かす。
+        // ズームインで 1 ステップが 1 サンプル未満のときは最低 pixelStep サンプル動かす。
         if (toSample == fromSample)
         {
-            var step = keyCode == Keys.Left ? -1L : 1L;
+            var step = (keyCode == Keys.Left ? -1L : 1L) * pixelStep;
             toSample = Math.Clamp(fromSample + step, 0L, frameCount - 1);
             if (toSample == fromSample)
             {
@@ -10358,6 +10379,104 @@ public partial class Form1 : Form, IMessageFilter
         waveformView.Update();
         return true;
     }
+
+    /// <summary>
+    /// Alt+←/→ 押し続け開始。OS のキーリピートに頼らずタイマーで連続移動し、
+    /// 途中の Shift／Ctrl 追加でも途切れず倍率・ペア移動を切り替える。
+    /// </summary>
+    private bool TryBeginWaveOnlyMarkerNudgeHold(Keys keyCode)
+    {
+        if (keyCode is not (Keys.Left or Keys.Right))
+        {
+            return false;
+        }
+
+        if (_markerNudgeTimer.Enabled && _markerNudgeDirection == keyCode)
+        {
+            // OS からのリピートは握りつぶし、タイマー側の間隔だけ使う。
+            return true;
+        }
+
+        if (_uiInteractionLocks != UiInteractionLock.None
+            || _previewSession is not { AllowsSessionMarkerEdit: true }
+            || _loadedPreview is null
+            || !_audioPlayer.HasSource)
+        {
+            return false;
+        }
+
+        StopWaveOnlyMarkerNudgeHold(flushPersist: false);
+        _markerNudgeDirection = keyCode;
+        _markerNudgeRepeatStarted = false;
+        _markerNudgeTimer.Interval = (SystemInformation.KeyboardDelay + 1) * 250;
+
+        if (!TryNudgeWaveOnlyMarkerAtPlayheadFromHeldKeys())
+        {
+            _markerNudgeDirection = Keys.None;
+            return false;
+        }
+
+        _markerNudgeTimer.Start();
+        return true;
+    }
+
+    private void TickWaveOnlyMarkerNudgeHold()
+    {
+        if (_markerNudgeDirection is not (Keys.Left or Keys.Right))
+        {
+            StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+            return;
+        }
+
+        var directionVk = _markerNudgeDirection == Keys.Left ? VkLeft : VkRight;
+        if (!IsAsyncKeyDown(directionVk) || !IsAsyncKeyDown(VkMenu))
+        {
+            StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+            return;
+        }
+
+        if (!_markerNudgeRepeatStarted)
+        {
+            _markerNudgeRepeatStarted = true;
+            // Windows の KeyboardSpeed: 0=約2.5回/秒、31=約30回/秒。
+            var repeatsPerSecond =
+                2.5d + SystemInformation.KeyboardSpeed * (30d - 2.5d) / 31d;
+            _markerNudgeTimer.Interval = Math.Max(
+                20,
+                (int)Math.Round(1000d / repeatsPerSecond));
+        }
+
+        TryNudgeWaveOnlyMarkerAtPlayheadFromHeldKeys();
+    }
+
+    private bool TryNudgeWaveOnlyMarkerAtPlayheadFromHeldKeys()
+    {
+        if (_markerNudgeDirection is not (Keys.Left or Keys.Right))
+        {
+            return false;
+        }
+
+        var shiftPrevious = IsAsyncKeyDown(VkControl);
+        var pixelStep = IsAsyncKeyDown(VkShift) ? 3 : 1;
+        return TryNudgeWaveOnlyMarkerAtPlayheadByPixel(
+            _markerNudgeDirection,
+            shiftPrevious,
+            pixelStep);
+    }
+
+    private void StopWaveOnlyMarkerNudgeHold(bool flushPersist)
+    {
+        _markerNudgeTimer.Stop();
+        _markerNudgeDirection = Keys.None;
+        _markerNudgeRepeatStarted = false;
+        if (flushPersist)
+        {
+            FlushPendingWaveOnlySessionPersist();
+        }
+    }
+
+    private static bool IsAsyncKeyDown(int vKey) =>
+        (GetAsyncKeyState(vKey) & 0x8000) != 0;
 
     private static bool AreOutputPartsEquivalent(
         IReadOnlyList<WaveformOutputPart> left,
