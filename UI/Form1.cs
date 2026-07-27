@@ -810,7 +810,7 @@ public partial class Form1 : Form, IMessageFilter
 
         RefreshWaapiStatusDisplay();
 
-        if (logReport)
+        if (logReport && !_exportBusy)
         {
             AppendReport(FormatWaapiLogReport(result));
             _waapiLoggedSelectionPath = GetDisplayTargetPath();
@@ -1312,6 +1312,12 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>接続中ポーリングの一時失敗を数え、連続 N 回で切断表示にする。</summary>
     private void RegisterWaapiPollFailure()
     {
+        // EXPORT 中は WWU 直編集でプロジェクトを閉じるため、一時不通を切断扱いにしない。
+        if (_exportBusy)
+        {
+            return;
+        }
+
         _waapiPollFailCount++;
         if (_waapiPollFailCount < WaapiPollFailThreshold || IsDisposed)
         {
@@ -3733,17 +3739,27 @@ public partial class Form1 : Form, IMessageFilter
             && parts.Any(part => !_disabledPlaylistPartNumbers.Contains(part.Number));
     }
 
-    private ExportPreflightResult EvaluateExportPreflight() =>
-        ExportPreflight.Evaluate(
+    private ExportPreflightResult EvaluateExportPreflight()
+    {
+        var fallbackProject = _keptTargetProjectFilePath.Trim();
+        if (fallbackProject.Length == 0)
+        {
+            fallbackProject = _lastKnownWwiseProjectFilePath.Trim();
+        }
+
+        return ExportPreflight.Evaluate(
             _projectOutputDirectory,
             _waapiLastResult,
             HasEnabledExportParts(),
             keepTarget: _keepTarget,
-            keptTargetPath: _keptTargetPath);
+            keptTargetPath: _keptTargetPath,
+            fallbackProjectFilePath: fallbackProject);
+    }
 
     /// <summary>
     /// 事前検証の結果が変わったときだけログへ出す（ポーリングで連打しない）。
     /// Wave 単体モードは条件達成／未達の両方を出す。それ以外は未達時のみ。
+    /// EXPORT 中（WWU 直編集のプロジェクトクローズ含む）は誤った NG を出さない。
     /// </summary>
     /// <summary>事前検証ログの重複抑止キー（結果が変わったときだけログする）。</summary>
     private static string BuildPreflightLogKey(ExportPreflightResult preflight) =>
@@ -3752,6 +3768,11 @@ public partial class Form1 : Form, IMessageFilter
 
     private void LogExportPreflightIfChanged(ExportPreflightResult preflight)
     {
+        if (_exportBusy)
+        {
+            return;
+        }
+
         var key = BuildPreflightLogKey(preflight);
         if (string.Equals(key, _lastLoggedPreflightKey, StringComparison.Ordinal))
         {

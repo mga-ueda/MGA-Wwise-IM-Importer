@@ -66,7 +66,8 @@ internal static class ExportPreflight
         WaapiProbeResult? waapi,
         bool hasEnabledParts,
         bool keepTarget = false,
-        string? keptTargetPath = null)
+        string? keptTargetPath = null,
+        string? fallbackProjectFilePath = null)
     {
         if (!hasEnabledParts)
         {
@@ -108,7 +109,7 @@ internal static class ExportPreflight
                 return Fail(
                     UiStrings.PreflightKeepTargetNoPath,
                     fullDirectory,
-                    projectFilePath: waapi.ProjectFilePath);
+                    projectFilePath: ResolveProjectFilePath(waapi, keepTarget, fallbackProjectFilePath));
             }
         }
         else
@@ -125,7 +126,9 @@ internal static class ExportPreflight
             targetPath = waapi.SelectedPath;
         }
 
-        var projectFilePath = waapi.ProjectFilePath.Trim();
+        // Keep Target 時は、プロジェクト再オープン直後や WWU 直編集のクローズ中など
+        // getProjectInfo が一時的に空でも、記憶済み .wproj で Originals 判定を続ける。
+        var projectFilePath = ResolveProjectFilePath(waapi, keepTarget, fallbackProjectFilePath);
         if (projectFilePath.Length == 0)
         {
             return Fail(
@@ -179,6 +182,25 @@ internal static class ExportPreflight
             ProjectFilePath = Path.GetFullPath(projectFilePath),
             OriginalsRoot = originalsRoot,
         };
+    }
+
+    private static string ResolveProjectFilePath(
+        WaapiProbeResult waapi,
+        bool keepTarget,
+        string? fallbackProjectFilePath)
+    {
+        var live = waapi.ProjectFilePath.Trim();
+        if (live.Length > 0)
+        {
+            return live;
+        }
+
+        if (!keepTarget)
+        {
+            return string.Empty;
+        }
+
+        return fallbackProjectFilePath?.Trim() ?? string.Empty;
     }
 
     /// <summary>
