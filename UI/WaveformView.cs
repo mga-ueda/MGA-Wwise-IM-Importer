@@ -1098,14 +1098,14 @@ internal sealed class WaveformView : Control
     public bool SeekToNextMarker() => TrySeekAlongSamples(CollectMarkerSamples(), previous: false);
 
     /// <summary>
-    /// 直前の Music Playlist 境界（先頭／末尾）またはマーカーへ。
-    /// Ctrl+← 用。Playlist 間ジャンプだけでなく、区間内のマーカーや末尾にも止まる。
+    /// 直前の Music Playlist 先頭またはマーカーへ。
+    /// Ctrl+← 用。Playlist 先頭に加え、区間内のマーカーにも止まる。
     /// </summary>
     public bool SeekToPreviousPlaylist() =>
         TrySeekAlongSamples(CollectPlaylistNavigationSamples(), previous: true);
 
     /// <summary>
-    /// 直後の Music Playlist 境界（先頭／末尾）またはマーカーへ。
+    /// 直後の Music Playlist 先頭またはマーカーへ。
     /// Ctrl+→ 用。
     /// </summary>
     public bool SeekToNextPlaylist() =>
@@ -1169,8 +1169,8 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// Ctrl+←/→ 用: 有効 Playlist の先頭・末尾と、表示マーカー位置をまとめた停止点。
-    /// 隣接 Playlist 先頭だけだと区間内マーカー／末尾に止まらないため。
+    /// Ctrl+←/→ 用: 有効 Playlist の先頭と、表示マーカー位置をまとめた停止点。
+    /// 隣接 Playlist 先頭だけだと区間内マーカーに止まらないため。
     /// グループ同期先の半透明マーカーも含める。
     /// </summary>
     private List<long> CollectPlaylistNavigationSamples()
@@ -1202,8 +1202,6 @@ internal sealed class WaveformView : Control
             }
 
             Add(part.StartSampleOffset);
-            // End は半開区間の終端（次 Playlist 先頭と一致し得る。その場合は 1 点にまとめる）。
-            Add(part.EndSampleOffset);
         }
 
         foreach (var markerSample in CollectMarkerSamples(includeSharedProjections: true))

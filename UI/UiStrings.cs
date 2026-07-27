@@ -341,7 +341,7 @@ internal static class UiStrings
         + Environment.NewLine
         + "[Ctrl+Shift+R] シーク位置のマーカーをリネーム"
         + Environment.NewLine
-        + "[Ctrl]+[←] / [→]: 前後の Playlist 先頭／末尾、またはマーカーへ移動"
+        + "[Ctrl]+[←] / [→]: 前後の Playlist 先頭、またはマーカーへ移動"
         + Environment.NewLine
         + "[Ctrl+Shift]+[←] / [→]: 前後のマーカーへ移動（Playlist 境界は飛ばす）"
         + Environment.NewLine
@@ -370,7 +370,7 @@ internal static class UiStrings
         + Environment.NewLine
         + "[Ctrl+Shift+R] rename marker at seek"
         + Environment.NewLine
-        + "[Ctrl]+[←] / [→]: jump to previous / next Playlist start/end or marker"
+        + "[Ctrl]+[←] / [→]: jump to previous / next Playlist start or marker"
         + Environment.NewLine
         + "[Ctrl+Shift]+[←] / [→]: jump to previous / next marker (skip Playlist edges)"
         + Environment.NewLine
@@ -765,8 +765,8 @@ internal static class UiStrings
         "[Page Up] Previous view page");
 
     public static string TipTransportPreviousPlaylist => WithKeyRepeat(
-        "[Ctrl+←] 前の Music Playlist 先頭／末尾、またはマーカーへ移動",
-        "[Ctrl+←] Previous Music Playlist start/end or marker");
+        "[Ctrl+←] 前の Music Playlist 先頭、またはマーカーへ移動",
+        "[Ctrl+←] Previous Music Playlist start or marker");
 
     public static string TipTransportPreviousMarker => WithKeyRepeat(
         "[Ctrl+Shift+←] 前のマーカーへ移動",
@@ -789,8 +789,8 @@ internal static class UiStrings
         "[End] Move forward about 5% of the view");
 
     public static string TipTransportNextPlaylist => WithKeyRepeat(
-        "[Ctrl+→] 次の Music Playlist 先頭／末尾、またはマーカーへ移動",
-        "[Ctrl+→] Next Music Playlist start/end or marker");
+        "[Ctrl+→] 次の Music Playlist 先頭、またはマーカーへ移動",
+        "[Ctrl+→] Next Music Playlist start or marker");
 
     public static string TipTransportNextMarker => WithKeyRepeat(
         "[Ctrl+Shift+→] 次のマーカーへ移動",
