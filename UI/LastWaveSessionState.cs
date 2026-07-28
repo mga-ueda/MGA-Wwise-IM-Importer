@@ -17,6 +17,9 @@ internal sealed class LastWaveSessionState
     /// </summary>
     public List<string> WavePaths { get; set; } = [];
 
+    /// <summary>波形名の手動リネーム（拡張子なし）。null なら元のファイル名を使う。</summary>
+    public string? SourceBaseNameOverride { get; set; }
+
     public List<LastWavePartSignature> Parts { get; set; } = [];
 
     /// <summary>パート番号 → グループ ID。</summary>
@@ -124,13 +127,17 @@ internal sealed class LastWaveSessionState
         IReadOnlyDictionary<int, bool>? partAdditiveLayers = null,
         IReadOnlyList<WaveformMarkerMark>? waveOnlySessionMarkers = null,
         IReadOnlyList<RegionEdgeFade>? regionEdgeFades = null,
-        IReadOnlyList<string>? wavePaths = null)
+        IReadOnlyList<string>? wavePaths = null,
+        string? sourceBaseNameOverride = null)
     {
         var normalizedPaths = NormalizeWavePaths(wavePaths, wavePath);
         return new LastWaveSessionState
         {
             WavePath = normalizedPaths.Count > 0 ? normalizedPaths[0] : NormalizePath(wavePath),
             WavePaths = normalizedPaths.Count > 1 ? normalizedPaths.ToList() : [],
+            SourceBaseNameOverride = string.IsNullOrWhiteSpace(sourceBaseNameOverride)
+                ? null
+                : sourceBaseNameOverride.Trim(),
             Parts = parts
                 .Select(part => new LastWavePartSignature
                 {

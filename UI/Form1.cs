@@ -7889,6 +7889,7 @@ public partial class Form1 : Form, IMessageFilter
             _sourceBaseNameOverride = null;
             waveformView.SetSourceDisplayName(originalName);
             UpdatePlaylistDisplayNames(GetEffectiveOutputParts());
+            PersistLastWaveSessionIfPossible();
             return;
         }
 
@@ -7916,6 +7917,7 @@ public partial class Form1 : Form, IMessageFilter
         _sourceBaseNameOverride = name;
         waveformView.SetSourceDisplayName(name);
         UpdatePlaylistDisplayNames(GetEffectiveOutputParts());
+        PersistLastWaveSessionIfPossible();
     }
 
     private Dictionary<int, string> BuildPlaylistNameOverrides(
@@ -8803,6 +8805,8 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
+        RestoreSourceBaseNameFromState(state, preview);
+
         var hasAny =
             state.Parts.Count > 0
             || savedGroups.Count > 0
@@ -9282,8 +9286,27 @@ public partial class Form1 : Form, IMessageFilter
             _playlistAdditiveLayersByPart,
             session.GetWaveOnlySessionMarkers(),
             session.RegionEdgeFades,
-            _lastWavePaths.Count > 0 ? _lastWavePaths : LastWaveSessionState.GetLoadedWavePaths(preview));
+            _lastWavePaths.Count > 0 ? _lastWavePaths : LastWaveSessionState.GetLoadedWavePaths(preview),
+            _sourceBaseNameOverride);
         _projectStore.SaveLastWaveSession(_loadedProjectName, state);
+    }
+
+    /// <summary>サイドカーに保存した波形名の手動リネームを復元する。</summary>
+    private void RestoreSourceBaseNameFromState(
+        LastWaveSessionState state,
+        WaveformPreviewData preview)
+    {
+        var name = state.SourceBaseNameOverride?.Trim();
+        if (string.IsNullOrEmpty(name)
+            || preview.IsMultiWaveOnly
+            || !WwiseObjectNames.TryValidateBaseName(name, out _))
+        {
+            return;
+        }
+
+        _sourceBaseNameOverride = name;
+        waveformView.SetSourceDisplayName(name);
+        UpdatePlaylistDisplayNames(GetEffectiveOutputParts());
     }
 
     /// <summary>
