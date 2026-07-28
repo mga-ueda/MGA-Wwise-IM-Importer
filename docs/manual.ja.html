@@ -23,6 +23,7 @@
     nav.toc ol ol li { margin: 0.2rem 0; }
     nav.toc a { color: var(--muted); }
     nav.toc a:hover { color: var(--accent); }
+    nav.toc a.active { color: var(--accent); font-weight: 600; }
     main { max-width: 52rem; padding: 1.75rem 2rem 4rem; }
     main > header h1 { margin: 0 0 0.35rem; font-size: 1.75rem; font-weight: 650; }
     .lead { color: var(--muted); margin: 0 0 1rem; font-size: 1.02rem; }
@@ -45,7 +46,7 @@
     .note { background: #20282f; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 0.75rem 0; }
     .note p { margin: 0.3rem 0; }
     .badge { display: inline-block; background: #2f4a2f; color: #a9e2a9; border: 1px solid #4a7a4a; border-radius: 999px; font-size: 0.78rem; padding: 0.05em 0.7em; margin-left: 0.4em; vertical-align: middle; }
-    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; text-align: center; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
       nav.toc { position: relative; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
@@ -97,6 +98,7 @@
         <li><a href="#suffixes">接尾辞と Cue</a></li>
         <li><a href="#troubleshooting">困ったときは</a></li>
         <li><a href="#shortcuts">ショートカット一覧</a></li>
+        <li><a href="#disclaimer">対応範囲と位置づけ</a></li>
         <li><a href="#trademarks">商標</a></li>
       </ol>
     </nav>
@@ -110,16 +112,18 @@
       <h2 id="about">1. このアプリでできること</h2>
       <div class="hero">
         <p><strong>DAW で設計した音楽の構造を、そのまま Wwise の Interactive Music へ運ぶ</strong>ためのツールです。</p>
-        <p>Wwise 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を <span class="ui">EXPORT</span> 一発で Wwise へ揃えられます。<strong>手作業での実装より大幅に時短</strong>できます。</p>
-        <p><strong>Nuendo／Cubase を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やループ用マーカーのペア移動機能があり、<strong>波形エディタすら必須ではありません</strong>——これも大きな魅力の一つです。</p>
+        <p>Wwise の Interactive Music は、コンテナ・トランジション・Cue・フェードなど組み立てる要素が多く、一つずつ手で実装すると時間がかかります。本アプリなら、波形上で遷移やレイヤーを聴きながら内容を決め、<span class="ui">EXPORT</span> 一発で Wwise へ揃えられます。<strong>手作業での実装より大幅に時短</strong>できます。</p>
+        <p><strong>Nuendo／Cubase を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やループ用マーカーのペア移動機能があり、<strong>波形エディタすら必須ではありません</strong>。レイヤーミュージックでは、何レイヤーあっても、ループポイントの処理は 1 レイヤーに対して作業するだけで、自動的に他のレイヤーへ反映されます。</p>
         <p><strong>Nuendo／Cubase があると非常に強力です。</strong> マーカートラックをエクスポートした XML があれば、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように打つことができ、Entry／Exit／ループ設計を視覚的に進められます。</p>
+        <p><strong>横方向と縦方向の推移を、混在したまま扱えます。</strong> インタラクティブミュージックの推移には、曲から曲へ切り替えるクロスフェードタイプ（横方向）と、レイヤーを重ねるタイプ（縦方向）があります。さらに縦方向には、再生位置を保ったままクロスフェードで曲を差し替えるレイヤー切替タイプと、鳴っている曲にパートを重ねていくアッドレイヤータイプの 2 種類があります。これらのアセットが 1 つのプロジェクトに混じっていても、分け隔てなく同時に推移をプレビューでき、そのまままとめて Wwise へ実装できます。</p>
         <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。</p>
+        <p><strong>実装は WAAPI ＋ 独自処理の組み合わせです。</strong> Wwise の遠隔操作（WAAPI）に加えて、WAV の切り出し・ラウドネス計測・フェードのプロパティ変換などをアプリ側の独自処理で補っているため、WAAPI を呼ぶだけの自動実装ツールでは実現できない実装まで踏み込めます。具体的には次のようなことができます。</p>
         <ul>
-          <li>Music Playlist の遷移プレビュー（Exit Source At／Fade In／Fade Out／Play -E）</li>
-          <li>グループ化による縦レイヤー（Alt 上乗せ、Group Fade、Change Occurs At）</li>
-          <li>ストリーミング（Prefetch Length／Look-ahead Time）や Keep Layer Balance（Make-Up Gain）</li>
-          <li>WAAPI 経由で Music 構造を自動生成</li>
-          <li><strong>複数波形の同時ドロップやマーカートラック XML の利用により、何曲でもまとめて実装可能</strong></li>
+          <li>Music Playlist 間の遷移を、Exit Source At／Fade In／Fade Out／Play -E を切り替えながら実際に聴いてプレビューできます</li>
+          <li>Playlist をグループ化して縦レイヤーを組み、上乗せ再生（Additive Layer）・Group Fade・Change Occurs At によるレイヤー切替を確認できます</li>          <li><strong>グループの音量バランスを維持したまま実装できます</strong>（Loudness Normalization で崩れがちなレイヤー間バランスを Make-Up Gain で自動補正。利用時に推奨）</li>
+          <li>設定を忘れがちなストリーミング設定（Prefetch Length／Look-ahead Time）も UI から指定して書き出せます</li>
+          <li>聴いて決めた内容は、WAAPI 経由で Wwise 上に Music 構造として自動生成されます</li>
+          <li><strong>複数波形の同時ドロップやマーカートラック XML の利用により、何曲でもまとめて実装できます</strong></li>
         </ul>
       </div>
 
@@ -155,7 +159,7 @@
         <li><strong>書き出しパスを設定する</strong><br />プロジェクトバーの書き出しパスに、Wwise プロジェクトの <code>Originals</code> フォルダ配下（例: <code>Originals\Music</code>。無ければエクスプローラーで作成）を指定します。</li>
         <li><strong>WAV を 1 本ドラッグ＆ドロップする</strong><br />ログに <code>=== Wave 単体モード ===</code> と表示され、波形が出ます。<kbd>Space</kbd> で再生できます。</li>
         <li><strong>（ループさせたい場合）マーカーを 2 本打つ</strong><br />波形をクリックしてループ開始位置へシークし、<kbd>Insert</kbd> でマーカーを追加。ループ終了位置でも同様に追加します。<strong>マーカーがちょうど 2 本なら、その間が自動でループ区間になります</strong>（先頭〜1 本目はイントロ、2 本目〜末尾は余韻として扱われます）。マーカーは ▼ のドラッグで微調整できます。</li>
-        <li><strong>聴いて確認する</strong><br /><kbd>Space</kbd> で再生するとループ区間は無限ループします。位置が気になったらマーカーを動かして詰めます。</li>
+        <li><strong>聴いて確認する</strong><br /><kbd>Space</kbd> で再生するとループ区間は無限ループします。<kbd>L</kbd> でループエンドの少し手前（1 小節前。小節管理がないときは 3 秒前）へジャンプできるので、つなぎ目の確認に便利です。位置が気になったらマーカーを動かして詰めます。</li>
         <li><strong><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）</strong><br />切り出した WAV が書き出しパスへ保存され、Wwise 側に Music Playlist Container 一式が自動生成されます。Wwise 側で再生して確認してみてください。</li>
       </ol>
       <div class="note">
@@ -171,10 +175,10 @@
         <thead><tr><th>方式</th><th>用意するもの</th><th>向いているケース</th><th>できること</th></tr></thead>
         <tbody>
           <tr>
-            <td><strong>A: Nuendo／Cubase の XML</strong><span class="badge">おすすめ</span></td>
+            <td><strong>A: Nuendo／Cubase の XML</strong></td>
             <td><code>Song.wav</code> ＋ 同名の <code>Song.xml</code>（マーカートラックの書き出し）</td>
             <td>Nuendo／Cubase を使っていて、<strong>小節・テンポ管理が必要な実装</strong>をしたい（Next Bar 遷移、Custom Cue、1 本のマスターに複数曲など）</td>
-            <td>小節線・テンポ・拍子の表示、小節単位の操作（Next Bar／Next Beat、メトロノーム、小節ジャンプ）、単発マーカー → Custom Cue、マーカーを「塗る」ように追加</td>
+            <td>小節線・テンポ・拍子の表示、小節単位の操作（Next Bar／Next Beat、メトロノーム、小節ジャンプ）、単発マーカー → Custom Cue、マーカーを「塗る」ように追加（グリッド＝小節・拍に沿って大量のマーカーを一気に付与できる）</td>
           </tr>
           <tr>
             <td><strong>B: マーカー入り WAV</strong></td>
@@ -202,7 +206,7 @@
         <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）と <strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）は読み込みエラーになります。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
       </div>
 
-      <h3 id="prepare-xml">4-2. 方式 A: Nuendo／Cubase の XML を用意する<span class="badge">おすすめ</span></h3>
+      <h3 id="prepare-xml">4-2. 方式 A: Nuendo／Cubase の XML を用意する</h3>
       <p>Nuendo／Cubase のプロジェクトから「マーカートラックの XML」と「WAV」の 2 ファイルを書き出し、<strong>同じフォルダに同じベース名で</strong>並べます（例: <code>Song.wav</code> と <code>Song.xml</code>）。</p>
       <div class="note">
         <p>XML の書き出しは、<strong>小節・テンポ管理を必要とするインタラクティブミュージックの実装を可能にするための追加手順</strong>です。単に「イントロがあってループする」だけの曲であれば XML は必須ではなく、マーカーを埋め込んだ WAV（<a href="#prepare-embedded">4-3</a>）だけで実装できます。</p>
@@ -310,6 +314,7 @@
         <li>小節線・テンポ・拍子は表示されません（<span class="ui">Exit Source At</span> の Next Bar／Next Beat も使えません）</li>
         <li><span class="ui">More Options</span> の <span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> は無効です（Wave 単体は <a href="#prepare-none">4-4</a> のマーカー編集操作を使います）</li>
         <li>埋め込みマーカーの読み込みに加え、アプリ上での付与・移動・ペア移動が可能です（WAV には書き戻しません）。波形エディタでの事前分割が不要なケースが多いです</li>
+        <li>Playlist を <kbd>Shift</kbd>+クリック／ドラッグでグループ化（縦レイヤー）すると、マーカーは基準 Playlist から全メンバーへ投影され（同期先には半透明で表示）、<strong>追加・削除・移動（ペア移動を含む）が自動でシンクロ</strong>します。1 か所の編集で全レイヤーのマーカーが揃うのが大きな魅力です</li>
         <li>埋め込み／編集したマーカーはプレビューとリージョン分割に使い、<strong>Wwise Custom Cue には出しません</strong></li>
         <li>WAV にサステインループ（smpl）がある場合、その Start を <code>-L</code>・End を <code>-E</code> として扱います。通常の埋め込みマーカーより優先し、ループ Start／End と同タイミングのマーカーは破棄します（ログに記録）</li>
         <li>書き出し名の目安: <code>基底名_1.wav</code> など（波形ファイル名のダブルクリックで基底名を編集可）</li>
@@ -327,6 +332,7 @@
       <ul>
         <li>Sample Rate／チャンネル数／ビット深度などが一致している必要があります（不一致だと読み込み中止）</li>
         <li>ファイルごとの埋め込みマーカー／サステインループ（smpl）は Wave 単体と同じ規則で処理します（サステインの Start／End → <code>-L</code>／<code>-E</code> 優先。同タイミングのマーカーは破棄）</li>
+        <li>グループ化した Playlist（縦レイヤー）では、マーカーが基準 Playlist から全メンバーへ投影され（同期先には半透明で表示）、<strong>追加・削除・移動（ペア移動を含む）が自動でシンクロ</strong>します。全レイヤーのループ位置を 1 回の操作で揃えられるのが大きな魅力です</li>
         <li>Wwise 側の親名は固定で <code>Multi_Wave</code>（編集不可）。Playlist 名はドロップ時のファイル名を維持します</li>
         <li>書き出しでは可能な範囲で元 WAV を共用し、ファイル名をむやみに改変しません</li>
         <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
@@ -385,6 +391,9 @@
         <li><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）を実行する</li>
       </ol>
       <p><span class="ui">EXPORT</span> は次の 4 条件が揃うと有効になります: <strong>①有効パートあり ②WAAPI 接続中 ③作成先選択済み ④書き出し先が存在し Originals 配下</strong>。未達の理由はログの <code>=== Export Preflight ===</code> に出ます。</p>
+      <div class="note">
+        <p><strong>重要 — 同名ファイルの上書き</strong>: 書き出しパスに同名の WAV がある場合、EXPORT は<strong>確認なしで上書き</strong>しますので、ご注意ください。</p>
+      </div>
 
       <h2 id="layout">7. 画面の見方</h2>
       <ol>
@@ -457,7 +466,7 @@
       <ul>
         <li>クリックで遷移。再生中は Exit Source At に従う。同一グループ内は Same Time、以外は Entry Cue</li>
         <li><kbd>Shift</kbd> … グループ化（縦レイヤー）／<kbd>Ctrl</kbd> … 解除／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> … 除外（<code>Excluded Region n</code>）</li>
-        <li><kbd>Alt</kbd> … グループ内上乗せ／停止（最大 8、Group Fade）。<span class="ui">Additive Layer</span> オン時は通常クリックでも可</li>
+        <li>グループ内上乗せ／停止 … <span class="ui">Additive Layer</span> オン時、再生中の同一グループ内を通常クリック（最大 8、Group Fade）</li>
         <li><span class="ui">Compact Num.</span> … 書き出し番号を詰める（既定オフ）</li>
       </ul>
       <h3 id="more-options">More Options</h3>
@@ -466,6 +475,9 @@
         <li><span class="ui">Stream</span> … Prefetch Length／Look-ahead Time（ms）。先頭 Music Segment の Look-ahead は固定 <strong>50 ms</strong>。2 番目以降は UI 値（既定 500）</li>
         <li><span class="ui">Keep Layer Balance</span> … 既定オフ。Loudness Normalization 利用時に推奨。グループ相対バランスを Music Track の Make-Up Gain へ非破壊設定</li>
       </ul>
+      <div class="note">
+        <p><strong>なぜ Keep Layer Balance が必要か</strong>: Wwise の Loudness Normalization は音源ごとに一律でターゲットラウドネスへ揃えるため、意図的に控えめにミックスしたレイヤーまで他と同じ音量へ持ち上げられ、グループ内の音量バランスが崩れてしまいます。オンにすると、EXPORT 時にグループ内各パートの Integrated Loudness（LKFS）を計測し、最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差のぶんだけ下げて設定します。これにより Normalization 後も DAW で決めたレイヤーバランスがそのまま再現されます。補正は Music Track の Make-Up Gain への非破壊設定で、WAV には焼き込みません。</p>
+      </div>
 
       <h2 id="action-bar">12. 操作バー／WAAPI ステータスバー</h2>
       <table>
@@ -490,6 +502,9 @@
         <li>リージョン端フェード → MusicClip Fade／Keep Layer Balance → Make-Up Gain</li>
         <li>Nuendo／Cubase XML モードの単発マーカー → Custom Cue。テンポ・拍子は Music Segment で Override</li>
       </ul>
+      <div class="note">
+        <p><strong>同名ファイルの上書きに注意</strong>: 書き出しパスに同名の WAV がある場合、EXPORT は<strong>確認なしで上書き</strong>しますので、ご注意ください。</p>
+      </div>
 
       <h2 id="suffixes">14. 接尾辞と Cue</h2>
       <table>
@@ -548,28 +563,83 @@
       </table>
 
       <h2 id="shortcuts">16. ショートカット一覧</h2>
+      <h3>再生</h3>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>Space</kbd></td><td>再生／一時停止</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>約 3 秒前から再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>直前の再生開始位置から再生し直し</td></tr>
-          <tr><td><kbd>←</kbd>／<kbd>→</kbd></td><td>1 px シーク</td></tr>
-          <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>表示中画面の 0%〜90%</td></tr>
-          <tr><td><kbd>Insert</kbd></td><td>シーク位置にマーカー追加（マーカー編集が可能なモード）</td></tr>
-          <tr><td><kbd>Delete</kbd></td><td>選択したマーカーを削除（アプリ上のみ）</td></tr>
-          <tr><td><kbd>Z</kbd></td><td>波形高さ循環</td></tr>
-          <tr><td><kbd>G</kbd></td><td>小節ジャンプ</td></tr>
+          <tr><td><kbd>E</kbd></td><td>Play -E のオン／オフ（表示中の Playlist）</td></tr>
           <tr><td><kbd>M</kbd></td><td>メトロノームのオン／オフ（波形再生位置の拍に同期。テンポ／拍子があるとき）</td></tr>
+        </tbody>
+      </table>
+      <h3>シーク／ナビゲーション</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>←</kbd>／<kbd>→</kbd></td><td>1 px シーク</td></tr>
+          <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>表示中画面の 0%〜90% へシーク</td></tr>
+          <tr><td><kbd>Home</kbd>／<kbd>End</kbd></td><td>前／次の小節へ（小節情報があるとき）。マーカー編集が可能なモードでは表示幅の約 5% ずつ移動</td></tr>
+          <tr><td><kbd>PageUp</kbd>／<kbd>PageDown</kbd></td><td>表示幅 1 画面ぶん前／次へ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Home</kbd>／<kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>先頭／末尾へ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>←</kbd>／<kbd>Ctrl</kbd>+<kbd>→</kbd></td><td>前／次の Music Playlist へ</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd></td><td>前／次のマーカーへ（マーカー編集が可能なモード）</td></tr>
+          <tr><td><kbd>G</kbd></td><td>小節ジャンプ（小節情報があるとき）</td></tr>
           <tr><td><kbd>L</kbd></td><td>ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）</td></tr>
+          <tr><td><kbd>C</kbd>／<kbd>.</kbd></td><td>再生位置を表示の中央へ寄せる（シーク位置は変わらない）</td></tr>
+        </tbody>
+      </table>
+      <h3>表示／ズーム</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>↑</kbd>／<kbd>↓</kbd></td><td>時間ズームイン／アウト</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>↑</kbd>／<kbd>Ctrl</kbd>+<kbd>↓</kbd></td><td>時間ズーム最大／リセット</td></tr>
+          <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd>／<kbd>Shift</kbd>+<kbd>↓</kbd></td><td>振幅ズームイン／アウト</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↑</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↓</kbd></td><td>振幅ズーム最大／リセット</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>波形高さ循環（1×→2×→3×）</td></tr>
+        </tbody>
+      </table>
+      <h3>マーカー編集（マーカー編集が可能なモード）</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Insert</kbd></td><td>シーク位置にマーカー追加</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>選択したマーカーを削除（アプリ上のみ）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>再生位置上のマーカーを削除</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>再生位置上のマーカー名を変更</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>←</kbd>／<kbd>→</kbd></td><td>再生位置上のマーカーを 1 px 移動（押し続けで連続移動）。<kbd>Shift</kbd> 追加で 3 px、<kbd>Ctrl</kbd> 追加で一つ前のマーカーとペア移動</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo（マーカー編集・リージョン端フェード）</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>／<kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Redo</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        <p>グループ化した Playlist では、マーカーの追加・削除・移動（ペア移動を含む）が基準 Playlist から全メンバーへ自動でシンクロします（同期先には半透明で表示）。</p>
+      </div>
+      <h3>アプリ</h3>
+      <table>
+        <thead><tr><th>キー</th><th>動作</th></tr></thead>
+        <tbody>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd></td><td>EXPORT</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd></td><td>Wwise を開く／前面化</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Y</kbd></td><td>Undo／Redo</td></tr>
           <tr><td><kbd>Esc</kbd></td><td>終了確認</td></tr>
         </tbody>
       </table>
+      <div class="note">
+        <p>ログ欄やテキスト入力にフォーカスがある間、再生／波形系のショートカットは無効になります。また、後ろ方向へのシーク（<kbd>←</kbd>／<kbd>Home</kbd>／<kbd>PageUp</kbd>／<kbd>L</kbd>）は再生中に押している間だけ一時停止し、キーを離すと再生を再開します。</p>
+      </div>
 
-      <h2 id="trademarks">17. 商標</h2>
+      <h2 id="disclaimer">17. 対応範囲と位置づけ</h2>
+      <ul>
+        <li>本アプリは、<strong>Wwise の Interactive Music で出来ることをすべてカバーするものではありません</strong>。よく行われる手順に絞って機能を実装しています。たとえばフェードタイムはプリセットからの選択式ですし、推移タイミングの指定にも、Wwise にはあって本アプリには無い項目があります。</li>
+        <li>アプリ内でのプレビューは、実装結果を<strong>ざっくり事前確認するまで</strong>の位置づけです。アプリ独自の再生エンジンによる近似のため、Wwise 実機の挙動と完全に一致するとは限りません。最終確認と追い込みは、EXPORT 後に必ず Wwise 上で行ってください。</li>
+        <li>本アプリは基本的に<strong>ビュワー＆インポーター</strong>であり、エディタではありません（マーカーの編集など、多少のエディットはできます）。細かい作り込みは Wwise 上で行う前提です。</li>
+        <li>ソース WAV には一切書き込みません（非破壊）。一方で EXPORT は Wwise プロジェクトにオブジェクトを作成・変更するため、実行前に Wwise プロジェクトのバックアップやバージョン管理をおすすめします。</li>
+        <li>EXPORT は、書き出しパスにある<strong>同名の WAV を予告なく上書き</strong>しますので、ご注意ください。</li>
+      </ul>
+
+      <h2 id="trademarks">18. 商標</h2>
       <ul>
         <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
         <li><strong>Nuendo®</strong>／<strong>Cubase®</strong>／<strong>Steinberg®</strong> は Steinberg Media Technologies GmbH の商標です。本ツールは非公式です。</li>
@@ -578,5 +648,65 @@
       <footer>© MIYABI GAME AUDIO INC. — MGA Wwise IMImporter User Manual (ja)</footer>
     </main>
   </div>
+  <script>
+    (function () {
+      var links = Array.prototype.slice.call(
+        document.querySelectorAll("nav.toc a[href^='#']"));
+      var linkByTargetId = {};
+      links.forEach(function (link) {
+        linkByTargetId[decodeURIComponent(link.hash.slice(1))] = link;
+      });
+      var headings = Array.prototype.slice.call(
+        document.querySelectorAll("main [id]")).filter(function (el) {
+          return linkByTargetId[el.id];
+        });
+      var activeLink = null;
+
+      function update() {
+        var offset = window.innerHeight * 0.25;
+        var current = null;
+        for (var i = 0; i < headings.length; i++) {
+          if (headings[i].getBoundingClientRect().top <= offset) {
+            current = headings[i];
+          } else {
+            break;
+          }
+        }
+        // ページ末尾では最後のセクションを指す（短い最終章対策）。
+        if (window.innerHeight + window.scrollY
+            >= document.documentElement.scrollHeight - 2) {
+          current = headings[headings.length - 1] || current;
+        }
+        var link = current ? linkByTargetId[current.id] : null;
+        if (link === activeLink) {
+          return;
+        }
+        if (activeLink) {
+          activeLink.classList.remove("active");
+        }
+        activeLink = link;
+        if (activeLink) {
+          activeLink.classList.add("active");
+          activeLink.scrollIntoView({ block: "nearest" });
+        }
+      }
+
+      var queued = false;
+      function onScroll() {
+        if (queued) {
+          return;
+        }
+        queued = true;
+        requestAnimationFrame(function () {
+          queued = false;
+          update();
+        });
+      }
+
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
+      update();
+    })();
+  </script>
 </body>
 </html>
