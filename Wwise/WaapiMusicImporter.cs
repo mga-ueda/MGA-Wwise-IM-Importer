@@ -24,8 +24,9 @@ namespace MgaWwiseIMImporter.Wwise;
 ///    完了後に現在 State を先頭へ設定し、作成した Switch／Playlist を選択する（プレビュー用）。
 /// 5. 必要なら MusicClip トリムとリージョン端フェード（非破壊）を設定する。
 ///    Fade Duration が WAAPI 上限（3.6 秒）を超える場合は WWU 直接編集で本値を書く。
-/// 6. Playlist 遷移の MusicFade（Time）と Group State の TransitionList／
-///    Track State Volume は WAAPI 非対応のため、同系統の WWU 直編集で書く。
+/// 6. Playlist 遷移の MusicFade（Time）・Playlist Container 既定ルール（Any to Any）の
+///    Play post-exit・Group State の TransitionList／Track State Volume は
+///    WAAPI 非対応のため、同系統の WWU 直編集で書く。
 /// </para>
 /// </summary>
 internal static class WaapiMusicImporter
@@ -276,6 +277,7 @@ internal static class WaapiMusicImporter
             .ConfigureAwait(false);
 
         // 負の PlayAt、WAAPI 上限超の Clip Fade Duration、Playlist 遷移 MusicFade、
+        // Playlist Container 自身の Play post-exit、
         // Group State の TransitionList / Track State Volume は
         // プロジェクトを保存→クローズし、WWU（XML）を直接書き換えてから再オープンする。
         var transitionFadePatches = plan.IsMultiPart
@@ -289,12 +291,19 @@ internal static class WaapiMusicImporter
                     p.PlayPostExit))
                 .ToList()
             : [];
+        // Play -E は各 Music Playlist Container 内の既定ルール（Any to Any）にも反映する。
+        var playlistPostExitPatches = plan.Playlists
+            .Select(p => new PlaylistPostExitPatch(
+                plan.IsMultiPart ? p.Name : plan.ContainerName,
+                p.PlayPostExit))
+            .ToList();
         await ApplyWorkUnitPatchesAsync(
                 client,
                 musicRootPath,
                 playAtFixes,
                 fadeDurationFixes,
                 transitionFadePatches,
+                playlistPostExitPatches,
                 groupStateTransitionPatches,
                 groupStateVolumePatches,
                 Log,
@@ -2171,7 +2180,16 @@ internal static class WaapiMusicImporter
         bool PlayPostExit);
 
     /// <summary>
+    /// Music Playlist Container 自身の既定トランジションルール（Any to Any）へ載せる
+    /// Play post-exit（UI: Play -E）。WAAPI 非対応のため WWU 直編集で書く。
+    /// </summary>
+    private readonly record struct PlaylistPostExitPatch(
+        string PlaylistContainerName,
+        bool PlayPostExit);
+
+    /// <summary>
     /// 負の PlayAt・WAAPI 上限超の Clip Fade Duration・Playlist 遷移 MusicFade・
+    /// Playlist Container 既定ルールの Play post-exit・
     /// Group State の旧 TransitionList クリア／Track State Volume を WWU 直接編集で設定する。
     /// 手順: project.save → 対象 WWU 特定 → project.close → XML パッチ → project.open。
     /// </summary>
@@ -2181,6 +2199,7 @@ internal static class WaapiMusicImporter
         IReadOnlyList<MusicClipPlayAtFix> playAtFixes,
         IReadOnlyList<MusicClipFadeDurationFix> fadeFixes,
         IReadOnlyList<MusicTransitionFadePatch> transitionFades,
+        IReadOnlyList<PlaylistPostExitPatch> playlistPostExits,
         IReadOnlyList<StateGroupTransitionPatch> groupStateTransitions,
         IReadOnlyList<MusicTrackStateVolumePatch> groupStateVolumes,
         Action<string> log,
@@ -2189,6 +2208,7 @@ internal static class WaapiMusicImporter
         if (playAtFixes.Count == 0
             && fadeFixes.Count == 0
             && transitionFades.Count == 0
+            && playlistPostExits.Count == 0
             && groupStateTransitions.Count == 0
             && groupStateVolumes.Count == 0)
         {
@@ -2231,6 +2251,7 @@ internal static class WaapiMusicImporter
             playAtFixes.Count,
             fadeFixes.Count,
             transitionFades.Count,
+            playlistPostExits.Count,
             groupStateTransitions.Count + groupStateVolumes.Count));
 
         var clipFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -2252,9 +2273,10 @@ internal static class WaapiMusicImporter
         }
 
         // MusicTransition は TransitionRoot 配下で name 照会が不安定なため、
-        // Switch Container 自体の WWU を開き、Destination 参照でルールを特定する。
+        // コンテナ自体の WWU を開き、Destination 参照等でルールを特定する。
+        // Playlist Container の Play post-exit も同じ WWU（musicRootPath の所属先）に載る。
         string? transitionWwuPath = null;
-        if (transitionFades.Count > 0)
+        if (transitionFades.Count > 0 || playlistPostExits.Count > 0)
         {
             transitionWwuPath = await QuerySingleReturnStringAsync(
                     client,
@@ -2300,12 +2322,18 @@ internal static class WaapiMusicImporter
                 PatchMusicClipPropertiesInWorkUnitFile(group.Key, group.ToList(), log);
             }
 
-            if (transitionWwuPath is not null)
+            if (transitionWwuPath is not null && transitionFades.Count > 0)
             {
                 PatchMusicTransitionFadesInWorkUnitFile(transitionWwuPath, transitionFades, log);
                 // MusicFade / Enable は TransitionInfo 配下で WAAPI 照会が不安定なため、
                 // 再オープン前に WWU 上で検証する。
                 VerifyMusicTransitionFadesInWorkUnitFile(transitionWwuPath, transitionFades);
+            }
+
+            if (transitionWwuPath is not null && playlistPostExits.Count > 0)
+            {
+                PatchPlaylistPostExitInWorkUnitFile(transitionWwuPath, playlistPostExits, log);
+                VerifyPlaylistPostExitInWorkUnitFile(transitionWwuPath, playlistPostExits);
             }
 
             if (groupStateTransitions.Count > 0)
@@ -2405,6 +2433,11 @@ internal static class WaapiMusicImporter
         if (transitionFades.Count > 0)
         {
             log(UiStrings.LogMusicTransitionFadePatchDone(transitionFades.Count));
+        }
+
+        if (playlistPostExits.Count > 0)
+        {
+            log(UiStrings.LogPlaylistPostExitPatchDone(playlistPostExits.Count));
         }
 
         if (groupStateTransitions.Count > 0)
@@ -3233,6 +3266,133 @@ internal static class WaapiMusicImporter
 
         doc.Save(wwuPath);
         log(UiStrings.LogMusicTransitionFadePatchFile(Path.GetFileName(wwuPath), patches.Count));
+    }
+
+    /// <summary>
+    /// Music Playlist Container 自身の既定トランジションルール（Any to Any）へ
+    /// Play post-exit（PlaySourcePostExit）を書き込む。WAAPI 非対応のため WWU 直編集。
+    /// </summary>
+    private static void PatchPlaylistPostExitInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<PlaylistPostExitPatch> patches,
+        Action<string> log)
+    {
+        WaitForExclusiveFileAccess(wwuPath);
+
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var rule = FindPlaylistAnyToAnyRule(doc, patch.PlaylistContainerName)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrPlaylistAnyToAnyRuleMissing(
+                        patch.PlaylistContainerName, wwuPath));
+
+            var propertyList = EnsureChildElement(doc, rule, "PropertyList", prepend: true);
+            // UI「Play post-exit」＝ WObjects の PlaySourcePostExit（@PlayPostExit は無効）。
+            UpsertBoolProperty(doc, propertyList, "PlaySourcePostExit", patch.PlayPostExit);
+        }
+
+        doc.Save(wwuPath);
+        log(UiStrings.LogPlaylistPostExitPatchFile(Path.GetFileName(wwuPath), patches.Count));
+    }
+
+    private static void VerifyPlaylistPostExitInWorkUnitFile(
+        string wwuPath,
+        IReadOnlyList<PlaylistPostExitPatch> patches)
+    {
+        var doc = new System.Xml.XmlDocument { PreserveWhitespace = true };
+        doc.Load(wwuPath);
+
+        foreach (var patch in patches)
+        {
+            var rule = FindPlaylistAnyToAnyRule(doc, patch.PlaylistContainerName)
+                ?? throw new InvalidOperationException(
+                    UiStrings.ErrPlaylistAnyToAnyRuleMissing(
+                        patch.PlaylistContainerName, wwuPath));
+
+            VerifyBoolProperty(
+                rule,
+                "PlaySourcePostExit",
+                patch.PlayPostExit,
+                patch.PlaylistContainerName);
+        }
+    }
+
+    /// <summary>
+    /// Music Playlist Container の TransitionRoot 直下から既定の Any to Any ルールを探す。
+    /// コンテナ作成時に Wwise が自動生成するルール（Source / Destination とも Any）が対象。
+    /// </summary>
+    private static System.Xml.XmlElement? FindPlaylistAnyToAnyRule(
+        System.Xml.XmlDocument doc,
+        string containerName)
+    {
+        var containers = doc.SelectNodes("//MusicPlaylistContainer");
+        if (containers is null)
+        {
+            return null;
+        }
+
+        foreach (System.Xml.XmlNode node in containers)
+        {
+            if (node is not System.Xml.XmlElement container
+                || !string.Equals(
+                    container.GetAttribute("Name"),
+                    containerName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var rules = container.SelectNodes(
+                "ReferenceList/Reference[@Name='TransitionRoot']/Custom/MusicTransition"
+                + "/ChildrenList/MusicTransition");
+            if (rules is null)
+            {
+                return null;
+            }
+
+            foreach (System.Xml.XmlNode ruleNode in rules)
+            {
+                if (ruleNode is not System.Xml.XmlElement rule
+                    || IsMusicTransitionFolder(rule))
+                {
+                    continue;
+                }
+
+                if (ReadTransitionContextType(rule, "SourceContextType") == 0
+                    && ReadTransitionContextType(rule, "DestinationContextType") == 0)
+                {
+                    return rule;
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /// <summary>MusicTransition の Context Type を読む（未記載はスキーマ既定の 0 = Any）。</summary>
+    private static int ReadTransitionContextType(
+        System.Xml.XmlElement rule,
+        string propertyName)
+    {
+        var property = rule.SelectSingleNode($"PropertyList/Property[@Name='{propertyName}']")
+            as System.Xml.XmlElement;
+        if (property is null)
+        {
+            return 0;
+        }
+
+        return int.TryParse(
+            property.GetAttribute("Value"),
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value)
+            ? value
+            : 0;
     }
 
     /// <summary>

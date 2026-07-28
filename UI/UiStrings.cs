@@ -2441,12 +2441,14 @@ internal static class UiStrings
         int playAtCount,
         int clipFadeCount,
         int transitionFadeCount,
+        int playlistPostExitCount,
         int groupStateTransitionCount) => Format(
-        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Clip Fade 超過={1} 件 / Playlist 遷移 Fade={2} 件 / Group State Transition={3} 件）。保存→クローズ→パッチ→再オープンを行います。",
-        "Message : Starting WWU patch (PlayAt={0}, Clip Fade over limit={1}, Playlist transition Fade={2}, Group State Transition={3}). save → close → patch → reopen.",
+        "Message : WWU 直接編集を開始します（PlayAt={0} 件 / Clip Fade 超過={1} 件 / Playlist 遷移 Fade={2} 件 / Play post-exit={3} 件 / Group State Transition={4} 件）。保存→クローズ→パッチ→再オープンを行います。",
+        "Message : Starting WWU patch (PlayAt={0}, Clip Fade over limit={1}, Playlist transition Fade={2}, Play post-exit={3}, Group State Transition={4}). save → close → patch → reopen.",
         playAtCount,
         clipFadeCount,
         transitionFadeCount,
+        playlistPostExitCount,
         groupStateTransitionCount);
 
     public static string LogMusicClipWorkUnitPatchDone(int count) => Format(
@@ -2464,6 +2466,23 @@ internal static class UiStrings
         "Message : Playlist 遷移 MusicFade WWU パッチ完了（{0} ルール）。",
         "Message : Playlist transition MusicFade WWU patch done ({0} rule(s)).",
         count);
+
+    public static string LogPlaylistPostExitPatchFile(string fileName, int count) => Format(
+        "Message : WWU の Playlist Container 既定ルール（Any to Any）へ Play post-exit を書き込みました → {0}（{1} 件）",
+        "Message : Patched Play post-exit on playlist container default rule (Any to Any) → {0} ({1} rule(s))",
+        fileName,
+        count);
+
+    public static string LogPlaylistPostExitPatchDone(int count) => Format(
+        "Message : Playlist Container の Play post-exit WWU パッチ完了（{0} 件）。",
+        "Message : Playlist container Play post-exit WWU patch done ({0} rule(s)).",
+        count);
+
+    public static string ErrPlaylistAnyToAnyRuleMissing(string containerName, string wwuPath) => Format(
+        "WWU 内に Music Playlist Container {0} の既定トランジションルール（Any to Any）が見つかりません（{1}）。プロジェクトの保存に失敗している可能性があります。",
+        "The default transition rule (Any to Any) of Music Playlist Container {0} was not found in {1}. The project may not have been saved.",
+        containerName,
+        wwuPath);
 
     public static string ErrMusicTransitionWorkUnitNotFound(string name) => Format(
         "MusicTransition の所属 WWU ファイルを特定できませんでした（{0}）",

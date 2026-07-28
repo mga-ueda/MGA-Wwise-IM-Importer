@@ -50,7 +50,9 @@ internal sealed class WwisePlaylistPlan
     public required RegionFadeCurveKind FadeOutCurve { get; init; }
 
     /// <summary>
-    /// Any → この Playlist ルールの Play post-exit（遷移先の記憶値。既定 true）。
+    /// Play post-exit（UI: Play -E。遷移先の記憶値。既定 true）。
+    /// Any → この Playlist ルール（複数パート時）と、この Playlist Container 自身の
+    /// 既定ルール（Any to Any）の両方に載せる。
     /// WAAPI 非対応のため、EXPORT 後に WWU の <c>PlaySourcePostExit</c> へ直編集する。
     /// </summary>
     public required bool PlayPostExit { get; init; }

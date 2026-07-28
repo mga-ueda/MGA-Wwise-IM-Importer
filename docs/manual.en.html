@@ -439,7 +439,7 @@
         <tbody>
           <tr><td class="ui">Fade In</td><td><code>None / 0.5 / 1.0 / 3.0 / 6.0 Sec.</code> (default None). Curve icon picks MusicFade curve. EXPORT → Destination Fade-in.</td></tr>
           <tr><td class="ui">Fade Out</td><td>Same seconds. EXPORT → Source Fade-out.</td></tr>
-          <tr><td class="ui">Options / Play -E</td><td>Default on. EXPORT → Play post-exit on Any → Object rules.</td></tr>
+          <tr><td class="ui">Options / Play -E</td><td>Default on. EXPORT → Play post-exit on the playlist container's default rule (Any to Any), and on the switch's Any → Object rules for multi-part.</td></tr>
           <tr><td class="ui">Options / Additive Layer</td><td>Default off. Per group. Additive playback (normal click toggles overlay). EXPORT uses cumulative State Volume (e.g. A = first only, B = both).</td></tr>
         </tbody>
       </table>
@@ -486,6 +486,7 @@
         <li>Two or more playlists → Music Switch Container + matching State Group</li>
         <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…)</li>
         <li>Any → Any (Exit Source At = Immediate) plus per-playlist Any → Object rules</li>
+        <li>Default rule (Any to Any) inside each playlist container → Play post-exit follows Play -E</li>
         <li>Edge fades → MusicClip Fade; Keep Layer Balance → Make-Up Gain</li>
         <li>Nuendo/Cubase XML single markers → Custom Cues; tempo/signature Override on Music Segments</li>
       </ul>
