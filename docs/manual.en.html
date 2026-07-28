@@ -114,7 +114,7 @@
         <p><strong>Carry the music structure you designed in the DAW straight into Wwise Interactive Music.</strong></p>
         <p>Interactive Music in Wwise involves many building blocks — containers, transitions, cues, fades — and assembling them by hand takes time. With this app, you decide transitions and layers by ear on the waveform, then push a consistent Wwise structure with a single <span class="ui">EXPORT</span>. <strong>Far faster than hand-building the same graph.</strong></p>
         <p><strong>You do not need Nuendo / Cubase.</strong> A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so <strong>a dedicated waveform editor is often unnecessary</strong>. With layered music, no matter how many layers you have, you only need to work the loop points on one layer — the edits carry over to the other layers automatically.</p>
-        <p><strong>Those DAWs make it especially powerful.</strong> Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.</p>
+        <p><strong>With Nuendo / Cubase, it is especially powerful.</strong> Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.</p>
         <p><strong>Horizontal and vertical transitions can be mixed freely.</strong> Interactive music transitions come in two directions: the crossfade type (horizontal — switching from one piece to another) and the layered type (vertical). The vertical kind further splits into layer switching — crossfading to another piece while keeping the playback position — and additive layering, which stacks extra parts on top of what is already playing. Even when these assets coexist in one project, you can preview their transitions together, with no distinction between them, and implement them into Wwise in one pass.</p>
         <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
         <p><strong>Implementation combines WAAPI with the app's own processing.</strong> On top of remote-controlling Wwise through WAAPI, the app handles WAV cutting, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:</p>
@@ -199,7 +199,7 @@
         <li><strong>First time?</strong> → Method C (follow the <a href="#quickstart">quick start</a>). Zero preparation, full workflow.</li>
         <li><strong>Using Nuendo / Cubase?</strong> → Make it a habit to export your mixdowns <strong>with the iXML chunk and markers included</strong> (a small extra step, but close to essential). For a simple “intro, then loop” piece, that alone (Method B) is enough to implement it. Only when you need <strong>bar / tempo management</strong> (Next Bar / Next Beat transitions, Custom Cues, several pieces on one master, etc.) do you additionally export the marker-track XML and use Method A.</li>
         <li><strong>Using another DAW?</strong> → Method B. Just export a WAV with markers to bring in your loop design.</li>
-        <li><strong>Lots of already-looped tracks?</strong> → Method C’s multi-wave mode. Drop them all at once for batch implementation.</li>
+        <li><strong>Lots of already-looped tracks?</strong> → Method C’s multi-wave mode. Drop them all at once for batch implementation into Wwise.</li>
       </ul>
       <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the cutting and Wwise-side implementation are still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
       <div class="note">
@@ -351,7 +351,7 @@
         <li>Makes the most of tempo, bar, and time-signature data. Markers/cycles overlay the waveform like painted regions for clearer structure work</li>
         <li>Multiple parts / pieces on one master can be implemented into Wwise together</li>
         <li>XML single markers are also used as Wwise <strong>Custom Cues</strong></li>
-        <li><kbd>Shift</kbd>+drag on the Marker lane adds session markers; <kbd>Ctrl</kbd>+drag removes only those additions (XML markers stay)</li>
+        <li><kbd>Shift</kbd>+drag on the Marker lane adds markers (for Custom Cues); <kbd>Ctrl</kbd>+drag removes only those additions (XML markers stay)</li>
         <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> are enabled</li>
         <li>Dropping <code>.xml</code> alone errors—a <code>.wav</code> is required</li>
       </ul>
@@ -400,7 +400,7 @@
         <li><strong>Project bar</strong></li>
         <li><strong>Waveform preview</strong></li>
         <li><strong>TRANSPORT</strong></li>
-        <li><strong>Log / transition panel</strong></li>
+        <li><strong>Log / transition panel</strong> (left: log; right: Fade / Exit / Music Playlist / More Options)</li>
         <li><strong>Action bar</strong> (CLEAR / RELOAD / EXPORT)</li>
         <li><strong>WAAPI status bar</strong></li>
       </ol>
@@ -464,7 +464,7 @@
       </table>
       <h3 id="playlist-list">Music Playlist list</h3>
       <ul>
-        <li>Click to transition. Same-group uses Same Time; otherwise Entry Cue</li>
+        <li>Click to transition. While playing, follows Exit Source At. Same-group uses Same Time; otherwise Entry Cue</li>
         <li><kbd>Shift</kbd> group / <kbd>Ctrl</kbd> ungroup / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> exclude (<code>Excluded Region n</code>)</li>
         <li>Layer on/off inside a group … with <span class="ui">Additive Layer</span> on, click a playlist in the playing group (max 8, Group Fade)</li>
         <li><span class="ui">Compact Num.</span> renumbers export IDs (default off)</li>
@@ -500,7 +500,7 @@
         <li>One part or one group → one Music Playlist Container</li>
         <li>Two or more playlists → Music Switch Container + matching State Group</li>
         <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…)</li>
-        <li>Any → Any (Exit Source At = Immediate) plus per-playlist Any → Object rules</li>
+        <li>Any → Any (Exit Source At = Immediate) plus per-playlist Any → Object (Fade / Exit Source At / Play post-exit)</li>
         <li>Default rule (Any to Any) inside each playlist container → Play post-exit follows Play -E</li>
         <li>Edge fades → MusicClip Fade; Keep Layer Balance → Make-Up Gain</li>
         <li>Nuendo/Cubase XML single markers → Custom Cues; tempo/signature Override on Music Segments</li>

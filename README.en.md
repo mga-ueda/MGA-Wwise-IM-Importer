@@ -17,7 +17,7 @@ Interactive Music in Wwise involves many building blocks — containers, transit
 
 **You do not need Nuendo / Cubase.** A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so **a dedicated waveform editor is often unnecessary**. With layered music, no matter how many layers you have, you only need to work the loop points on one layer — the edits carry over to the other layers automatically.
 
-**Those DAWs make it especially powerful.** Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.
+**With Nuendo / Cubase, it is especially powerful.** Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.
 
 **Horizontal and vertical transitions can be mixed freely.** Interactive music transitions come in two directions: the crossfade type (horizontal — switching from one piece to another) and the layered type (vertical). The vertical kind further splits into layer switching — crossfading to another piece while keeping the playback position — and additive layering, which stacks extra parts on top of what is already playing. Even when these assets coexist in one project, you can preview their transitions together, with no distinction between them, and implement them into Wwise in one pass.
 
