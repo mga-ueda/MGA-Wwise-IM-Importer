@@ -10083,8 +10083,6 @@ public partial class Form1 : Form, IMessageFilter
         _appSettings.SaveMetronomeVolume(_metronomePlayer.Volume);
         _audioPlayer.SetMetronomeVolume(_metronomePlayer.Volume);
         transportBar.PulseMetronomeFeedback();
-        // 変更後の音量をすぐ確認できるよう 1 クリック鳴らす（確認用は別経路）。
-        _metronomePlayer.PlayClick();
         ShowMetronomeVolumeTip();
         return true;
     }
@@ -10167,31 +10165,20 @@ public partial class Form1 : Form, IMessageFilter
 
         var positionSample = Math.Min(timeSample, frameCount - 1);
 
-        WaveformBarMark? activeBar = null;
-        WaveformBarMark? activeState = null;
-        WaveformBarMark? nextBar = null;
-        foreach (var mark in preview.Bars)
-        {
-            if (mark.SampleOffset <= positionSample)
-            {
-                activeState = mark;
-                if (!mark.IsTempoChangeOnly)
-                {
-                    activeBar = mark;
-                }
-                continue;
-            }
-
-            if (!mark.IsTempoChangeOnly)
-            {
-                nextBar = mark;
-                break;
-            }
-        }
-
-        activeBar ??= preview.Bars.FirstOrDefault(mark => !mark.IsTempoChangeOnly);
-        activeState ??= activeBar;
-        if (activeBar is not { } bar || activeState is not { } state)
+        if (!MetronomeBeatGrid.TryResolve(
+                preview.Bars,
+                positionSample,
+                frameCount,
+                (int)preview.WavInfo.SampleRate,
+                out var barNumber,
+                out var beat,
+                out var bpm,
+                out var numerator,
+                out var denominator,
+                out _,
+                out _,
+                out var beatStartSample,
+                out var nextBeatSample))
         {
             transportBar.SetPosition(new TransportPositionInfo(
                 Bpm: 120,
@@ -10206,32 +10193,19 @@ public partial class Form1 : Form, IMessageFilter
             return;
         }
 
-        var estimatedBarSamples = state.Bpm > 0d && state.Denominator > 0
-            ? (long)Math.Round(
-                60d / state.Bpm
-                * state.Numerator
-                * 4d / state.Denominator
-                * preview.WavInfo.SampleRate)
-            : frameCount - bar.SampleOffset;
-        var barEndSample = nextBar?.SampleOffset
-            ?? Math.Min(frameCount, bar.SampleOffset + Math.Max(1L, estimatedBarSamples));
-        var barLengthSamples = Math.Max(1L, barEndSample - bar.SampleOffset);
-        var offsetInBar = Math.Clamp(positionSample - bar.SampleOffset, 0L, barLengthSamples - 1);
-        var beatPosition = offsetInBar / (double)barLengthSamples * Math.Max(1, state.Numerator);
-        var beatZeroBased = Math.Min(
-            Math.Max(0, state.Numerator - 1),
-            Math.Max(0, (int)Math.Floor(beatPosition)));
+        var beatLengthSamples = Math.Max(1L, nextBeatSample - beatStartSample);
+        var offsetInBeat = Math.Clamp(positionSample - beatStartSample, 0L, beatLengthSamples - 1);
         var subdivision = Math.Clamp(
-            (int)Math.Floor((beatPosition - beatZeroBased) * 4d) + 1,
+            (int)Math.Floor(offsetInBeat / (double)beatLengthSamples * 4d) + 1,
             1,
             4);
 
         transportBar.SetPosition(new TransportPositionInfo(
-            state.Bpm,
-            state.Numerator,
-            state.Denominator,
-            Math.Max(0, bar.BarNumber),
-            beatZeroBased + 1,
+            bpm,
+            numerator,
+            denominator,
+            barNumber,
+            beat,
             subdivision,
             elapsed,
             HasMusicalPosition: true));

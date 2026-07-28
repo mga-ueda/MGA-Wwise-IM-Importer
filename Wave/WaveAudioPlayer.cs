@@ -1277,6 +1277,8 @@ internal sealed class WaveAudioPlayer : IDisposable
         }
 
         _reader.CurrentTime = TimeSpan.FromTicks(ticks);
+        // 不連続シーク後は着地拍をサイレントアーム（ジャンプ抑制で１拍目を落とさない）。
+        _provider?.ResetMetronomeSchedule();
 
         // 再生中は連続読み出しで自然に切り替わる。毎回デバイス再作成すると
         // シークバードラッグのスクラブが極端に重くなる。
@@ -1519,6 +1521,11 @@ internal sealed class WaveAudioPlayer : IDisposable
         private double _metronomeCachedBpm;
         private int _metronomeCachedNumerator;
         private int _metronomeCachedDenominator;
+        private long[] _metronomeCachedBeatStarts = [];
+        /// <summary>現在拍（0 始まり）。ホットパスで境界内なら解決を省略する。</summary>
+        private int _metronomeCurrentBeatZeroBased = -1;
+        private long _metronomeCurrentBeatStart;
+        private long _metronomeCurrentNextBeat;
 
         public StereoFloatWaveProvider(
             WaveFileReader source,
@@ -1626,14 +1633,35 @@ internal sealed class WaveAudioPlayer : IDisposable
                 lock (_gate)
                 {
                     _metronomeEnabled = enabled;
-                    _metronomeActiveClick = null;
-                    _metronomeClickPos = -1;
-                    _metronomeLastAbsSample = -1;
-                    _metronomeArmedBeatKey = null;
-                    _metronomeCachedBarStart = -1;
-                    _metronomeCachedBarEnd = -1;
+                    ResetMetronomeScheduleNoLock();
                 }
             }
+        }
+
+        /// <summary>シーク等の不連続後に、着地拍をサイレントアームし直す。</summary>
+        public void ResetMetronomeSchedule()
+        {
+            lock (_readGate)
+            {
+                lock (_gate)
+                {
+                    ResetMetronomeScheduleNoLock();
+                }
+            }
+        }
+
+        private void ResetMetronomeScheduleNoLock()
+        {
+            _metronomeActiveClick = null;
+            _metronomeClickPos = -1;
+            _metronomeLastAbsSample = -1;
+            _metronomeArmedBeatKey = null;
+            _metronomeCachedBarStart = -1;
+            _metronomeCachedBarEnd = -1;
+            _metronomeCachedBeatStarts = [];
+            _metronomeCurrentBeatZeroBased = -1;
+            _metronomeCurrentBeatStart = 0;
+            _metronomeCurrentNextBeat = 0;
         }
 
         public void SetMetronomeVolume(float volume)
@@ -1654,10 +1682,7 @@ internal sealed class WaveAudioPlayer : IDisposable
                 lock (_gate)
                 {
                     _metronomeBars = bars ?? [];
-                    _metronomeArmedBeatKey = null;
-                    _metronomeLastAbsSample = -1;
-                    _metronomeCachedBarStart = -1;
-                    _metronomeCachedBarEnd = -1;
+                    ResetMetronomeScheduleNoLock();
                 }
             }
         }
@@ -1757,6 +1782,7 @@ internal sealed class WaveAudioPlayer : IDisposable
             {
                 var generation = NextPlaylistGeneration();
                 SeekToSample(_source, startSample);
+                ResetMetronomeScheduleNoLock();
                 lock (_gate)
                 {
                     _pendingPlaylistTransition = null;
@@ -2978,6 +3004,7 @@ internal sealed class WaveAudioPlayer : IDisposable
         /// <summary>
         /// 再生サンプル位置の拍境界で High／Low をアームし、進行中クリックの 1 サンプルを返す。
         /// 呼び出しは <see cref="ReadCore"/>（<_readGate>）上のみ。
+        /// 同一拍内は O(1)。小節跨ぎ／拍境界でのみグリッドを進める（毎サンプルの全マーク走査はしない）。
         /// </summary>
         private float NextMetronomeSample(
             long absSample,
@@ -2993,7 +3020,20 @@ internal sealed class WaveAudioPlayer : IDisposable
                 _metronomeClickPos = -1;
                 _metronomeArmedBeatKey = null;
                 _metronomeLastAbsSample = -1;
+                _metronomeCurrentBeatZeroBased = -1;
                 return 0f;
+            }
+
+            // 同一拍内ホットパス: 解決・マーク走査なし。
+            if (_metronomeArmedBeatKey is not null
+                && _metronomeCurrentBeatZeroBased >= 0
+                && absSample >= _metronomeCurrentBeatStart
+                && absSample < _metronomeCurrentNextBeat
+                && absSample >= _metronomeCachedBarStart
+                && absSample < _metronomeCachedBarEnd)
+            {
+                _metronomeLastAbsSample = absSample;
+                return ReadMetronomeClickSample(volume);
             }
 
             if (TryResolveMusicalBeatAtSample(
@@ -3001,11 +3041,9 @@ internal sealed class WaveAudioPlayer : IDisposable
                     absSample,
                     out var barNumber,
                     out var beat,
-                    out var bpm,
-                    out var denominator)
-                && beat >= 1
-                && bpm > 0d
-                && denominator > 0)
+                    out var beatStartSample,
+                    out var nextBeatSample)
+                && beat >= 1)
             {
                 var beatKey = ((long)barNumber << 16) | (uint)beat;
                 if (_metronomeArmedBeatKey is not long lastKey)
@@ -3016,10 +3054,8 @@ internal sealed class WaveAudioPlayer : IDisposable
                 else if (beatKey != lastKey)
                 {
                     var sampleDelta = absSample - _metronomeLastAbsSample;
-                    var beatSamples = Math.Max(
-                        1L,
-                        (long)Math.Round(
-                            60d / bpm * (4d / denominator) * WaveFormat.SampleRate));
+                    // 到着拍の実長のみ使う（BPM 再走査しない）。
+                    var beatSamples = Math.Max(1L, nextBeatSample - beatStartSample);
                     _metronomeLastAbsSample = absSample;
                     _metronomeArmedBeatKey = beatKey;
                     // 前方への大きなジャンプ（シーク等）はクリックしない。ループ折り返しは鳴らす。
@@ -3035,6 +3071,11 @@ internal sealed class WaveAudioPlayer : IDisposable
                 }
             }
 
+            return ReadMetronomeClickSample(volume);
+        }
+
+        private float ReadMetronomeClickSample(float volume)
+        {
             if (_metronomeActiveClick is not { Length: > 0 } click
                 || _metronomeClickPos < 0
                 || _metronomeClickPos >= click.Length)
@@ -3060,13 +3101,13 @@ internal sealed class WaveAudioPlayer : IDisposable
             long positionSample,
             out int barNumber,
             out int beat,
-            out double bpm,
-            out int denominator)
+            out long beatStartSample,
+            out long nextBeatSample)
         {
             barNumber = 0;
             beat = 1;
-            bpm = 0d;
-            denominator = 0;
+            beatStartSample = 0;
+            nextBeatSample = 0;
 
             var frameCount = _sourceBlockAlign <= 0 ? 0L : _source.Length / _sourceBlockAlign;
             if (frameCount <= 0 || bars.Count == 0)
@@ -3075,91 +3116,98 @@ internal sealed class WaveAudioPlayer : IDisposable
             }
 
             positionSample = Math.Clamp(positionSample, 0L, frameCount - 1);
+            var sampleRate = WaveFormat.SampleRate;
 
             if (_metronomeCachedBarStart >= 0
                 && positionSample >= _metronomeCachedBarStart
                 && positionSample < _metronomeCachedBarEnd
                 && _metronomeCachedNumerator > 0
-                && _metronomeCachedBpm > 0d
-                && _metronomeCachedDenominator > 0)
+                && _metronomeCachedDenominator > 0
+                && _metronomeCachedBeatStarts.Length == _metronomeCachedNumerator)
             {
-                var barLengthSamples = Math.Max(
-                    1L,
-                    _metronomeCachedBarEnd - _metronomeCachedBarStart);
-                var offsetInBar = positionSample - _metronomeCachedBarStart;
-                var beatPosition = offsetInBar / (double)barLengthSamples * _metronomeCachedNumerator;
-                var beatZeroBased = Math.Min(
-                    _metronomeCachedNumerator - 1,
-                    Math.Max(0, (int)Math.Floor(beatPosition)));
+                // 連続再生は前方へしか進まないので、現在拍から前方スキャン。
+                var beatZeroBased = _metronomeCurrentBeatZeroBased;
+                if (beatZeroBased < 0
+                    || beatZeroBased >= _metronomeCachedBeatStarts.Length
+                    || positionSample < _metronomeCachedBeatStarts[beatZeroBased])
+                {
+                    beatZeroBased = 0;
+                }
+
+                while (beatZeroBased + 1 < _metronomeCachedBeatStarts.Length
+                    && positionSample >= _metronomeCachedBeatStarts[beatZeroBased + 1])
+                {
+                    beatZeroBased++;
+                }
+
+                ApplyCurrentBeat(beatZeroBased);
                 barNumber = _metronomeCachedBarNumber;
                 beat = beatZeroBased + 1;
-                bpm = _metronomeCachedBpm;
-                denominator = _metronomeCachedDenominator;
+                beatStartSample = _metronomeCurrentBeatStart;
+                nextBeatSample = _metronomeCurrentNextBeat;
                 return true;
             }
 
-            WaveformBarMark? activeBar = null;
-            WaveformBarMark? activeState = null;
-            WaveformBarMark? nextBar = null;
-            foreach (var mark in bars)
-            {
-                if (mark.SampleOffset <= positionSample)
-                {
-                    activeState = mark;
-                    if (!mark.IsTempoChangeOnly)
-                    {
-                        activeBar = mark;
-                    }
-
-                    continue;
-                }
-
-                if (!mark.IsTempoChangeOnly)
-                {
-                    nextBar = mark;
-                    break;
-                }
-            }
-
-            activeBar ??= bars.FirstOrDefault(mark => !mark.IsTempoChangeOnly);
-            activeState ??= activeBar;
-            if (activeBar is not { } bar || activeState is not { } state)
+            if (!MetronomeBeatGrid.TryFindBarContext(
+                    bars,
+                    positionSample,
+                    frameCount,
+                    sampleRate,
+                    out var bar,
+                    out var state,
+                    out var barStartSample,
+                    out var barEndSample))
             {
                 return false;
             }
 
-            var estimatedBarSamples = state.Bpm > 0d && state.Denominator > 0
-                ? (long)Math.Round(
-                    60d / state.Bpm
-                    * state.Numerator
-                    * 4d / state.Denominator
-                    * WaveFormat.SampleRate)
-                : frameCount - bar.SampleOffset;
-            var barEndSample = nextBar?.SampleOffset
-                ?? Math.Min(frameCount, bar.SampleOffset + Math.Max(1L, estimatedBarSamples));
-            var resolvedBarLengthSamples = Math.Max(1L, barEndSample - bar.SampleOffset);
-            var offsetInResolvedBar = Math.Clamp(
-                positionSample - bar.SampleOffset,
-                0L,
-                resolvedBarLengthSamples - 1);
-            var resolvedBeatPosition =
-                offsetInResolvedBar / (double)resolvedBarLengthSamples * Math.Max(1, state.Numerator);
-            var resolvedBeatZeroBased = Math.Min(
-                Math.Max(0, state.Numerator - 1),
-                Math.Max(0, (int)Math.Floor(resolvedBeatPosition)));
+            var numerator = Math.Max(1, state.Numerator > 0 ? state.Numerator : bar.Numerator);
+            var denominator = state.Denominator > 0 ? state.Denominator : bar.Denominator;
+            var startBpm = bar.Bpm > 0d ? bar.Bpm : state.Bpm;
+            if (denominator <= 0 || startBpm <= 0d)
+            {
+                return false;
+            }
 
-            _metronomeCachedBarStart = bar.SampleOffset;
+            var beatStarts = MetronomeBeatGrid.BuildBeatStarts(
+                bars,
+                barStartSample,
+                barEndSample,
+                startBpm,
+                numerator,
+                denominator,
+                sampleRate);
+
+            var resolvedBeatZeroBased = 0;
+            while (resolvedBeatZeroBased + 1 < beatStarts.Length
+                && positionSample >= beatStarts[resolvedBeatZeroBased + 1])
+            {
+                resolvedBeatZeroBased++;
+            }
+
+            _metronomeCachedBarStart = barStartSample;
             _metronomeCachedBarEnd = barEndSample;
             _metronomeCachedBarNumber = Math.Max(0, bar.BarNumber);
-            _metronomeCachedBpm = state.Bpm;
-            _metronomeCachedNumerator = Math.Max(1, state.Numerator);
-            _metronomeCachedDenominator = state.Denominator;
+            _metronomeCachedBpm = state.Bpm > 0d ? state.Bpm : startBpm;
+            _metronomeCachedNumerator = numerator;
+            _metronomeCachedDenominator = denominator;
+            _metronomeCachedBeatStarts = beatStarts;
+            ApplyCurrentBeat(resolvedBeatZeroBased);
 
             barNumber = _metronomeCachedBarNumber;
             beat = resolvedBeatZeroBased + 1;
-            bpm = state.Bpm;
-            denominator = state.Denominator;
+            beatStartSample = _metronomeCurrentBeatStart;
+            nextBeatSample = _metronomeCurrentNextBeat;
             return true;
+        }
+
+        private void ApplyCurrentBeat(int beatZeroBased)
+        {
+            _metronomeCurrentBeatZeroBased = beatZeroBased;
+            _metronomeCurrentBeatStart = _metronomeCachedBeatStarts[beatZeroBased];
+            _metronomeCurrentNextBeat = beatZeroBased + 1 < _metronomeCachedBeatStarts.Length
+                ? _metronomeCachedBeatStarts[beatZeroBased + 1]
+                : _metronomeCachedBarEnd;
         }
 
         private void PushMonitorSamples(byte[] buffer, int offset, int frames)
@@ -3246,6 +3294,7 @@ internal sealed class WaveAudioPlayer : IDisposable
             }
 
             SeekToSample(_source, transition.TargetEntrySample);
+            ResetMetronomeScheduleNoLock();
             var continuedFromPreRoll = false;
             var sourceExitWillBeMaintained = false;
             lock (_gate)
