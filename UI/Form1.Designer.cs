@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 partial class Form1
 {
@@ -1383,7 +1383,7 @@ partial class Form1
         MinimumSize = new Size(480, 320);
         Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
-        Text = "MGA Wwise IMImporter - Version 1.1.1-beta";
+        Text = "MGA Wwise IM Importer - Version 1.1.1-beta";
         ((System.ComponentModel.ISupportInitialize)brandLogoPictureBox).EndInit();
         projectActionPanel.ResumeLayout(false);
         projectActionPanel.PerformLayout();

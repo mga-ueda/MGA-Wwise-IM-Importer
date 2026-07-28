@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -10,7 +10,7 @@ namespace MgaWwiseIMImporter.UI;
 internal static class AppVersion
 {
     public const string GitHubOwner = "mga-ueda";
-    public const string GitHubRepo = "MGA-Wwise-IMImporter";
+    public const string GitHubRepo = "MGA-Wwise-IM-Importer";
     public const string RepositoryUrl = "https://github.com/" + GitHubOwner + "/" + GitHubRepo;
     public const string ReleasesApiUrl =
         "https://api.github.com/repos/" + GitHubOwner + "/" + GitHubRepo + "/releases";
@@ -27,7 +27,7 @@ internal static class AppVersion
     public static string Current => CurrentLazy.Value;
 
     public static string FormTitle =>
-        "MGA Wwise IMImporter - Version " + Current;
+        "MGA Wwise IM Importer - Version " + Current;
 
     /// <summary>
     /// <paramref name="remoteSemVer"/> がローカルより新しいとき true。

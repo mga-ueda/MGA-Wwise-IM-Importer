@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -8,8 +8,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MgaWwiseIMImporter</RootNamespace>
     <AssemblyName>MgaWwiseIMImporter</AssemblyName>
-    <Product>MGA Wwise IMImporter</Product>
-    <ApplicationTitle>MGA Wwise IMImporter</ApplicationTitle>
+    <Product>MGA Wwise IM Importer</Product>
+    <ApplicationTitle>MGA Wwise IM Importer</ApplicationTitle>
     <ApplicationIcon>Assets\Branding\MgaWwiseIMImporter.ico</ApplicationIcon>
     <!-- 表示・比較・GitHub タグ共通の SemVer（例: 1.1.1-beta ↔ tag v1.1.1-beta） -->
     <Version>1.1.1-beta</Version>

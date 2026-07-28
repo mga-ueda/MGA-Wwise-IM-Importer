@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace MgaWwiseIMImporter.UI;
@@ -84,7 +84,7 @@ internal static class GitHubUpdateChecker
             Timeout = TimeSpan.FromSeconds(8),
         };
         client.DefaultRequestHeaders.UserAgent.Add(
-            new ProductInfoHeaderValue("MGA-Wwise-IMImporter", AppVersion.Current));
+            new ProductInfoHeaderValue("MGA-Wwise-IM-Importer", AppVersion.Current));
         client.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         return client;
