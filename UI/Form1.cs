@@ -2721,8 +2721,8 @@ public partial class Form1 : Form, IMessageFilter
                 waveformView.SetMarkers(session.EffectiveMarkers);
             }
 
-            _playlistFadeInSeconds = profile.FadeInSeconds;
-            _playlistFadeSeconds = profile.FadeOutSeconds;
+            _playlistFadeInSeconds = NormalizeTransitionFadeSeconds(profile.FadeInSeconds);
+            _playlistFadeSeconds = NormalizeTransitionFadeSeconds(profile.FadeOutSeconds);
             _playlistFadeInCurve = ParseFadeCurve(
                 profile.FadeInCurve,
                 _appSettings.DefaultPlaylistFadeInCurve);
@@ -2784,6 +2784,26 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         UpdateExportButtonState();
+    }
+
+    /// <summary>
+    /// Fade In / Fade Out の保存値をラジオの選択肢（None / 0.5 / 1 / 3 / 6 秒）の最寄りへ丸める。
+    /// 旧バージョンで保存した 9.0 など、選択肢に無い値と UI 表示の食い違いを防ぐ。
+    /// Group Fade には適用しない。
+    /// </summary>
+    private static double NormalizeTransitionFadeSeconds(double seconds)
+    {
+        double[] choices = [0d, 0.5d, 1d, 3d, 6d];
+        var best = choices[0];
+        foreach (var choice in choices)
+        {
+            if (Math.Abs(choice - seconds) < Math.Abs(best - seconds))
+            {
+                best = choice;
+            }
+        }
+
+        return best;
     }
 
     private void SelectFadeRadio(
@@ -4050,20 +4070,20 @@ public partial class Form1 : Form, IMessageFilter
         foreach (var radio in new[]
         {
             fadeInNoneRadio,
+            fadeInHalfSecondRadio,
             fadeInOneSecondRadio,
             fadeInThreeSecondsRadio,
             fadeInSixSecondsRadio,
-            fadeInNineSecondsRadio,
             fadeInGroupNoneRadio,
             fadeInGroupOneSecondRadio,
             fadeInGroupThreeSecondsRadio,
             fadeInGroupSixSecondsRadio,
             fadeInGroupNineSecondsRadio,
+            transitionTimeNoneRadio,
             transitionTimeHalfSecondRadio,
             transitionTimeOneSecondRadio,
             transitionTimeThreeSecondsRadio,
             transitionTimeSixSecondsRadio,
-            transitionTimeNineSecondsRadio,
             exitSourceImmediateRadio,
             exitSourceNextBarRadio,
             exitSourceNextBeatRadio,
@@ -7371,15 +7391,15 @@ public partial class Form1 : Form, IMessageFilter
         FlatOptionRadioButton[] fadeRadios =
         [
             fadeInNoneRadio,
+            fadeInHalfSecondRadio,
             fadeInOneSecondRadio,
             fadeInThreeSecondsRadio,
             fadeInSixSecondsRadio,
-            fadeInNineSecondsRadio,
+            transitionTimeNoneRadio,
             transitionTimeHalfSecondRadio,
             transitionTimeOneSecondRadio,
             transitionTimeThreeSecondsRadio,
             transitionTimeSixSecondsRadio,
-            transitionTimeNineSecondsRadio,
             fadeInGroupNoneRadio,
             fadeInGroupOneSecondRadio,
             fadeInGroupThreeSecondsRadio,
@@ -7583,15 +7603,15 @@ public partial class Form1 : Form, IMessageFilter
         FlatOptionRadioButton[] fadeRadios =
         [
             fadeInNoneRadio,
+            fadeInHalfSecondRadio,
             fadeInOneSecondRadio,
             fadeInThreeSecondsRadio,
             fadeInSixSecondsRadio,
-            fadeInNineSecondsRadio,
+            transitionTimeNoneRadio,
             transitionTimeHalfSecondRadio,
             transitionTimeOneSecondRadio,
             transitionTimeThreeSecondsRadio,
             transitionTimeSixSecondsRadio,
-            transitionTimeNineSecondsRadio,
             fadeInGroupNoneRadio,
             fadeInGroupOneSecondRadio,
             fadeInGroupThreeSecondsRadio,
@@ -9071,7 +9091,7 @@ public partial class Form1 : Form, IMessageFilter
                 continue;
             }
 
-            _playlistFadeInSecondsByPart[partNumber] = seconds;
+            _playlistFadeInSecondsByPart[partNumber] = NormalizeTransitionFadeSeconds(seconds);
             fadeInApplied++;
         }
 
@@ -9089,7 +9109,7 @@ public partial class Form1 : Form, IMessageFilter
                 continue;
             }
 
-            _playlistFadeOutSecondsByPart[partNumber] = seconds;
+            _playlistFadeOutSecondsByPart[partNumber] = NormalizeTransitionFadeSeconds(seconds);
             fadeOutApplied++;
         }
 

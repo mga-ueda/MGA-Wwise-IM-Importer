@@ -30,7 +30,7 @@ partial class Form1
     private FlatOptionRadioButton fadeInOneSecondRadio;
     private FlatOptionRadioButton fadeInThreeSecondsRadio;
     private FlatOptionRadioButton fadeInSixSecondsRadio;
-    private FlatOptionRadioButton fadeInNineSecondsRadio;
+    private FlatOptionRadioButton fadeInHalfSecondRadio;
     private SectionHeaderLabel optionsHeaderLabel;
     private FlowLayoutPanel optionsChoicesPanel;
     private FlatOptionCheckBox playMinusECheckBox;
@@ -54,11 +54,11 @@ partial class Form1
     private SectionHeaderLabel transitionTimeHeaderLabel;
     private PictureBox fadeOutCurveIcon;
     private FlowLayoutPanel transitionTimeChoicesPanel;
-    private FlatOptionRadioButton transitionTimeHalfSecondRadio;
+    private FlatOptionRadioButton transitionTimeNoneRadio;
     private FlatOptionRadioButton transitionTimeOneSecondRadio;
     private FlatOptionRadioButton transitionTimeThreeSecondsRadio;
     private FlatOptionRadioButton transitionTimeSixSecondsRadio;
-    private FlatOptionRadioButton transitionTimeNineSecondsRadio;
+    private FlatOptionRadioButton transitionTimeHalfSecondRadio;
     private Panel exitSourceAtSectionPanel;
     private SectionHeaderLabel exitSourceAtHeaderLabel;
     private FlowLayoutPanel exitSourceAtChoicesPanel;
@@ -141,7 +141,7 @@ partial class Form1
         fadeInOneSecondRadio = new FlatOptionRadioButton();
         fadeInThreeSecondsRadio = new FlatOptionRadioButton();
         fadeInSixSecondsRadio = new FlatOptionRadioButton();
-        fadeInNineSecondsRadio = new FlatOptionRadioButton();
+        fadeInHalfSecondRadio = new FlatOptionRadioButton();
         optionsHeaderLabel = new SectionHeaderLabel();
         optionsChoicesPanel = new FlowLayoutPanel();
         playMinusECheckBox = new FlatOptionCheckBox();
@@ -165,11 +165,11 @@ partial class Form1
         transitionTimeHeaderLabel = new SectionHeaderLabel();
         fadeOutCurveIcon = new PictureBox();
         transitionTimeChoicesPanel = new FlowLayoutPanel();
-        transitionTimeHalfSecondRadio = new FlatOptionRadioButton();
+        transitionTimeNoneRadio = new FlatOptionRadioButton();
         transitionTimeOneSecondRadio = new FlatOptionRadioButton();
         transitionTimeThreeSecondsRadio = new FlatOptionRadioButton();
         transitionTimeSixSecondsRadio = new FlatOptionRadioButton();
-        transitionTimeNineSecondsRadio = new FlatOptionRadioButton();
+        transitionTimeHalfSecondRadio = new FlatOptionRadioButton();
         exitSourceAtSectionPanel = new Panel();
         exitSourceAtHeaderLabel = new SectionHeaderLabel();
         exitSourceAtChoicesPanel = new FlowLayoutPanel();
@@ -643,10 +643,10 @@ partial class Form1
         fadeInChoicesPanel.TabIndex = 1;
         fadeInChoicesPanel.WrapContents = false;
         fadeInChoicesPanel.Controls.Add(fadeInNoneRadio);
+        fadeInChoicesPanel.Controls.Add(fadeInHalfSecondRadio);
         fadeInChoicesPanel.Controls.Add(fadeInOneSecondRadio);
         fadeInChoicesPanel.Controls.Add(fadeInThreeSecondsRadio);
         fadeInChoicesPanel.Controls.Add(fadeInSixSecondsRadio);
-        fadeInChoicesPanel.Controls.Add(fadeInNineSecondsRadio);
         //
         // fadeInNoneRadio
         //
@@ -668,7 +668,7 @@ partial class Form1
         fadeInOneSecondRadio.Font = new Font("Yu Gothic UI", 8.5F);
         fadeInOneSecondRadio.Margin = new Padding(3, 1, 3, 1);
         fadeInOneSecondRadio.Name = "fadeInOneSecondRadio";
-        fadeInOneSecondRadio.TabIndex = 1;
+        fadeInOneSecondRadio.TabIndex = 2;
         fadeInOneSecondRadio.Tag = 1D;
         fadeInOneSecondRadio.Text = "1.0 Sec.";
         fadeInOneSecondRadio.CheckedChanged += FadeInTimeRadio_CheckedChanged;
@@ -680,7 +680,7 @@ partial class Form1
         fadeInThreeSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
         fadeInThreeSecondsRadio.Margin = new Padding(3, 1, 3, 1);
         fadeInThreeSecondsRadio.Name = "fadeInThreeSecondsRadio";
-        fadeInThreeSecondsRadio.TabIndex = 2;
+        fadeInThreeSecondsRadio.TabIndex = 3;
         fadeInThreeSecondsRadio.Tag = 3D;
         fadeInThreeSecondsRadio.Text = "3.0 Sec.";
         fadeInThreeSecondsRadio.CheckedChanged += FadeInTimeRadio_CheckedChanged;
@@ -692,22 +692,22 @@ partial class Form1
         fadeInSixSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
         fadeInSixSecondsRadio.Margin = new Padding(3, 1, 3, 1);
         fadeInSixSecondsRadio.Name = "fadeInSixSecondsRadio";
-        fadeInSixSecondsRadio.TabIndex = 3;
+        fadeInSixSecondsRadio.TabIndex = 4;
         fadeInSixSecondsRadio.Tag = 6D;
         fadeInSixSecondsRadio.Text = "6.0 Sec.";
         fadeInSixSecondsRadio.CheckedChanged += FadeInTimeRadio_CheckedChanged;
         //
-        // fadeInNineSecondsRadio
+        // fadeInHalfSecondRadio
         //
-        fadeInNineSecondsRadio.AutoSize = false;
-        fadeInNineSecondsRadio.Height = 30;
-        fadeInNineSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        fadeInNineSecondsRadio.Margin = new Padding(3, 1, 3, 1);
-        fadeInNineSecondsRadio.Name = "fadeInNineSecondsRadio";
-        fadeInNineSecondsRadio.TabIndex = 4;
-        fadeInNineSecondsRadio.Tag = 9D;
-        fadeInNineSecondsRadio.Text = "9.0 Sec.";
-        fadeInNineSecondsRadio.CheckedChanged += FadeInTimeRadio_CheckedChanged;
+        fadeInHalfSecondRadio.AutoSize = false;
+        fadeInHalfSecondRadio.Height = 30;
+        fadeInHalfSecondRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        fadeInHalfSecondRadio.Margin = new Padding(3, 1, 3, 1);
+        fadeInHalfSecondRadio.Name = "fadeInHalfSecondRadio";
+        fadeInHalfSecondRadio.TabIndex = 1;
+        fadeInHalfSecondRadio.Tag = 0.5D;
+        fadeInHalfSecondRadio.Text = "0.5 Sec.";
+        fadeInHalfSecondRadio.CheckedChanged += FadeInTimeRadio_CheckedChanged;
         //
         // optionsHeaderLabel
         //
@@ -994,24 +994,24 @@ partial class Form1
         transitionTimeChoicesPanel.Size = new Size(100, 164);
         transitionTimeChoicesPanel.TabIndex = 1;
         transitionTimeChoicesPanel.WrapContents = false;
+        transitionTimeChoicesPanel.Controls.Add(transitionTimeNoneRadio);
         transitionTimeChoicesPanel.Controls.Add(transitionTimeHalfSecondRadio);
         transitionTimeChoicesPanel.Controls.Add(transitionTimeOneSecondRadio);
         transitionTimeChoicesPanel.Controls.Add(transitionTimeThreeSecondsRadio);
         transitionTimeChoicesPanel.Controls.Add(transitionTimeSixSecondsRadio);
-        transitionTimeChoicesPanel.Controls.Add(transitionTimeNineSecondsRadio);
         //
-        // transitionTimeHalfSecondRadio
+        // transitionTimeNoneRadio
         //
-        transitionTimeHalfSecondRadio.AutoSize = false;
-        transitionTimeHalfSecondRadio.Height = 30;
-        transitionTimeHalfSecondRadio.Checked = true;
-        transitionTimeHalfSecondRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        transitionTimeHalfSecondRadio.Margin = new Padding(3, 1, 3, 1);
-        transitionTimeHalfSecondRadio.Name = "transitionTimeHalfSecondRadio";
-        transitionTimeHalfSecondRadio.TabIndex = 0;
-        transitionTimeHalfSecondRadio.Tag = 0D;
-        transitionTimeHalfSecondRadio.Text = "None";
-        transitionTimeHalfSecondRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
+        transitionTimeNoneRadio.AutoSize = false;
+        transitionTimeNoneRadio.Height = 30;
+        transitionTimeNoneRadio.Checked = true;
+        transitionTimeNoneRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        transitionTimeNoneRadio.Margin = new Padding(3, 1, 3, 1);
+        transitionTimeNoneRadio.Name = "transitionTimeNoneRadio";
+        transitionTimeNoneRadio.TabIndex = 0;
+        transitionTimeNoneRadio.Tag = 0D;
+        transitionTimeNoneRadio.Text = "None";
+        transitionTimeNoneRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
         //
         // transitionTimeOneSecondRadio
         //
@@ -1020,7 +1020,7 @@ partial class Form1
         transitionTimeOneSecondRadio.Font = new Font("Yu Gothic UI", 8.5F);
         transitionTimeOneSecondRadio.Margin = new Padding(3, 1, 3, 1);
         transitionTimeOneSecondRadio.Name = "transitionTimeOneSecondRadio";
-        transitionTimeOneSecondRadio.TabIndex = 1;
+        transitionTimeOneSecondRadio.TabIndex = 2;
         transitionTimeOneSecondRadio.Tag = 1D;
         transitionTimeOneSecondRadio.Text = "1.0 Sec.";
         transitionTimeOneSecondRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
@@ -1032,7 +1032,7 @@ partial class Form1
         transitionTimeThreeSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
         transitionTimeThreeSecondsRadio.Margin = new Padding(3, 1, 3, 1);
         transitionTimeThreeSecondsRadio.Name = "transitionTimeThreeSecondsRadio";
-        transitionTimeThreeSecondsRadio.TabIndex = 2;
+        transitionTimeThreeSecondsRadio.TabIndex = 3;
         transitionTimeThreeSecondsRadio.Tag = 3D;
         transitionTimeThreeSecondsRadio.Text = "3.0 Sec.";
         transitionTimeThreeSecondsRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
@@ -1044,22 +1044,22 @@ partial class Form1
         transitionTimeSixSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
         transitionTimeSixSecondsRadio.Margin = new Padding(3, 1, 3, 1);
         transitionTimeSixSecondsRadio.Name = "transitionTimeSixSecondsRadio";
-        transitionTimeSixSecondsRadio.TabIndex = 3;
+        transitionTimeSixSecondsRadio.TabIndex = 4;
         transitionTimeSixSecondsRadio.Tag = 6D;
         transitionTimeSixSecondsRadio.Text = "6.0 Sec.";
         transitionTimeSixSecondsRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
         //
-        // transitionTimeNineSecondsRadio
+        // transitionTimeHalfSecondRadio
         //
-        transitionTimeNineSecondsRadio.AutoSize = false;
-        transitionTimeNineSecondsRadio.Height = 30;
-        transitionTimeNineSecondsRadio.Font = new Font("Yu Gothic UI", 8.5F);
-        transitionTimeNineSecondsRadio.Margin = new Padding(3, 1, 3, 1);
-        transitionTimeNineSecondsRadio.Name = "transitionTimeNineSecondsRadio";
-        transitionTimeNineSecondsRadio.TabIndex = 4;
-        transitionTimeNineSecondsRadio.Tag = 9D;
-        transitionTimeNineSecondsRadio.Text = "9.0 Sec.";
-        transitionTimeNineSecondsRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
+        transitionTimeHalfSecondRadio.AutoSize = false;
+        transitionTimeHalfSecondRadio.Height = 30;
+        transitionTimeHalfSecondRadio.Font = new Font("Yu Gothic UI", 8.5F);
+        transitionTimeHalfSecondRadio.Margin = new Padding(3, 1, 3, 1);
+        transitionTimeHalfSecondRadio.Name = "transitionTimeHalfSecondRadio";
+        transitionTimeHalfSecondRadio.TabIndex = 1;
+        transitionTimeHalfSecondRadio.Tag = 0.5D;
+        transitionTimeHalfSecondRadio.Text = "0.5 Sec.";
+        transitionTimeHalfSecondRadio.CheckedChanged += TransitionTimeRadio_CheckedChanged;
         //
         // exitSourceAtSectionPanel
         //
