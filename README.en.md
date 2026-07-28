@@ -13,18 +13,23 @@ Take Interactive Music from “hand-built Authoring” to “listen, decide, and
 
 **Carry the music structure you designed in the DAW straight into Wwise Interactive Music.**
 
-Building Music Playlist Containers, Music Switch Containers, Music Segments, Music Tracks, State Groups, transitions, cues, and fades one by one in Authoring takes time. Preview on the waveform, decide transitions and layers by ear, then push a consistent Wwise structure with a single EXPORT. **Far faster than hand-building the same graph.**
+Interactive Music in Wwise involves many building blocks — containers, transitions, cues, fades — and assembling them by hand takes time. With this app, you decide transitions and layers by ear on the waveform, then push a consistent Wwise structure with a single EXPORT. **Far faster than hand-building the same graph.**
 
-**You do not need Nuendo / Cubase.** A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so **a dedicated waveform editor is often unnecessary**, which is another major benefit.
+**You do not need Nuendo / Cubase.** A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so **a dedicated waveform editor is often unnecessary**. With layered music, no matter how many layers you have, you only need to work the loop points on one layer — the edits carry over to the other layers automatically.
 
 **Those DAWs make it especially powerful.** Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.
 
+**Horizontal and vertical transitions can be mixed freely.** Interactive music transitions come in two directions: the crossfade type (horizontal — switching from one piece to another) and the layered type (vertical). The vertical kind further splits into layer switching — crossfading to another piece while keeping the playback position — and additive layering, which stacks extra parts on top of what is already playing. Even when these assets coexist in one project, you can preview their transitions together, with no distinction between them, and implement them into Wwise in one pass.
+
 The workflow assumes **the Interactive Music data in Wwise is the master**. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.
 
-- Music Playlist transition preview (Exit Source At / Fade In / Fade Out / Play -E)
-- Vertical layers via grouping (Alt layering / Additive Layer, Group Fade, Change Occurs At)
-- Streaming (Prefetch Length / Look-ahead Time) and Keep Layer Balance (Make-Up Gain)
-- Automatic Music hierarchy creation over WAAPI
+**Implementation combines WAAPI with the app's own processing.** On top of remote-controlling Wwise through WAAPI, the app handles WAV cutting, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:
+
+- Preview transitions between Music Playlists by ear while switching Exit Source At / Fade In / Fade Out / Play -E
+- Group playlists into vertical layers and check layer switching with additive-layer playback, Group Fade, and Change Occurs At
+- **Implement groups with their volume balance preserved** (automatically compensates, via Make-Up Gain, the layer balance that Loudness Normalization would otherwise destroy; recommended when using it)
+- Set easy-to-forget streaming options (Prefetch Length / Look-ahead Time) from the UI and have them written out
+- Have everything you decided by ear generated automatically as a Music hierarchy in Wwise over WAAPI
 - **Drop multiple waves at once, or use marker-track XML, to implement any number of pieces together**
 
 ## Manual & download
