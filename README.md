@@ -4,6 +4,11 @@
 
 Interactive Music を、手作業の積み上げから「聴いて決めて渡す」流れへ。
 
+<p align="center">
+  <img src="docs/images/screenshot-transition-preview.png" width="49%" alt="遷移プレビューとフェードカーブ選択">
+  <img src="docs/images/screenshot-multi-part.png" width="49%" alt="長尺マスター波形の複数パート分割">
+</p>
+
 ## このアプリの魅力
 
 **DAW で設計した音楽の構造を、そのまま Wwise の Interactive Music へ運ぶ**ためのツールです。

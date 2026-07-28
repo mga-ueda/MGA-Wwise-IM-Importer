@@ -4,6 +4,11 @@
 
 Take Interactive Music from “hand-built Authoring” to “listen, decide, and deliver.”
 
+<p align="center">
+  <img src="docs/images/screenshot-transition-preview.png" width="49%" alt="Transition preview with fade curve selection">
+  <img src="docs/images/screenshot-multi-part.png" width="49%" alt="Splitting a long master waveform into multiple parts">
+</p>
+
 ## What makes this app stand out
 
 **Carry the music structure you designed in the DAW straight into Wwise Interactive Music.**
