@@ -25,6 +25,7 @@ The workflow assumes **the Interactive Music data in Wwise is the master**. Keep
 ## Manual & download
 
 - Manual: [Japanese](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.en.html) · [Hub](https://mga-ueda.github.io/MGA-Wwise-IMImporter/)
+- New here? Start with the [quick start](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.en.html#quickstart) (a single WAV is enough) and [preparing your material](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.en.html#prepare) (XML and marker rules)
 - In-app: project-bar **Manual (`?`)** (left of the gear; follows JP/EN)
 - Builds: [Releases](https://github.com/mga-ueda/MGA-Wwise-IMImporter/releases)
 

@@ -42,6 +42,9 @@
     th { background: #2a3036; color: #dce3ea; font-weight: 600; }
     tr:nth-child(even) td { background: #1e2226; }
     .ui { font-weight: 600; color: #f0f3f6; }
+    .note { background: #20282f; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 0.75rem 0; }
+    .note p { margin: 0.3rem 0; }
+    .badge { display: inline-block; background: #2f4a2f; color: #a9e2a9; border: 1px solid #4a7a4a; border-radius: 999px; font-size: 0.78rem; padding: 0.05em 0.7em; margin-left: 0.4em; vertical-align: middle; }
     footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
@@ -55,9 +58,20 @@
     <nav class="toc" aria-label="目次">
       <h1>目次</h1>
       <ol>
-        <li><a href="#about">このアプリの魅力</a></li>
+        <li><a href="#about">このアプリでできること</a></li>
+        <li><a href="#overview">はじめての方へ：全体の流れと用語</a></li>
+        <li><a href="#quickstart">クイックスタート（まずはこれだけ）</a></li>
         <li>
-          <a href="#load">読み込みのパターン</a>
+          <a href="#prepare">素材の準備：3 つの方式と選び方</a>
+          <ol>
+            <li><a href="#prepare-choose">どの方式で持ち込むか</a></li>
+            <li><a href="#prepare-xml">方式 A: Nuendo／Cubase の XML</a></li>
+            <li><a href="#prepare-embedded">方式 B: マーカー入り WAV</a></li>
+            <li><a href="#prepare-none">方式 C: WAV だけ</a></li>
+          </ol>
+        </li>
+        <li>
+          <a href="#load">読み込みモードの判定ルール</a>
           <ol>
             <li><a href="#load-single">Wave 単体</a></li>
             <li><a href="#load-multi">複数波形</a></li>
@@ -81,6 +95,7 @@
         <li><a href="#action-bar">操作バー／WAAPI ステータスバー</a></li>
         <li><a href="#export">EXPORT と Wwise に作られるもの</a></li>
         <li><a href="#suffixes">接尾辞と Cue</a></li>
+        <li><a href="#troubleshooting">困ったときは</a></li>
         <li><a href="#shortcuts">ショートカット一覧</a></li>
         <li><a href="#trademarks">商標</a></li>
       </ol>
@@ -92,11 +107,11 @@
         <p class="lead">Interactive Music を、手作業の積み上げから「聴いて決めて渡す」流れへ。</p>
       </header>
 
-      <h2 id="about">1. このアプリの魅力</h2>
+      <h2 id="about">1. このアプリでできること</h2>
       <div class="hero">
         <p><strong>DAW で設計した音楽の構造を、そのまま Wwise の Interactive Music へ運ぶ</strong>ためのツールです。</p>
-        <p>Authoring 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を <span class="ui">EXPORT</span> 一発で Wwise へ揃えられます。<strong>手作業での実装より大幅に時短</strong>できます。</p>
-        <p><strong>それらの DAW（Nuendo／Cubase）を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やループ用マーカーのペア移動機能があり、<strong>波形エディタすら必須ではありません</strong>——これも大きな魅力の一つです。</p>
+        <p>Wwise 上で Music Playlist Container／Music Switch Container／Music Segment／Music Track／State Group／トランジション／Cue／フェードを一つずつ手で組む作業は、時間がかかります。本アプリなら、波形上でプレビューし、遷移やレイヤーを聴きながら決めた内容を <span class="ui">EXPORT</span> 一発で Wwise へ揃えられます。<strong>手作業での実装より大幅に時短</strong>できます。</p>
+        <p><strong>Nuendo／Cubase を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やループ用マーカーのペア移動機能があり、<strong>波形エディタすら必須ではありません</strong>——これも大きな魅力の一つです。</p>
         <p><strong>Nuendo／Cubase があると非常に強力です。</strong> マーカートラックをエクスポートした XML があれば、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように打つことができ、Entry／Exit／ループ設計を視覚的に進められます。</p>
         <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。</p>
         <ul>
@@ -108,10 +123,181 @@
         </ul>
       </div>
 
-      <h2 id="load">2. 読み込みのパターン</h2>
-      <p>ドロップするファイルの組み合わせでモードが決まります。ログ先頭の見出しで現在のモードを確認できます。</p>
+      <h2 id="overview">2. はじめての方へ：全体の流れと用語</h2>
+      <p>使い方は、大きく次の 4 ステップだけです。</p>
+      <ol>
+        <li><strong>素材を用意する</strong> …… 曲の WAV（必要なら XML やマーカーも）。→ <a href="#prepare">4 章</a></li>
+        <li><strong>アプリへドロップする</strong> …… ファイルの組み合わせでモードは自動判定されます。切り替え操作は不要です。→ <a href="#load">5 章</a></li>
+        <li><strong>聴きながら調整する</strong> …… ループ位置・曲間の遷移・フェード・縦レイヤーを波形上で確認します。</li>
+        <li><strong><span class="ui">EXPORT</span> を押す</strong> …… WAV の切り出しと Wwise 上の構造作成が自動で行われます。→ <a href="#wwise-prep">6 章</a></li>
+      </ol>
+      <p>本マニュアルには Wwise の用語がいくつか登場します。最低限、次だけ押さえれば読み進められます。</p>
+      <table>
+        <thead><tr><th>用語</th><th>ざっくり言うと</th></tr></thead>
+        <tbody>
+          <tr><td>Interactive Music</td><td>ゲームの状況に合わせて曲を切り替えたり重ねたりする、Wwise の音楽再生の仕組み。</td></tr>
+          <tr><td>Music Segment</td><td>Wwise 上の音楽の最小単位。「1 区間の波形＋開始点（Entry Cue）＋終了点（Exit Cue）」のセット。</td></tr>
+          <tr><td>Music Playlist Container</td><td>Music Segment を並べて「イントロ → ループ」のような再生順を持たせる入れ物。本マニュアルでは「Playlist」と略します。おおむね「1 曲（またはループする 1 状態）」に相当します。</td></tr>
+          <tr><td>Music Switch Container</td><td>複数の Playlist を State（ゲームの状態）で切り替える親。Playlist が 2 つ以上あると自動で作られます。</td></tr>
+          <tr><td>Entry Cue／Exit Cue</td><td>Music Segment の「本編の開始点／終了点」。この外側（アウフタクトや余韻）は、次の曲と重ねて鳴らせます。</td></tr>
+          <tr><td>マーカー／サイクルマーカー</td><td>波形上の目印。マーカーは 1 点、サイクルマーカーは範囲（開始と終了）を持ちます。本アプリはこの目印から「どこがループか」などを読み取ります。</td></tr>
+          <tr><td>WAAPI</td><td>Wwise Authoring API。本アプリが起動中の Wwise を遠隔操作してオブジェクトを作るための通信窓口です。</td></tr>
+          <tr><td>Originals フォルダ</td><td>Wwise プロジェクトフォルダ内にある、ソース WAV の置き場。本アプリの書き出し先はこの配下を指定します。</td></tr>
+        </tbody>
+      </table>
 
-      <h3 id="load-single">2-1. Wave 単体（XML なし・WAV 1 本）</h3>
+      <h2 id="quickstart">3. クイックスタート（まずはこれだけ）</h2>
+      <p>特別な準備なしで、手元の WAV 1 本を Wwise に入れてみましょう。DAW も波形エディタも使いません。10 分程度で「ドロップ → 聴く → EXPORT」の流れが体験できます。</p>
+      <ol>
+        <li><strong>Wwise でプロジェクトを開き、WAAPI を有効にする</strong><br />メニュー <span class="ui">Project → User Preferences...</span> で <span class="ui">Enable Wwise Authoring API</span> にチェックを入れ、Wwise を再起動します（最初の 1 回だけ。詳細は <a href="#wwise-prep">6 章</a>）。</li>
+        <li><strong>Wwise の Project Explorer で作成先を選ぶ</strong><br /><span class="ui">Interactive Music Hierarchy</span> の <span class="ui">Default Work Unit</span> など、生成物を置きたいオブジェクトをクリックして選択状態にします。</li>
+        <li><strong>本アプリを起動する</strong><br />画面下の WAAPI ステータスバーに Wwise のバージョンとプロジェクト名、選択中の作成先が表示されれば接続できています。</li>
+        <li><strong>書き出しパスを設定する</strong><br />プロジェクトバーの書き出しパスに、Wwise プロジェクトの <code>Originals</code> フォルダ配下（例: <code>Originals\Music</code>。無ければエクスプローラーで作成）を指定します。</li>
+        <li><strong>WAV を 1 本ドラッグ＆ドロップする</strong><br />ログに <code>=== Wave 単体モード ===</code> と表示され、波形が出ます。<kbd>Space</kbd> で再生できます。</li>
+        <li><strong>（ループさせたい場合）マーカーを 2 本打つ</strong><br />波形をクリックしてループ開始位置へシークし、<kbd>Insert</kbd> でマーカーを追加。ループ終了位置でも同様に追加します。<strong>マーカーがちょうど 2 本なら、その間が自動でループ区間になります</strong>（先頭〜1 本目はイントロ、2 本目〜末尾は余韻として扱われます）。マーカーは ▼ のドラッグで微調整できます。</li>
+        <li><strong>聴いて確認する</strong><br /><kbd>Space</kbd> で再生するとループ区間は無限ループします。位置が気になったらマーカーを動かして詰めます。</li>
+        <li><strong><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）</strong><br />切り出した WAV が書き出しパスへ保存され、Wwise 側に Music Playlist Container 一式が自動生成されます。Wwise 側で再生して確認してみてください。</li>
+      </ol>
+      <div class="note">
+        <p><span class="ui">EXPORT</span> ボタンが押せないときは、ログの <code>=== Export Preflight ===</code> に理由（未接続・作成先未選択・書き出し先が Originals 配下でない、など）が出ています。→ <a href="#troubleshooting">15 章</a></p>
+      </div>
+      <p>この「マーカーを打って区間を決める」が本アプリの基本操作です。慣れてきたら、次章の方式 A／B で DAW からの持ち込みに進むと、テンポ同期や複数曲の一括実装まで広がります。</p>
+
+      <h2 id="prepare">4. 素材の準備：3 つの方式と選び方</h2>
+      <p>本アプリへ曲を持ち込む方法は 3 つあります。<strong>どれを使うかはドロップするファイルの組み合わせで自動判定される</strong>ため、アプリ側での切り替え操作はありません。また、どの方式でも読み込み後にアプリ内でマーカーを編集できます（元の WAV には書き戻さない非破壊編集です）。</p>
+
+      <h3 id="prepare-choose">4-1. どの方式で持ち込むか</h3>
+      <table>
+        <thead><tr><th>方式</th><th>用意するもの</th><th>向いているケース</th><th>できること</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>A: Nuendo／Cubase の XML</strong><span class="badge">おすすめ</span></td>
+            <td><code>Song.wav</code> ＋ 同名の <code>Song.xml</code>（マーカートラックの書き出し）</td>
+            <td>Nuendo／Cubase を使っていて、<strong>小節・テンポ管理が必要な実装</strong>をしたい（Next Bar 遷移、Custom Cue、1 本のマスターに複数曲など）</td>
+            <td>小節線・テンポ・拍子の表示、小節単位の操作（Next Bar／Next Beat、メトロノーム、小節ジャンプ）、単発マーカー → Custom Cue、マーカーを「塗る」ように追加</td>
+          </tr>
+          <tr>
+            <td><strong>B: マーカー入り WAV</strong></td>
+            <td>マーカー（またはサステインループ）を埋め込んだ <code>.wav</code></td>
+            <td>マーカー入り WAV を書き出せる DAW なら何でも（<strong>Nuendo／Cubase のミックスダウンも含む</strong>）。イントロ＋ループ程度のシンプルな構成ならこれで十分</td>
+            <td>埋め込みマーカーからループ／除外などの区間を自動認識。小節・テンポ情報は無し</td>
+          </tr>
+          <tr>
+            <td><strong>C: WAV だけ</strong></td>
+            <td><code>.wav</code> のみ（準備ゼロ）</td>
+            <td>まず試したい／素材 WAV しか無い／完成済みループ曲を大量に流し込みたい</td>
+            <td>アプリ内でマーカーを付与して区間を決める。2 本以上まとめてドロップすれば複数曲を一括実装（複数波形モード）</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>迷ったときの指針です。</p>
+      <ul>
+        <li><strong>初めて触る</strong> → 方式 C（<a href="#quickstart">クイックスタート</a>のとおり）。準備なしで全機能の流れを体験できます。</li>
+        <li><strong>Nuendo／Cubase を使っている</strong> → まず、ミックスダウンに <strong>iXML とマーカーを含めて</strong>書き出すことを習慣にしてください（ひと手間ですが、ほぼ必須級に便利です）。「イントロがあってループする」程度のシンプルな構成なら、それだけ（方式 B）で十分実装できます。<strong>小節・テンポ管理を必要とする実装</strong>（Next Bar／Next Beat での遷移、Custom Cue、1 本のマスターに複数曲を載せる等）をするときだけ、さらにマーカートラックの XML を書き出して方式 A にします。</li>
+        <li><strong>他の DAW を使っている</strong> → 方式 B。マーカー付き WAV を書き出すだけで、ループ設計を持ち込めます。</li>
+        <li><strong>すでにループ加工済みの曲ファイルがたくさんある</strong> → 方式 C の複数波形モード。まとめてドロップして一括で Wwise に実装できます。</li>
+      </ul>
+      <p>なお、マーカーが全く無い WAV でも読み込めます。その場合はアプリ内でループマーカーを打つことになり、手順としては波形エディタでループを打ち込む作業と大差なくなりますが、それでも切り出し・Wwise 実装は自動化され、ループ位置も取りやすい設計です。可能であれば、マーカーを含めた書き出し（方式 B）までは済ませておくことをおすすめします。</p>
+      <div class="note">
+        <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）と <strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）は読み込みエラーになります。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
+      </div>
+
+      <h3 id="prepare-xml">4-2. 方式 A: Nuendo／Cubase の XML を用意する<span class="badge">おすすめ</span></h3>
+      <p>Nuendo／Cubase のプロジェクトから「マーカートラックの XML」と「WAV」の 2 ファイルを書き出し、<strong>同じフォルダに同じベース名で</strong>並べます（例: <code>Song.wav</code> と <code>Song.xml</code>）。</p>
+      <div class="note">
+        <p>XML の書き出しは、<strong>小節・テンポ管理を必要とするインタラクティブミュージックの実装を可能にするための追加手順</strong>です。単に「イントロがあってループする」だけの曲であれば XML は必須ではなく、マーカーを埋め込んだ WAV（<a href="#prepare-embedded">4-3</a>）だけで実装できます。</p>
+      </div>
+
+      <p><strong>① DAW 上でマーカーを打つ</strong></p>
+      <p>マーカートラック上に、曲の構造を次のルールで配置します（名前の末尾で判定します。大文字小文字は区別しません）。</p>
+      <table>
+        <thead><tr><th>置くもの</th><th>名前の末尾</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>サイクルマーカー（範囲）</td><td><code>-L</code></td><td>ループ区間。プレビューで無限ループし、Wwise ではループする Music Segment になります。</td></tr>
+          <tr><td>サイクルマーカー（範囲）</td><td><code>-E</code></td><td>Exit Cue 以降（ループ後の余韻・リリース部）。ループ部と同じ Music Segment に束ねられ、遷移時に次の曲と重なって鳴ります。<br /><code>-L</code> の直後に <code>-E</code> を置き忘れても、自動で付与されます。</td></tr>
+          <tr><td>サイクルマーカー（範囲）</td><td><code>-R</code></td><td>除外（Remove）。この範囲は書き出さず、Wwise にも登録しません。1 本のマスター上に複数曲を置くとき、曲間の区切りとして使います。</td></tr>
+          <tr><td>単発マーカー（1 点）</td><td>（任意の名前）</td><td>Wwise の <strong>Custom Cue</strong> になります（名前がそのまま Cue 名）。ゲーム側同期用の目印などに。</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li><code>-L</code>／<code>-E</code>／<code>-R</code> の各範囲は<strong>重ねないでください</strong>（重なりは読み込みエラーになります）。</li>
+        <li>サイクルマーカーの In／Out、テンポが変わる小節頭、拍子の変更位置では波形が自動で分割されます。<strong><code>-R</code> で区切られた連続区間が 1 つの書き出しファイル＝1 つの Music Playlist</strong> になるため、1 本のマスター WAV に複数曲を並べてまとめて実装できます。</li>
+        <li>曲の頭が小節の途中から始まる場合（アウフタクト）は自動検出され、接尾辞 <code>-A</code> の区間として Entry Cue 前に配置されます。手動で <code>-A</code> を打つ必要は基本的にありません。</li>
+      </ul>
+
+      <p><strong>② マーカートラックを XML で書き出す</strong></p>
+      <ol>
+        <li>トラックリストで<strong>マーカートラックを選択</strong>します。選択するのはマーカートラックです——<strong>テンポトラックや拍子トラックを書き出しても情報が不足します</strong>。</li>
+        <li>メニューの <span class="ui">ファイル → 書き出し → 選択トラック</span>（Export → Selected Tracks）を実行し、<code>.xml</code> で保存します。</li>
+        <li>ファイル名は WAV と同じベース名にします（<code>Song.wav</code> に対して <code>Song.xml</code>）。</li>
+      </ol>
+      <div class="note">
+        <p>マーカートラックを選択して書き出した XML には、テンポ・拍子の情報も含まれます。読み込み時に「MTempoTrackEvent (Tempo Track) が見つかりません」と出る場合は、<strong>マーカートラックを選択して</strong>書き出したかを確認してください（テンポ／拍子トラックだけの書き出しでは不足します）。</p>
+      </div>
+
+      <p><strong>③ WAV を書き出す</strong></p>
+      <ol>
+        <li>同じプロジェクトから <span class="ui">ファイル → 書き出し → オーディオミックスダウン</span> で <code>.wav</code> を書き出します。</li>
+        <li>書き出しオプションで <strong>iXML チャンクとマーカーを含める設定を有効</strong>にしてください（推奨・ほぼ必須）。iXML により WAV にタイムライン上の開始位置（TimeReference）が記録され、小節線と波形が正確に一致します。</li>
+        <li>マーカーのオプションでは、<strong>意図したマーカートラックが埋め込み対象になっているか</strong>を必ず確認してください。別のトラックが対象のままだと「埋め込んだつもりが埋め込めていない」ことが起こり得ます。</li>
+        <li>XML と同じフォルダに、同じベース名で保存します。</li>
+      </ol>
+      <div class="note">
+        <p>iXML を入れられない場合は、<strong>曲をプロジェクト先頭（1 小節目の頭）に配置して先頭から書き出せば</strong>問題ありません（TimeReference が無い／0 のときは「波形先頭＝タイムライン先頭」とみなされます）。曲がタイムラインの途中に置いてある場合は iXML が必要です。</p>
+      </div>
+
+      <p><strong>④ ドロップする</strong></p>
+      <p><code>Song.wav</code> か <code>Song.xml</code> のどちらか一方（または両方）をアプリへドロップすれば、自動で両方読み込まれます。ログに <code>=== Nuendo/Cubase XML モード ===</code> と出れば成功です。小節・テンポ・拍子・マーカー・サイクルが波形に重なって表示されます。</p>
+
+      <h3 id="prepare-embedded">4-3. 方式 B: マーカー入り WAV を用意する</h3>
+      <p>Logic をはじめ、マーカーを WAV に埋め込んで書き出せる DAW・波形エディタなら何でも使えます。<strong>Nuendo／Cubase のオーディオミックスダウン（マーカーを含める設定）もこの方式に使えます</strong>——「イントロがあってループする」程度のシンプルな構成なら、XML を作らずこれだけで十分です。読み取られるのは次の 2 種類です。</p>
+      <ul>
+        <li><strong>サステインループ（smpl チャンク）</strong> …… サンプラー用のループ情報です。あれば最優先で採用され、ループ Start が <code>-L</code>、End が <code>-E</code> として扱われます。ループの Start／End と同じ位置にある通常マーカーは破棄されます（ログに記録されます）。</li>
+        <li><strong>通常のマーカー（cue ポイント）</strong> …… 名前（コメント）で意味を判定します。</li>
+      </ul>
+      <p>通常マーカーの名前ルールは次のとおりです。区間は「そのマーカーから次のマーカー（無ければ波形終端）まで」です。</p>
+      <table>
+        <thead><tr><th>マーカー名</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td><code>-L</code></td><td>ここからループ区間。</td></tr>
+          <tr><td><code>-E</code></td><td>ここから Exit Cue 以降（余韻）。</td></tr>
+          <tr><td><code>-R</code></td><td>ここから除外（書き出さない）。</td></tr>
+          <tr><td><code>-A</code></td><td>ここから Entry Cue 前（アウフタクト）。</td></tr>
+          <tr><td><code>Loop</code> を含む名前</td><td><code>-L</code> と同等。2 個で挟むとその間がループ区間になります（奇数個の余り 1 個は単独 <code>-L</code> 扱い）。</td></tr>
+          <tr><td>上記以外の名前</td><td>区間には影響しません（表示・編集用の目印）。</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li><strong>特例</strong>: マーカーがちょうど 2 本で特殊な名前が無い場合、その間が自動でループ区間になります。「ループの入りと出にただ目印を打っただけ」の WAV がそのまま使えます。</li>
+        <li>特殊名のマーカーが 1 つも無い場合は、曲全体が 1 区間（頭が Entry Cue、末尾が Exit Cue）として扱われます。ワンショット曲はマーカー無しで OK です。</li>
+        <li>小節線・テンポは表示されません（テンポ同期の機能を使いたい場合は方式 A へ）。</li>
+        <li>リージョン（cue＋<code>ltxt</code>）だけが入った WAV は現在未対応です。ポイントマーカーかサステインループをお使いください。</li>
+        <li>埋め込みマーカーはプレビューと区間分割にのみ使われ、<strong>Wwise の Custom Cue には出力されません</strong>（Custom Cue が必要なら方式 A の単発マーカーを使います）。</li>
+      </ul>
+
+      <h3 id="prepare-none">4-4. 方式 C: WAV だけで始める（アプリ内でマーカーを打つ）</h3>
+      <p>準備は不要です。<code>.wav</code> をそのままドロップし、アプリ内でマーカーを打って区間を決めます。操作は波形下のマーカーレーンで行います（元の WAV には一切書き込みません）。</p>
+      <ul>
+        <li><kbd>Insert</kbd> …… シーク位置にマーカーを追加</li>
+        <li>▼ をドラッグ …… マーカーを移動（<kbd>Alt</kbd>＋ドラッグで 1 つ前のマーカーも同量移動——ループ範囲の長さを保ったままのスライドに便利です）</li>
+        <li>▼ やコメントをダブルクリック …… 名前（コメント）を編集。<code>-L</code>／<code>-E</code>／<code>-R</code>／<code>-A</code> の意味は方式 B と同じです</li>
+        <li><kbd>Delete</kbd> …… 選択したマーカーを削除、<kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Y</kbd> …… Undo／Redo</li>
+      </ul>
+      <p>複数曲をまとめて実装したい場合は、<strong>2 本以上の WAV を同時にドロップ</strong>してください（複数波形モード）。仮想タイムライン上に連結表示され、<strong>1 ファイル＝1 Music Playlist</strong> として一括で Wwise に登録できます。各ファイルの埋め込みマーカー（方式 B のルール）もそのまま有効です。</p>
+
+      <h2 id="load">5. 読み込みモードの判定ルール</h2>
+      <p>ドロップするファイルの組み合わせでモードが決まります。ログ先頭の見出しで現在のモードを確認できます。</p>
+      <table>
+        <thead><tr><th>ドロップしたもの</th><th>モード（ログの見出し）</th></tr></thead>
+        <tbody>
+          <tr><td><code>.wav</code> 1 本（同名 <code>.xml</code> なし）</td><td><code>=== Wave 単体モード ===</code></td></tr>
+          <tr><td><code>.wav</code> 2 本以上（いずれも同名 <code>.xml</code> なし）</td><td><code>=== 複数波形モード（XML なし） ===</code></td></tr>
+          <tr><td>同名の <code>.wav</code> ＋ <code>.xml</code>（どちらか一方のドロップでも可）</td><td><code>=== Nuendo/Cubase XML モード ===</code></td></tr>
+          <tr><td><code>.xml</code> のみ（同名 <code>.wav</code> が見つからない）</td><td>エラー（波形表示には <code>.wav</code> が必須）</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="load-single">5-1. Wave 単体（XML なし・WAV 1 本）</h3>
       <p><strong>手順</strong></p>
       <ol>
         <li>同名の <code>.xml</code> が無い <code>.wav</code> を 1 本、アプリへドロップする</li>
@@ -122,14 +308,14 @@
       <p><strong>ポイント</strong></p>
       <ul>
         <li>小節線・テンポ・拍子は表示されません（<span class="ui">Exit Source At</span> の Next Bar／Next Beat も使えません）</li>
-        <li><span class="ui">More Options</span> の <span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> は無効です（Wave 単体は別のマーカー編集操作を使います）</li>
+        <li><span class="ui">More Options</span> の <span class="ui">Marker Comment</span>／<span class="ui">Marker Grid</span> は無効です（Wave 単体は <a href="#prepare-none">4-4</a> のマーカー編集操作を使います）</li>
         <li>埋め込みマーカーの読み込みに加え、アプリ上での付与・移動・ペア移動が可能です（WAV には書き戻しません）。波形エディタでの事前分割が不要なケースが多いです</li>
         <li>埋め込み／編集したマーカーはプレビューとリージョン分割に使い、<strong>Wwise Custom Cue には出しません</strong></li>
         <li>WAV にサステインループ（smpl）がある場合、その Start を <code>-L</code>・End を <code>-E</code> として扱います。通常の埋め込みマーカーより優先し、ループ Start／End と同タイミングのマーカーは破棄します（ログに記録）</li>
         <li>書き出し名の目安: <code>基底名_1.wav</code> など（波形ファイル名のダブルクリックで基底名を編集可）</li>
       </ul>
 
-      <h3 id="load-multi">2-2. 複数波形（XML なし・WAV 2 本以上）</h3>
+      <h3 id="load-multi">5-2. 複数波形（XML なし・WAV 2 本以上）</h3>
       <p><strong>手順</strong></p>
       <ol>
         <li><strong>2 本以上</strong>の <code>.wav</code> を同時にドロップする（どれにも同名 <code>.xml</code> が無いこと）</li>
@@ -146,8 +332,8 @@
         <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
       </ul>
 
-      <h3 id="load-xml">2-3. WAV ＋ 同名 XML（マーカートラックのエクスポート）</h3>
-      <p><strong>手順</strong></p>
+      <h3 id="load-xml">5-3. WAV ＋ 同名 XML（マーカートラックのエクスポート）</h3>
+      <p><strong>手順</strong>（XML と WAV の作り方は <a href="#prepare-xml">4-2</a> を参照）</p>
       <ol>
         <li>Nuendo／Cubase で<strong>マーカートラックを XML エクスポート</strong>し、同じフォルダに<strong>同じベース名</strong>の <code>.wav</code> と並べる（例: <code>Song.wav</code> と <code>Song.xml</code>）</li>
         <li>どちらか一方、または両方をドロップする</li>
@@ -171,18 +357,36 @@
         <li><span class="ui">RELOAD</span> や Keep Last Session による再読み込みでは、グループ／フェード等を可能な範囲で復元します</li>
       </ul>
 
-      <h2 id="wwise-prep">3. Wwise 側の準備と EXPORT</h2>
+      <h2 id="wwise-prep">6. Wwise 側の準備と EXPORT</h2>
+      <h3>6-1. WAAPI を有効にする（最初の 1 回だけ）</h3>
+      <p>本アプリは、起動中の Wwise Authoring と <strong>WAAPI（HTTP）</strong>で通信してオブジェクトを作ります。</p>
       <ol>
-        <li><strong>Wwise Authoring</strong> を起動し、<strong>WAAPI（HTTP）</strong> を有効にする</li>
+        <li>Wwise のメニュー <span class="ui">Project → User Preferences...</span> を開く</li>
+        <li><span class="ui">Enable Wwise Authoring API</span> にチェックを入れて <span class="ui">OK</span></li>
+        <li>Wwise を再起動する</li>
+      </ol>
+      <div class="note">
+        <p>本アプリの接続先は <code>http://127.0.0.1:8090/waapi</code>（同じ PC の Wwise、HTTP ポート 8090）で固定です。User Preferences で HTTP ポートを既定の <strong>8090</strong> から変更している場合は、既定に戻してください。</p>
+      </div>
+
+      <h3>6-2. 作成先と書き出しパス</h3>
+      <ul>
+        <li><strong>作成先</strong> …… Wwise の Project Explorer で、生成物を置きたいオブジェクト（<span class="ui">Interactive Music Hierarchy</span> の Work Unit や Virtual Folder など）をクリックして選択します。本アプリは「Wwise 上でいま選択されているオブジェクト」を作成先として使います。毎回選び直すのが煩わしい場合は、操作バーの <span class="ui">Keep Target</span> で固定できます。</li>
+        <li><strong>書き出しパス</strong> …… プロジェクトバーで、切り出した WAV の保存先を指定します。<strong>接続中の Wwise プロジェクトの <code>Originals</code> フォルダ配下</strong>である必要があります（例: <code>&lt;プロジェクト&gt;\Originals\Music\IMImporter</code>）。Wwise がソース WAV を参照できる場所に置くためです。</li>
+      </ul>
+
+      <h3>6-3. EXPORT の手順</h3>
+      <ol>
+        <li><strong>Wwise Authoring</strong> を起動し、WAAPI を有効にしておく（6-1）</li>
         <li>Project Explorer で<strong>作成先オブジェクト</strong>を選択する</li>
         <li>アプリの<strong>書き出しパス</strong>に、接続中プロジェクトの <code>Originals</code> 配下を指定する</li>
-        <li>上記のいずれかのパターンで波形を読み込む</li>
+        <li><a href="#load">5 章</a>のいずれかのパターンで波形を読み込む</li>
         <li>遷移・フェード・グループ化などをプレビューで確認する</li>
         <li><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）を実行する</li>
       </ol>
-      <p><span class="ui">EXPORT</span> 有効条件: 有効パートあり／WAAPI 接続／作成先選択／書き出し先が存在し Originals 配下。未達理由はログの <code>=== Export Preflight ===</code> に出ます。</p>
+      <p><span class="ui">EXPORT</span> は次の 4 条件が揃うと有効になります: <strong>①有効パートあり ②WAAPI 接続中 ③作成先選択済み ④書き出し先が存在し Originals 配下</strong>。未達の理由はログの <code>=== Export Preflight ===</code> に出ます。</p>
 
-      <h2 id="layout">4. 画面の見方</h2>
+      <h2 id="layout">7. 画面の見方</h2>
       <ol>
         <li><strong>プロジェクトバー</strong></li>
         <li><strong>波形プレビュー</strong></li>
@@ -192,7 +396,7 @@
         <li><strong>WAAPI ステータスバー</strong></li>
       </ol>
 
-      <h2 id="project-bar">5. プロジェクトバー</h2>
+      <h2 id="project-bar">8. プロジェクトバー</h2>
       <p>左から: プロジェクト名 → 書き出しパス → フォルダ／削除 → <span class="ui">Keep Last Session</span> → <span class="ui">Always on Top</span> → JP／EN → Tips → <strong>マニュアル</strong> → 歯車 → スペクトラム。</p>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
@@ -208,7 +412,7 @@
         </tbody>
       </table>
 
-      <h2 id="waveform">6. 波形プレビュー</h2>
+      <h2 id="waveform">9. 波形プレビュー</h2>
       <p>Measure／Tempo／Signature／Marker レーン、波形、Music Segment Name／Music Playlist Name レーンで構成されます（XML 無しモードでは小節系レーンは使えません）。</p>
       <ul>
         <li>クリック／ドラッグで再生位置を移動</li>
@@ -218,7 +422,7 @@
         <li>リージョン端の白三角フェードは非破壊。EXPORT 時に MusicClip の Fade へ設定</li>
       </ul>
 
-      <h2 id="transport">7. TRANSPORT</h2>
+      <h2 id="transport">10. TRANSPORT</h2>
       <p>位置表示 → <span class="ui">TRANS</span>（再生／<kbd>G</kbd>）→ <span class="ui">NAV</span> → <span class="ui">TIME</span> → <span class="ui">AMP</span> → <span class="ui">SIZE</span>。</p>
       <ul>
         <li><kbd>Space</kbd> … 再生／一時停止。<code>-L</code> 区間は無限ループ</li>
@@ -228,7 +432,7 @@
         <li><kbd>L</kbd> … ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）</li>
       </ul>
 
-      <h2 id="transition">8. ログ／遷移パネル</h2>
+      <h2 id="transition">11. ログ／遷移パネル</h2>
       <h3 id="fade-options">Fade In／Fade Out／Options</h3>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
@@ -263,7 +467,7 @@
         <li><span class="ui">Keep Layer Balance</span> … 既定オフ。Loudness Normalization 利用時に推奨。グループ相対バランスを Music Track の Make-Up Gain へ非破壊設定</li>
       </ul>
 
-      <h2 id="action-bar">9. 操作バー／WAAPI ステータスバー</h2>
+      <h2 id="action-bar">12. 操作バー／WAAPI ステータスバー</h2>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
         <tbody>
@@ -275,7 +479,7 @@
         </tbody>
       </table>
 
-      <h2 id="export">10. EXPORT と Wwise に作られるもの</h2>
+      <h2 id="export">13. EXPORT と Wwise に作られるもの</h2>
       <p><strong>Wwise 上の Interactive Music 実装をマスターとして扱う</strong>想定です。ワンショットとループをあらかじめ別 WAV に分けず、マスター波形上の構造を非破壊で組み立てます。書き出し WAV は範囲の<strong>切り出しのみ</strong>で、フェード・レイヤーバランス・Cue は Wwise プロパティへ設定します（ソースへ焼き込みません）。</p>
       <ul>
         <li>パートまたはグループ 1 つ → Music Playlist Container 1 つ</li>
@@ -286,7 +490,7 @@
         <li>Nuendo／Cubase XML モードの単発マーカー → Custom Cue。テンポ・拍子は Music Segment で Override</li>
       </ul>
 
-      <h2 id="suffixes">11. 接尾辞と Cue</h2>
+      <h2 id="suffixes">14. 接尾辞と Cue</h2>
       <table>
         <thead><tr><th>接尾辞</th><th>意味</th></tr></thead>
         <tbody>
@@ -299,7 +503,50 @@
       <p>重複配置はエラー。<code>-L</code> 連続の直後に接尾辞が無い場合、<code>-E</code> が自動付与されることがあります。</p>
       <p>Wave 単体／複数波形では、WAV のサステインループ（smpl）があればその Start を <code>-L</code>・End を <code>-E</code> として採用します。通常の埋め込みマーカー（コメント付き）も読み取りますが、サステインの Start／End と同タイミングのマーカーは破棄し、その旨をログに出します。</p>
 
-      <h2 id="shortcuts">12. ショートカット一覧</h2>
+      <h2 id="troubleshooting">15. 困ったときは</h2>
+      <table>
+        <thead><tr><th>症状</th><th>確認すること</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="ui">EXPORT</span> が押せない</td>
+            <td>ログの <code>=== Export Preflight ===</code> に理由が出ています。①波形（有効パート）を読み込んでいるか ②WAAPI 接続済みか ③Wwise 側で作成先を選択しているか（または Keep Target 済みか） ④書き出しパスが存在し、接続中プロジェクトの <code>Originals</code> 配下か。</td>
+          </tr>
+          <tr>
+            <td>WAAPI に接続できない／タイムアウトする</td>
+            <td>Wwise Authoring が起動しているか。<span class="ui">Project → User Preferences...</span> で <span class="ui">Enable Wwise Authoring API</span> にチェックが入っているか（変更後は Wwise 再起動）。HTTP ポートが既定の 8090 のままか。</td>
+          </tr>
+          <tr>
+            <td>XML のドロップで「MTempoTrackEvent (Tempo Track) が見つかりません」</td>
+            <td>マーカートラック以外（テンポ／拍子トラックのみ等）を書き出した XML では情報が揃いません。<strong>マーカートラックを選択して</strong> <span class="ui">ファイル → 書き出し → 選択トラック</span> をやり直してください。</td>
+          </tr>
+          <tr>
+            <td>マーカーを埋め込んだはずの WAV なのに、読み込んでもマーカーが出ない</td>
+            <td>ミックスダウンのマーカーオプションで、<strong>意図したマーカートラックが埋め込み対象になっているか</strong>を確認してください。別トラックが対象のままだと、埋め込んだつもりでも WAV にマーカーは入っていません。</td>
+          </tr>
+          <tr>
+            <td>小節線と波形がずれる／「iXML の TimeReference が取れません」と出る</td>
+            <td>WAV にタイムライン開始位置が記録されていません。ミックスダウン時に <span class="ui">iXML チャンクを挿入</span> をオンにするか、曲をプロジェクト先頭に置いて先頭から書き出してください。</td>
+          </tr>
+          <tr>
+            <td>複数の WAV をドロップしたのに複数波形モードにならない</td>
+            <td>どれか 1 本に同名の <code>.xml</code> が隣にあると、ペア処理（XML モード／Wave 単体）に切り替わります。また、サンプルレート・チャンネル数・ビット深度が全ファイルで一致していないと読み込みを中止します（ログに詳細）。</td>
+          </tr>
+          <tr>
+            <td>ファイル名のエラーで読み込めない</td>
+            <td>ファイル名（拡張子を除く）は Wwise オブジェクト名になるため、数字始まり（例: <code>01_Battle</code>）と Windows 予約名（<code>CON</code> など）は使えません。リネームしてから読み込んでください。</td>
+          </tr>
+          <tr>
+            <td>「リージョンが重なっています」のエラー</td>
+            <td><code>-L</code>／<code>-E</code>／<code>-R</code>（自動の <code>-A</code> 含む）の範囲が重なっています。DAW 側でサイクルマーカーの範囲が重ならないよう修正してください。</td>
+          </tr>
+          <tr>
+            <td>マーカーは読めたのにループしない</td>
+            <td>マーカー名を確認してください。区間として解釈されるのは <code>-L</code>／<code>-E</code>／<code>-R</code>／<code>-A</code>、名前に <code>Loop</code> を含むもの、または「マーカーちょうど 2 本」の特例のみです（<a href="#prepare-embedded">4-3</a>）。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="shortcuts">16. ショートカット一覧</h2>
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
@@ -308,6 +555,8 @@
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>直前の再生開始位置から再生し直し</td></tr>
           <tr><td><kbd>←</kbd>／<kbd>→</kbd></td><td>1 px シーク</td></tr>
           <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>表示中画面の 0%〜90%</td></tr>
+          <tr><td><kbd>Insert</kbd></td><td>シーク位置にマーカー追加（マーカー編集が可能なモード）</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>選択したマーカーを削除（アプリ上のみ）</td></tr>
           <tr><td><kbd>Z</kbd></td><td>波形高さ循環</td></tr>
           <tr><td><kbd>G</kbd></td><td>小節ジャンプ</td></tr>
           <tr><td><kbd>M</kbd></td><td>メトロノームのオン／オフ（波形再生位置の拍に同期。テンポ／拍子があるとき）</td></tr>
@@ -319,7 +568,7 @@
         </tbody>
       </table>
 
-      <h2 id="trademarks">13. 商標</h2>
+      <h2 id="trademarks">17. 商標</h2>
       <ul>
         <li><strong>Wwise®</strong>／<strong>Audiokinetic®</strong> は Audiokinetic Inc. の商標です。本ツールは非公式です。WAAPI には有効な Wwise ライセンスが必要です。</li>
         <li><strong>Nuendo®</strong>／<strong>Cubase®</strong>／<strong>Steinberg®</strong> は Steinberg Media Technologies GmbH の商標です。本ツールは非公式です。</li>

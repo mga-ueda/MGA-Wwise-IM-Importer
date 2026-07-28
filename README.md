@@ -25,6 +25,7 @@ Authoring 上で Music Playlist Container／Music Switch Container／Music Segme
 ## マニュアル・ダウンロード
 
 - マニュアル: [日本語](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.ja.html) · [English](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.en.html) · [一覧](https://mga-ueda.github.io/MGA-Wwise-IMImporter/)
+- 初めての方: WAV 1 本だけで試せる [クイックスタート](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.ja.html#quickstart) と、XML などの [素材の準備と方式の選び方](https://mga-ueda.github.io/MGA-Wwise-IMImporter/manual.ja.html#prepare) をどうぞ
 - アプリ内: プロジェクトバーの **マニュアル（`?`）**（歯車の左。JP／EN 追従）
 - 配布: [Releases](https://github.com/mga-ueda/MGA-Wwise-IMImporter/releases)
 

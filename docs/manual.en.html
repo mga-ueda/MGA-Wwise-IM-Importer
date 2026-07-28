@@ -42,6 +42,9 @@
     th { background: #2a3036; color: #dce3ea; font-weight: 600; }
     tr:nth-child(even) td { background: #1e2226; }
     .ui { font-weight: 600; color: #f0f3f6; }
+    .note { background: #20282f; border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 0.6rem 0.9rem; margin: 0.75rem 0; }
+    .note p { margin: 0.3rem 0; }
+    .badge { display: inline-block; background: #2f4a2f; color: #a9e2a9; border: 1px solid #4a7a4a; border-radius: 999px; font-size: 0.78rem; padding: 0.05em 0.7em; margin-left: 0.4em; vertical-align: middle; }
     footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; }
@@ -55,9 +58,20 @@
     <nav class="toc" aria-label="Contents">
       <h1>Contents</h1>
       <ol>
-        <li><a href="#about">What makes this app stand out</a></li>
+        <li><a href="#about">What this app does</a></li>
+        <li><a href="#overview">First time here? Workflow and terms</a></li>
+        <li><a href="#quickstart">Quick start (do this first)</a></li>
         <li>
-          <a href="#load">Loading patterns</a>
+          <a href="#prepare">Preparing your material: 3 methods</a>
+          <ol>
+            <li><a href="#prepare-choose">Which method to use</a></li>
+            <li><a href="#prepare-xml">Method A: Nuendo / Cubase XML</a></li>
+            <li><a href="#prepare-embedded">Method B: WAV with markers</a></li>
+            <li><a href="#prepare-none">Method C: plain WAV</a></li>
+          </ol>
+        </li>
+        <li>
+          <a href="#load">How the loading mode is chosen</a>
           <ol>
             <li><a href="#load-single">Wave-only</a></li>
             <li><a href="#load-multi">Multi-wave</a></li>
@@ -81,6 +95,7 @@
         <li><a href="#action-bar">Action bar / WAAPI status</a></li>
         <li><a href="#export">What EXPORT creates in Wwise</a></li>
         <li><a href="#suffixes">Suffixes and cues</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#shortcuts">Shortcuts</a></li>
         <li><a href="#trademarks">Trademarks</a></li>
       </ol>
@@ -92,10 +107,10 @@
         <p class="lead">Take Interactive Music from “hand-built Authoring” to “listen, decide, and deliver.”</p>
       </header>
 
-      <h2 id="about">1. What makes this app stand out</h2>
+      <h2 id="about">1. What this app does</h2>
       <div class="hero">
         <p><strong>Carry the music structure you designed in the DAW straight into Wwise Interactive Music.</strong></p>
-        <p>Building Music Playlist Containers, Music Switch Containers, Music Segments, Music Tracks, State Groups, transitions, cues, and fades one by one in Authoring takes time. Preview on the waveform, decide transitions and layers by ear, then push a consistent Wwise structure with a single <span class="ui">EXPORT</span>. <strong>Far faster than hand-building the same graph.</strong></p>
+        <p>Building Music Playlist Containers, Music Switch Containers, Music Segments, Music Tracks, State Groups, transitions, cues, and fades one by one in Wwise takes time. Preview on the waveform, decide transitions and layers by ear, then push a consistent Wwise structure with a single <span class="ui">EXPORT</span>. <strong>Far faster than hand-building the same graph.</strong></p>
         <p><strong>You do not need Nuendo / Cubase.</strong> A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so <strong>a dedicated waveform editor is often unnecessary</strong>, which is another major benefit.</p>
         <p><strong>Those DAWs make it especially powerful.</strong> Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.</p>
         <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
@@ -108,10 +123,181 @@
         </ul>
       </div>
 
-      <h2 id="load">2. Loading patterns</h2>
-      <p>The drop combination selects the mode. Check the log banner at the top.</p>
+      <h2 id="overview">2. First time here? Workflow and terms</h2>
+      <p>Using the app boils down to four steps.</p>
+      <ol>
+        <li><strong>Prepare your material</strong> — the WAV of your piece (plus an XML or markers if you have them). → <a href="#prepare">Chapter 4</a></li>
+        <li><strong>Drop it onto the app</strong> — the mode is chosen automatically from the file combination; there is nothing to switch. → <a href="#load">Chapter 5</a></li>
+        <li><strong>Listen and adjust</strong> — check loop points, transitions between pieces, fades, and vertical layers right on the waveform.</li>
+        <li><strong>Press <span class="ui">EXPORT</span></strong> — WAV cutting and the Wwise structure are created automatically. → <a href="#wwise-prep">Chapter 6</a></li>
+      </ol>
+      <p>This manual uses a few Wwise terms. Knowing just these is enough to follow along.</p>
+      <table>
+        <thead><tr><th>Term</th><th>In a nutshell</th></tr></thead>
+        <tbody>
+          <tr><td>Interactive Music</td><td>Wwise’s system for switching and layering music to follow the game state.</td></tr>
+          <tr><td>Music Segment</td><td>The smallest music unit in Wwise: one stretch of audio plus a start point (Entry Cue) and an end point (Exit Cue).</td></tr>
+          <tr><td>Music Playlist Container</td><td>A container that plays Music Segments in order, e.g. “intro → loop”. Called “Playlist” in this manual. Roughly “one piece (or one looping state)”.</td></tr>
+          <tr><td>Music Switch Container</td><td>A parent that switches between Playlists via States (game conditions). Created automatically when there are two or more Playlists.</td></tr>
+          <tr><td>Entry Cue / Exit Cue</td><td>The “main body start / end” of a Music Segment. Audio outside them (pickups and tails) can overlap the next piece.</td></tr>
+          <tr><td>Marker / cycle marker</td><td>Landmarks on the waveform. A marker is a single point; a cycle marker is a range (start and end). The app reads these to learn where the loop is, etc.</td></tr>
+          <tr><td>WAAPI</td><td>The Wwise Authoring API — the communication channel this app uses to remote-control a running Wwise and create objects.</td></tr>
+          <tr><td>Originals folder</td><td>The folder inside a Wwise project where source WAVs live. This app’s export path must be somewhere under it.</td></tr>
+        </tbody>
+      </table>
 
-      <h3 id="load-single">2-1. Wave-only (no XML, one WAV)</h3>
+      <h2 id="quickstart">3. Quick start (do this first)</h2>
+      <p>Let’s put one WAV into Wwise with no special preparation — no DAW, no waveform editor. In about ten minutes you will have experienced the whole “drop → listen → EXPORT” flow.</p>
+      <ol>
+        <li><strong>Open your project in Wwise and enable WAAPI</strong><br />In <span class="ui">Project → User Preferences...</span>, check <span class="ui">Enable Wwise Authoring API</span> and restart Wwise (one-time setup; details in <a href="#wwise-prep">Chapter 6</a>).</li>
+        <li><strong>Select a destination in Wwise’s Project Explorer</strong><br />Click the object where generated content should go, e.g. the <span class="ui">Default Work Unit</span> under <span class="ui">Interactive Music Hierarchy</span>.</li>
+        <li><strong>Start this app</strong><br />If the WAAPI status bar at the bottom shows the Wwise version, project name, and the selected destination, you are connected.</li>
+        <li><strong>Set the export path</strong><br />In the project bar, point the export path at a folder under your Wwise project’s <code>Originals</code> folder (e.g. <code>Originals\Music</code>; create it in Explorer if needed).</li>
+        <li><strong>Drag and drop one WAV</strong><br />The log shows <code>=== Wave-only mode ===</code> and the waveform appears. <kbd>Space</kbd> plays it.</li>
+        <li><strong>(To loop it) place two markers</strong><br />Click the waveform to seek to the loop start and press <kbd>Insert</kbd> to add a marker; do the same at the loop end. <strong>With exactly two markers, the span between them automatically becomes the loop</strong> (before the first marker = intro, after the second = tail). Drag the ▼ handles to fine-tune.</li>
+        <li><strong>Listen</strong><br />Press <kbd>Space</kbd>; the loop region repeats endlessly. Nudge the markers until it feels right.</li>
+        <li><strong><span class="ui">EXPORT</span> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>)</strong><br />The cut WAVs are saved to the export path and a full Music Playlist Container setup is generated in Wwise. Play it in Wwise to confirm.</li>
+      </ol>
+      <div class="note">
+        <p>If the <span class="ui">EXPORT</span> button is disabled, the reason (not connected, no destination selected, export path not under Originals, etc.) is written in the log under <code>=== Export Preflight ===</code>. → <a href="#troubleshooting">Chapter 15</a></p>
+      </div>
+      <p>“Place markers to define ranges” is the core operation of this app. Once comfortable, move on to methods A / B in the next chapter to bring in material from your DAW — tempo sync and batch implementation of many pieces become available.</p>
+
+      <h2 id="prepare">4. Preparing your material: 3 methods</h2>
+      <p>There are three ways to bring a piece into the app. <strong>The method is detected automatically from the files you drop</strong> — there is nothing to switch in the app. In every method you can still edit markers inside the app after loading (nondestructive; the original WAV is never modified).</p>
+
+      <h3 id="prepare-choose">4-1. Which method to use</h3>
+      <table>
+        <thead><tr><th>Method</th><th>What you prepare</th><th>Best for</th><th>What you get</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>A: Nuendo / Cubase XML</strong><span class="badge">Recommended</span></td>
+            <td><code>Song.wav</code> + <code>Song.xml</code> with the same base name (exported marker track)</td>
+            <td>You use Nuendo / Cubase and need <strong>bar / tempo management</strong> (Next Bar transitions, Custom Cues, several pieces on one master, etc.)</td>
+            <td>Bar / tempo / time-signature overlay, bar-based operations (Next Bar / Next Beat, metronome, bar jump), single markers → Custom Cues, “paint” markers onto the waveform</td>
+          </tr>
+          <tr>
+            <td><strong>B: WAV with markers</strong></td>
+            <td>A <code>.wav</code> with embedded markers (or a sustain loop)</td>
+            <td>Any DAW that can export a WAV with embedded markers (<strong>including a Nuendo / Cubase mixdown</strong>). Enough for a simple intro + loop piece</td>
+            <td>Loop / exclude ranges recognized automatically from embedded markers. No bar / tempo data</td>
+          </tr>
+          <tr>
+            <td><strong>C: Plain WAV</strong></td>
+            <td>Just a <code>.wav</code> (zero preparation)</td>
+            <td>Trying the app out / only have plain WAVs / batch-importing finished loops</td>
+            <td>Add markers inside the app to define ranges. Drop two or more files together to implement many pieces at once (multi-wave mode)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>If you are unsure:</p>
+      <ul>
+        <li><strong>First time?</strong> → Method C (follow the <a href="#quickstart">quick start</a>). Zero preparation, full workflow.</li>
+        <li><strong>Using Nuendo / Cubase?</strong> → Make it a habit to export your mixdowns <strong>with the iXML chunk and markers included</strong> (a small extra step, but close to essential). For a simple “intro, then loop” piece, that alone (Method B) is enough to implement it. Only when you need <strong>bar / tempo management</strong> (Next Bar / Next Beat transitions, Custom Cues, several pieces on one master, etc.) do you additionally export the marker-track XML and use Method A.</li>
+        <li><strong>Using another DAW?</strong> → Method B. Just export a WAV with markers to bring in your loop design.</li>
+        <li><strong>Lots of already-looped tracks?</strong> → Method C’s multi-wave mode. Drop them all at once for batch implementation.</li>
+      </ul>
+      <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the cutting and Wwise-side implementation are still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
+      <div class="note">
+        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>) or are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, ...) are rejected at load. When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
+      </div>
+
+      <h3 id="prepare-xml">4-2. Method A: preparing a Nuendo / Cubase XML<span class="badge">Recommended</span></h3>
+      <p>Export two files from your Nuendo / Cubase project — the marker-track XML and the WAV — and put them <strong>in the same folder with the same base name</strong> (e.g. <code>Song.wav</code> and <code>Song.xml</code>).</p>
+      <div class="note">
+        <p>The XML export is <strong>an extra step that enables bar / tempo-managed interactive music</strong>. For a piece that simply has an intro and then loops, the XML is not required — a WAV with embedded markers (<a href="#prepare-embedded">4-3</a>) is all you need. Method A is optional, not mandatory.</p>
+      </div>
+
+      <p><strong>① Place markers in the DAW</strong></p>
+      <p>Lay out the piece’s structure on the marker track using these naming rules (matched on the name’s ending, case-insensitive).</p>
+      <table>
+        <thead><tr><th>What to place</th><th>Name ends with</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>Cycle marker (range)</td><td><code>-L</code></td><td>Loop range. Loops endlessly in preview and becomes a looping Music Segment in Wwise.</td></tr>
+          <tr><td>Cycle marker (range)</td><td><code>-E</code></td><td>After the Exit Cue (the tail / release after the loop). Bundled into the same Music Segment as the loop, so it overlaps the next piece on transition.<br />If you forget an <code>-E</code> right after an <code>-L</code>, it is added automatically.</td></tr>
+          <tr><td>Cycle marker (range)</td><td><code>-R</code></td><td>Remove (exclude). This range is neither exported nor registered in Wwise. Use it as a divider between pieces when placing several on one master.</td></tr>
+          <tr><td>Single marker (point)</td><td>(any name)</td><td>Becomes a Wwise <strong>Custom Cue</strong> (the name is the cue name). Useful as sync points for the game.</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li>Never let <code>-L</code> / <code>-E</code> / <code>-R</code> ranges <strong>overlap</strong> (overlaps are a load error).</li>
+        <li>The waveform is split automatically at cycle In/Out points, at bar starts where the tempo changes, and at time-signature changes. <strong>Each run of contiguous non-excluded regions between <code>-R</code> dividers becomes one exported file = one Music Playlist</strong>, so a single master WAV can carry several pieces and implement them all at once.</li>
+        <li>If the piece starts mid-bar (a pickup / anacrusis), that is detected automatically and placed before the Entry Cue as an <code>-A</code> region. You normally never write <code>-A</code> yourself.</li>
+      </ul>
+
+      <p><strong>② Export the marker track as XML</strong></p>
+      <ol>
+        <li>In the track list, select the <strong>marker track</strong>. The marker track is the one to export — <strong>exporting the tempo or signature track instead does not contain enough information</strong>.</li>
+        <li>Run <span class="ui">File → Export → Selected Tracks</span> and save as <code>.xml</code>.</li>
+        <li>Use the same base name as the WAV (<code>Song.xml</code> next to <code>Song.wav</code>).</li>
+      </ol>
+      <div class="note">
+        <p>An XML exported from the marker track also carries the tempo and time-signature data. If loading reports “MTempoTrackEvent (Tempo Track) was not found”, check that it was the <strong>marker track</strong> you selected for export (tempo/signature-track-only exports are insufficient).</p>
+      </div>
+
+      <p><strong>③ Export the WAV</strong></p>
+      <ol>
+        <li>From the same project, export the audio via <span class="ui">File → Export → Audio Mixdown</span> as <code>.wav</code>.</li>
+        <li>In the export options, <strong>enable both the iXML chunk and marker embedding</strong> (recommended, close to essential). The iXML chunk records the timeline start position (TimeReference) in the WAV so bar lines align exactly with the audio.</li>
+        <li>In the marker option, always verify that <strong>the intended marker track is the embed target</strong>. If another track is still selected there, you may think markers were embedded when they were not.</li>
+        <li>Save it in the same folder with the same base name as the XML.</li>
+      </ol>
+      <div class="note">
+        <p>If you cannot include iXML, <strong>place the piece at the very start of the project (bar 1) and export from the top</strong> — with no TimeReference (or 0), the waveform start is assumed to be the timeline start. If the piece sits mid-timeline, iXML is required.</p>
+      </div>
+
+      <p><strong>④ Drop</strong></p>
+      <p>Drop either <code>Song.wav</code> or <code>Song.xml</code> (or both) onto the app; both are loaded automatically. When the log shows <code>=== Nuendo/Cubase XML mode ===</code>, you are set — bars, tempo, signature, markers, and cycles overlay the waveform.</p>
+
+      <h3 id="prepare-embedded">4-3. Method B: preparing a WAV with markers</h3>
+      <p>Any DAW or waveform editor that can embed markers into a WAV works — Logic included. <strong>A Nuendo / Cubase Audio Mixdown with marker embedding enabled also produces this kind of WAV</strong> — for a simple “intro, then loop” piece it is all you need, no XML required. Two kinds of metadata are read.</p>
+      <ul>
+        <li><strong>Sustain loop (smpl chunk)</strong> — sampler loop data. If present it takes top priority: the loop Start is treated as <code>-L</code> and the End as <code>-E</code>. Regular markers at exactly the same position as the loop Start/End are discarded (logged).</li>
+        <li><strong>Regular markers (cue points)</strong> — interpreted by name (comment).</li>
+      </ul>
+      <p>Marker-name rules. Each range runs “from this marker to the next marker (or the end of the file)”.</p>
+      <table>
+        <thead><tr><th>Marker name</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>-L</code></td><td>Loop range starts here.</td></tr>
+          <tr><td><code>-E</code></td><td>After-Exit-Cue (tail) range starts here.</td></tr>
+          <tr><td><code>-R</code></td><td>Excluded (not exported) range starts here.</td></tr>
+          <tr><td><code>-A</code></td><td>Before-Entry-Cue (pickup) range starts here.</td></tr>
+          <tr><td>Name containing <code>Loop</code></td><td>Treated like <code>-L</code>. Two of them bracket a loop range (an unpaired odd one acts as a lone <code>-L</code>).</td></tr>
+          <tr><td>Any other name</td><td>No effect on ranges (display / editing landmark only).</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li><strong>Special case</strong>: with exactly two markers and no special names, the span between them automatically becomes the loop. A WAV where you simply dropped two plain markers at the loop points works as-is.</li>
+        <li>With no special markers at all, the whole file is one part (start = Entry Cue, end = Exit Cue). One-shot pieces need no markers.</li>
+        <li>No bar lines or tempo are shown (use Method A if you want tempo-synced features).</li>
+        <li>WAVs that contain only regions (cue + <code>ltxt</code>) are not supported yet. Use point markers or a sustain loop.</li>
+        <li>Embedded markers drive preview and region splitting only — they are <strong>not exported as Wwise Custom Cues</strong> (use Method A’s single markers for Custom Cues).</li>
+      </ul>
+
+      <h3 id="prepare-none">4-4. Method C: starting from a plain WAV (markers in the app)</h3>
+      <p>No preparation needed. Drop the <code>.wav</code> as-is and define ranges by placing markers in the app, on the marker lane below the waveform (the original WAV is never written to).</p>
+      <ul>
+        <li><kbd>Insert</kbd> — add a marker at the seek position</li>
+        <li>Drag ▼ — move a marker (<kbd>Alt</kbd>+drag also moves the previous marker by the same amount — handy for sliding a loop range while keeping its length)</li>
+        <li>Double-click ▼ or the comment — edit the name (comment); <code>-L</code> / <code>-E</code> / <code>-R</code> / <code>-A</code> mean the same as in Method B</li>
+        <li><kbd>Delete</kbd> — remove the selected marker; <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd> — Undo / Redo</li>
+      </ul>
+      <p>To implement many pieces at once, <strong>drop two or more WAVs together</strong> (multi-wave mode). They are laid out on a concatenated virtual timeline, <strong>one file = one Music Playlist</strong>, and registered to Wwise in one batch. Each file’s embedded markers (Method B rules) still apply.</p>
+
+      <h2 id="load">5. How the loading mode is chosen</h2>
+      <p>The drop combination selects the mode. Check the log banner at the top.</p>
+      <table>
+        <thead><tr><th>What you dropped</th><th>Mode (log banner)</th></tr></thead>
+        <tbody>
+          <tr><td>One <code>.wav</code> (no matching <code>.xml</code>)</td><td><code>=== Wave-only mode ===</code></td></tr>
+          <tr><td>Two or more <code>.wav</code> (none with a matching <code>.xml</code>)</td><td><code>=== Multi-wave mode (no XML) ===</code></td></tr>
+          <tr><td>Matching <code>.wav</code> + <code>.xml</code> (dropping either one is enough)</td><td><code>=== Nuendo/Cubase XML mode ===</code></td></tr>
+          <tr><td><code>.xml</code> alone (no matching <code>.wav</code> found)</td><td>Error (a <code>.wav</code> is required to show the waveform)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="load-single">5-1. Wave-only (no XML, one WAV)</h3>
       <p><strong>Steps</strong></p>
       <ol>
         <li>Drop a single <code>.wav</code> that has no matching <code>.xml</code></li>
@@ -122,14 +308,14 @@
       <p><strong>Notes</strong></p>
       <ul>
         <li>No bar / tempo / signature overlay (Next Bar / Next Beat in <span class="ui">Exit Source At</span> are unavailable)</li>
-        <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> in <span class="ui">More Options</span> are disabled (Wave-only uses its own marker editing)</li>
+        <li><span class="ui">Marker Comment</span> / <span class="ui">Marker Grid</span> in <span class="ui">More Options</span> are disabled (Wave-only uses the marker editing in <a href="#prepare-none">4-4</a>)</li>
         <li>Besides embedded markers, you can add, move, and pair-move markers in the app (not written back to the WAV)—often without a separate waveform editor</li>
         <li>Markers drive preview/region splitting and are <strong>not</strong> exported as Wwise Custom Cues</li>
         <li>If the WAV has a sustain loop (smpl), its Start becomes <code>-L</code> and End becomes <code>-E</code>. These take priority over normal embedded markers; markers at the same timing as loop Start/End are discarded (logged)</li>
         <li>Export names look like <code>basename_1.wav</code> (double-click the waveform name to edit the base name)</li>
       </ul>
 
-      <h3 id="load-multi">2-2. Multi-wave (no XML, two or more WAVs)</h3>
+      <h3 id="load-multi">5-2. Multi-wave (no XML, two or more WAVs)</h3>
       <p><strong>Steps</strong></p>
       <ol>
         <li>Drop <strong>two or more</strong> <code>.wav</code> files together (none may have a matching <code>.xml</code>)</li>
@@ -146,8 +332,8 @@
         <li>If any file has a matching XML, this mode is not used—pair processing applies instead</li>
       </ul>
 
-      <h3 id="load-xml">2-3. WAV + matching XML (exported marker track)</h3>
-      <p><strong>Steps</strong></p>
+      <h3 id="load-xml">5-3. WAV + matching XML (exported marker track)</h3>
+      <p><strong>Steps</strong> (how to create the XML and WAV: <a href="#prepare-xml">4-2</a>)</p>
       <ol>
         <li>In Nuendo / Cubase, <strong>export the marker track as XML</strong> and place it next to a <code>.wav</code> with the <strong>same base name</strong> (e.g. <code>Song.wav</code> + <code>Song.xml</code>)</li>
         <li>Drop either or both</li>
@@ -171,18 +357,36 @@
         <li><span class="ui">RELOAD</span> / Keep Last Session restore groups, fades, and related session data when possible</li>
       </ul>
 
-      <h2 id="wwise-prep">3. Wwise setup and EXPORT</h2>
+      <h2 id="wwise-prep">6. Wwise setup and EXPORT</h2>
+      <h3>6-1. Enable WAAPI (one-time setup)</h3>
+      <p>This app talks to the running Wwise Authoring over <strong>WAAPI (HTTP)</strong> to create objects.</p>
       <ol>
-        <li>Start <strong>Wwise Authoring</strong> and enable <strong>WAAPI (HTTP)</strong></li>
+        <li>In Wwise, open <span class="ui">Project → User Preferences...</span></li>
+        <li>Check <span class="ui">Enable Wwise Authoring API</span> and press <span class="ui">OK</span></li>
+        <li>Restart Wwise</li>
+      </ol>
+      <div class="note">
+        <p>The app always connects to <code>http://127.0.0.1:8090/waapi</code> (Wwise on the same PC, HTTP port 8090). If you changed the HTTP port in User Preferences, set it back to the default <strong>8090</strong>.</p>
+      </div>
+
+      <h3>6-2. Destination and export path</h3>
+      <ul>
+        <li><strong>Destination</strong> — in Wwise’s Project Explorer, click the object that should receive the generated content (a Work Unit or Virtual Folder under <span class="ui">Interactive Music Hierarchy</span>, etc.). The app uses “whatever is currently selected in Wwise” as the destination. If reselecting every time is tedious, pin it with <span class="ui">Keep Target</span> on the action bar.</li>
+        <li><strong>Export path</strong> — set in the project bar; where the cut WAVs are saved. It must be <strong>under the connected Wwise project’s <code>Originals</code> folder</strong> (e.g. <code>&lt;project&gt;\Originals\Music\IMImporter</code>) so Wwise can reference the source WAVs.</li>
+      </ul>
+
+      <h3>6-3. EXPORT procedure</h3>
+      <ol>
+        <li>Start <strong>Wwise Authoring</strong> with WAAPI enabled (6-1)</li>
         <li>Select the destination object in Project Explorer</li>
         <li>Set this app’s export path under the connected project’s <code>Originals</code></li>
-        <li>Load audio using one of the patterns above</li>
+        <li>Load audio using one of the patterns in <a href="#load">Chapter 5</a></li>
         <li>Preview transitions, fades, and grouping</li>
         <li>Run <span class="ui">EXPORT</span> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>)</li>
       </ol>
-      <p><span class="ui">EXPORT</span> requires: at least one valid part, WAAPI connected, destination selected, and an existing Originals path. Reasons appear under <code>=== Export Preflight ===</code>.</p>
+      <p><span class="ui">EXPORT</span> becomes available when all four conditions hold: <strong>① at least one valid part ② WAAPI connected ③ destination selected ④ export path exists and is under Originals</strong>. Reasons appear under <code>=== Export Preflight ===</code> in the log.</p>
 
-      <h2 id="layout">4. UI overview</h2>
+      <h2 id="layout">7. UI overview</h2>
       <ol>
         <li><strong>Project bar</strong></li>
         <li><strong>Waveform preview</strong></li>
@@ -192,7 +396,7 @@
         <li><strong>WAAPI status bar</strong></li>
       </ol>
 
-      <h2 id="project-bar">5. Project bar</h2>
+      <h2 id="project-bar">8. Project bar</h2>
       <p>Left to right: project name → export path → folder/delete → <span class="ui">Keep Last Session</span> → <span class="ui">Always on Top</span> → JP/EN → Tips → <strong>Manual</strong> → gear → spectrum.</p>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
@@ -208,15 +412,17 @@
         </tbody>
       </table>
 
-      <h2 id="waveform">6. Waveform preview</h2>
+      <h2 id="waveform">9. Waveform preview</h2>
       <p>Measure / Tempo / Signature / Marker lanes, waveform, then Music Segment Name / Music Playlist Name (bar lanes are inactive without XML).</p>
       <ul>
         <li>Click/drag to seek</li>
         <li>Double-click the waveform name to edit the base name (<code>Multi_Wave</code> parent name is not editable in multi-wave mode)</li>
+        <li>Double-click the timeline to zoom into the Music Playlist under the cursor (back to full view when only one intersects)</li>
+        <li><kbd>Z</kbd> / <span class="ui">SIZE</span> on TRANSPORT cycles waveform height 1×→2×→3×</li>
         <li>White-triangle edge fades are nondestructive and become MusicClip Fade on EXPORT</li>
       </ul>
 
-      <h2 id="transport">7. TRANSPORT</h2>
+      <h2 id="transport">10. TRANSPORT</h2>
       <p>Position → <span class="ui">TRANS</span> (play / <kbd>G</kbd>) → <span class="ui">NAV</span> → <span class="ui">TIME</span> → <span class="ui">AMP</span> → <span class="ui">SIZE</span>.</p>
       <ul>
         <li><kbd>Space</kbd> play/pause; <code>-L</code> regions loop</li>
@@ -226,7 +432,7 @@
         <li><kbd>L</kbd> jump to 1 bar before loop end (or 3 seconds before without bar data)</li>
       </ul>
 
-      <h2 id="transition">8. Log / transition panel</h2>
+      <h2 id="transition">11. Log / transition panel</h2>
       <h3 id="fade-options">Fade In / Fade Out / Options</h3>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
@@ -261,7 +467,7 @@
         <li><span class="ui">Keep Layer Balance</span> … default off; recommended with Wwise Loudness Normalization. Writes relative balance to Music Track Make-Up Gain</li>
       </ul>
 
-      <h2 id="action-bar">9. Action bar / WAAPI status</h2>
+      <h2 id="action-bar">12. Action bar / WAAPI status</h2>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
         <tbody>
@@ -273,7 +479,7 @@
         </tbody>
       </table>
 
-      <h2 id="export">10. What EXPORT creates in Wwise</h2>
+      <h2 id="export">13. What EXPORT creates in Wwise</h2>
       <p>Designed so <strong>the Interactive Music implementation in Wwise is the master</strong>. Keep one-shot and loop material on one master waveform instead of pre-separating files; build structure nondestructively. Split WAVs are <strong>cut-only</strong>; fades, layer balance, and cues become Wwise properties (nothing is baked into the source).</p>
       <ul>
         <li>One part or one group → one Music Playlist Container</li>
@@ -284,7 +490,7 @@
         <li>Nuendo/Cubase XML single markers → Custom Cues; tempo/signature Override on Music Segments</li>
       </ul>
 
-      <h2 id="suffixes">11. Suffixes and cues</h2>
+      <h2 id="suffixes">14. Suffixes and cues</h2>
       <table>
         <thead><tr><th>Suffix</th><th>Meaning</th></tr></thead>
         <tbody>
@@ -297,13 +503,60 @@
       <p>Overlapping suffixes error. A bare region after contiguous <code>-L</code> regions may auto-receive <code>-E</code>.</p>
       <p>In Wave-only and Multi-wave modes, a WAV sustain loop (smpl) is applied as <code>-L</code> (Start) and <code>-E</code> (End). Other embedded markers (with comments) are still read, but markers at the same timing as sustain Start/End are discarded and logged.</p>
 
-      <h2 id="shortcuts">12. Shortcuts</h2>
+      <h2 id="troubleshooting">15. Troubleshooting</h2>
+      <table>
+        <thead><tr><th>Symptom</th><th>What to check</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="ui">EXPORT</span> is disabled</td>
+            <td>The reason is in the log under <code>=== Export Preflight ===</code>. ① Is a waveform (valid part) loaded? ② Is WAAPI connected? ③ Is a destination selected in Wwise (or pinned via Keep Target)? ④ Does the export path exist, under the connected project’s <code>Originals</code>?</td>
+          </tr>
+          <tr>
+            <td>Cannot connect to WAAPI / timeout</td>
+            <td>Is Wwise Authoring running? Is <span class="ui">Enable Wwise Authoring API</span> checked in <span class="ui">Project → User Preferences...</span> (restart Wwise after changing it)? Is the HTTP port still the default 8090?</td>
+          </tr>
+          <tr>
+            <td>Dropping the XML reports “MTempoTrackEvent (Tempo Track) was not found”</td>
+            <td>An XML exported from something other than the marker track (e.g. the tempo or signature track only) lacks the required data. Select the <strong>marker track</strong> and redo <span class="ui">File → Export → Selected Tracks</span>.</td>
+          </tr>
+          <tr>
+            <td>The WAV should contain markers, but none appear after loading</td>
+            <td>In the Audio Mixdown marker option, verify that <strong>the intended marker track is the embed target</strong>. If another track is selected there, the WAV contains no markers even though you thought they were embedded.</td>
+          </tr>
+          <tr>
+            <td>Bar lines do not match the audio / “cannot read iXML TimeReference” warning</td>
+            <td>The WAV lacks its timeline start position. Turn on <span class="ui">Insert iXML chunk</span> in the Audio Mixdown dialog, or place the piece at the very start of the project and export from the top.</td>
+          </tr>
+          <tr>
+            <td>Dropped several WAVs but multi-wave mode did not start</td>
+            <td>If any file has a matching <code>.xml</code> next to it, pair processing (XML mode / Wave-only) applies instead. Also, sample rate, channel count, and bit depth must match across all files (details in the log).</td>
+          </tr>
+          <tr>
+            <td>File-name error at load</td>
+            <td>The file name (without extension) becomes the Wwise object name, so names starting with a digit (e.g. <code>01_Battle</code>) or Windows reserved names (<code>CON</code>, etc.) are rejected. Rename and reload.</td>
+          </tr>
+          <tr>
+            <td>“Regions overlap” error</td>
+            <td>The <code>-L</code> / <code>-E</code> / <code>-R</code> ranges (including the automatic <code>-A</code>) overlap. Fix the cycle-marker ranges in the DAW so they do not overlap.</td>
+          </tr>
+          <tr>
+            <td>Markers loaded, but nothing loops</td>
+            <td>Check the marker names. Only <code>-L</code> / <code>-E</code> / <code>-R</code> / <code>-A</code>, names containing <code>Loop</code>, or the “exactly two markers” special case define ranges (<a href="#prepare-embedded">4-3</a>).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="shortcuts">16. Shortcuts</h2>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>Space</kbd></td><td>Play / pause</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from ~3 seconds earlier</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from last play start</td></tr>
+          <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Seek by 1 px</td></tr>
+          <tr><td><kbd>0</kbd>–<kbd>9</kbd></td><td>Jump to 0%–90% of the current view</td></tr>
+          <tr><td><kbd>Insert</kbd></td><td>Add a marker at the seek position (modes that allow marker editing)</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>Remove the selected marker (app session only)</td></tr>
           <tr><td><kbd>Z</kbd></td><td>Cycle waveform height</td></tr>
           <tr><td><kbd>G</kbd></td><td>Bar jump</td></tr>
           <tr><td><kbd>M</kbd></td><td>Toggle metronome (synced to waveform playback beats when tempo / time signature is available)</td></tr>
@@ -315,7 +568,7 @@
         </tbody>
       </table>
 
-      <h2 id="trademarks">13. Trademarks</h2>
+      <h2 id="trademarks">17. Trademarks</h2>
       <ul>
         <li><strong>Wwise®</strong> / <strong>Audiokinetic®</strong> are trademarks of Audiokinetic Inc. This tool is unofficial. A valid Wwise license is required for WAAPI.</li>
         <li><strong>Nuendo®</strong> / <strong>Cubase®</strong> / <strong>Steinberg®</strong> are trademarks of Steinberg Media Technologies GmbH. This tool is unofficial.</li>
