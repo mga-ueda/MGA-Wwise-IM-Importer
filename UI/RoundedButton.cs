@@ -1,4 +1,4 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -117,16 +117,18 @@ internal sealed class RoundedButton : Button
             g.DrawPath(pen, borderPath);
         }
 
-        // Yu Gothic UI は下寄りに見えやすいため、中央から 1px 上へオフセットする。
+        // ボタン高さに対し Font.Height 帯を中央配置する（nudge なし）。
+        var textHeight = Math.Min(Height, Math.Max(1, Font.Height));
+        var top = Math.Max(0, (Height - textHeight) / 2);
         TextRenderer.DrawText(
             g,
             Text,
             Font,
             new Rectangle(
                 Padding.Left,
-                -1,
+                top,
                 Math.Max(0, Width - Padding.Horizontal),
-                Height),
+                textHeight),
             textColor,
             TextFormatFlags.HorizontalCenter
             | TextFormatFlags.VerticalCenter

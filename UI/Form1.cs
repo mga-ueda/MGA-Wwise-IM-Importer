@@ -50,8 +50,10 @@ public partial class Form1 : Form, IMessageFilter
     private const uint PfmLineSpacing = 0x00000100;
     private const byte LineSpacingExact = 4;
 
-    /// <summary>プレイリスト行（グループ枠・ステータスラベル）の左インデント（非スケール px）。</summary>
-    private const int PlaylistItemIndent = 15;
+    /// <summary>プレイリスト行（グループ枠・ステータスラベル）の左インデント（150% 設計 px）。</summary>
+    private const int PlaylistItemIndentDesign = 15;
+
+    private int PlaylistItemIndent => DesignMetrics.Px(PlaylistItemIndentDesign, this);
 
     [DllImport("user32.dll")]
     private static extern bool HideCaret(IntPtr hWnd);
@@ -136,6 +138,8 @@ public partial class Form1 : Form, IMessageFilter
     private double? _lastPlaybackStartProgress;
 #if DEBUG
     private ColorDevPanelForm? _colorDevPanel;
+    /// <summary>0 = ディスプレイどおり。96/144 = シミュレート DPI。</summary>
+    private int _uiScaleSimulateDpi;
 #endif
     private int _exportGeneration;
     private WaveformPreviewData? _loadedPreview;
@@ -355,12 +359,7 @@ public partial class Form1 : Form, IMessageFilter
             _waveformHostBaseHeight = Math.Max(
                 1,
                 (int)Math.Round((double)waveformHostPanel.Height / scale));
-            AdjustTransitionSectionHeights();
-            ApplyMarkerOptionsPanelFixedHeight();
-            SyncRightSideContentHostHeight();
-            AlignCompactFileNumbersCheckBox();
-            AlignProjectBarInputs();
-            UpdateMinimumWindowSize();
+            ApplyFixedUiMetrics();
             LayoutActionBarCopyright();
             UpdatePlaylistFadeCurveIcons();
         };
@@ -445,6 +444,10 @@ public partial class Form1 : Form, IMessageFilter
         ApplyProjectProfile(_projectStore.GetActive(), selectInCombo: true);
 #if DEBUG
         detailedLogCheckBox.Checked = _developerSettings.DetailedPlaybackLog;
+        _uiScaleSimulateDpi = _developerSettings.UiScaleSimulateDpi is 96 or 144
+            ? _developerSettings.UiScaleSimulateDpi
+            : 0;
+        ApplyUiScaleSimulation(force: true);
 #else
         // リリース版では開発用ログ UI をレイアウトから除去し、イベントも無効化する。
         detailedLogCheckBox.CheckedChanged -= DetailedLogCheckBox_CheckedChanged;
@@ -455,6 +458,7 @@ public partial class Form1 : Form, IMessageFilter
 #endif
         RestoreWindowBounds();
         LayoutActionBarCopyright();
+        ApplyFixedUiMetrics();
 
         _playheadTimer.Tick += (_, _) => UpdatePlayhead();
         _playlistBlinkTimer.Tick += (_, _) => UpdatePendingPlaylistBlink();
@@ -1441,6 +1445,21 @@ public partial class Form1 : Form, IMessageFilter
 
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+#if DEBUG
+        // Ctrl+1 / Ctrl+2 … DPI シミュレート切替（Release では無効）
+        if (keyData is (Keys.Control | Keys.D1) or (Keys.Control | Keys.NumPad1))
+        {
+            SetUiScaleSimulateDpi(96);
+            return true;
+        }
+
+        if (keyData is (Keys.Control | Keys.D2) or (Keys.Control | Keys.NumPad2))
+        {
+            SetUiScaleSimulateDpi(144);
+            return true;
+        }
+#endif
+
         if (_uiInteractionLocks != UiInteractionLock.None)
         {
             return base.ProcessCmdKey(ref msg, keyData);
@@ -2192,6 +2211,44 @@ public partial class Form1 : Form, IMessageFilter
         var y = Math.Max(screen.Top, Top);
         panel.Location = new Point(Math.Max(screen.Left, x), y);
     }
+
+    /// <summary>
+    /// レイアウト寸法だけ指定 DPI 相当へ載せ替える。
+    /// フォントは実 DPI のままなので完全再現ではないが、高さ・余白の比率確認用。
+    /// </summary>
+    private void ApplyUiScaleSimulation(bool force = false)
+    {
+        var nextOverride = _uiScaleSimulateDpi > 0 ? _uiScaleSimulateDpi : 0;
+        if (!force && DesignMetrics.LayoutDpiOverride == nextOverride)
+        {
+            return;
+        }
+
+        DesignMetrics.LayoutDpiOverride = nextOverride;
+        ApplyFixedUiMetrics();
+        ApplyLocalizedUiText();
+    }
+
+    private void SetUiScaleSimulateDpi(int dpi)
+    {
+        var next = dpi is 96 or 144 ? dpi : 0;
+        if (_uiScaleSimulateDpi == next && DesignMetrics.LayoutDpiOverride == next)
+        {
+            return;
+        }
+
+        _uiScaleSimulateDpi = next;
+        DeveloperSettings.SaveUiScaleSimulateDpi(next);
+        ApplyUiScaleSimulation(force: true);
+    }
+
+    private string GetUiScaleSimulateTitleSuffix() =>
+        _uiScaleSimulateDpi switch
+        {
+            96 => "  [DPI sim: 100%]",
+            144 => "  [DPI sim: 150%]",
+            _ => "  [DPI: display]",
+        };
 #endif
 
     private void ApplyUiColors()
@@ -2290,7 +2347,10 @@ public partial class Form1 : Form, IMessageFilter
         actionControlsPanel.BringToFront();
         brandLogoPictureBox.BringToFront();
 
-        const int gap = 12;
+        // 折り返しで 3 行になると BottomLeft 固定高で © 行が上に消えるため、高さを 2 行分に確定する。
+        copyrightLinkLabel.Height = MeasureCopyrightPreferredHeight();
+
+        var gap = DesignMetrics.Px(18, this);
         var left = copyrightLinkLabel.Left;
         var rightLimit = actionControlsPanel.Left;
         if (rightLimit <= left)
@@ -2298,9 +2358,90 @@ public partial class Form1 : Form, IMessageFilter
             rightLimit = actionBar.ClientSize.Width - actionBar.Padding.Right;
         }
 
-        var maxWidth = Math.Max(80, rightLimit - left - gap);
-        copyrightLinkLabel.Width = maxWidth;
-        copyrightLinkLabel.Top = brandLogoPictureBox.Bottom - copyrightLinkLabel.Height;
+        var preferred = MeasureCopyrightPreferredWidth();
+        var available = Math.Max(0, rightLimit - left - gap);
+        // 最小幅保証後は省略せず全文を見せる。非常時のみ Ellipsis。
+        if (available >= preferred)
+        {
+            copyrightLinkLabel.AutoEllipsis = false;
+            copyrightLinkLabel.Width = preferred;
+        }
+        else
+        {
+            copyrightLinkLabel.AutoEllipsis = true;
+            // 非常時の下限も 150% 設計（旧 80@96 ≈ 120@144）。
+            copyrightLinkLabel.Width = Math.Max(DesignMetrics.Px(120, this), available);
+        }
+
+        var top = brandLogoPictureBox.Bottom - copyrightLinkLabel.Height;
+        copyrightLinkLabel.Top = Math.Max(DesignMetrics.Px(3, this), top);
+    }
+
+    /// <summary>
+    /// 権利表記 2 行が折り返しなしで収まる幅。
+    /// SmoothLinkLabel は GDI+ 描画のため MeasureString で測る（TextRenderer だと ® 等で狭く見積もる）。
+    /// </summary>
+    private int MeasureCopyrightPreferredWidth()
+    {
+        if (copyrightLinkLabel is null)
+        {
+            return 0;
+        }
+
+        var width = 0f;
+        using (var g = copyrightLinkLabel.CreateGraphics())
+        {
+            foreach (var line in copyrightLinkLabel.Text.Split('\n'))
+            {
+                var size = g.MeasureString(
+                    string.IsNullOrEmpty(line) ? " " : line,
+                    copyrightLinkLabel.Font);
+                width = Math.Max(width, size.Width);
+            }
+        }
+
+        return (int)Math.Ceiling(width) + DesignMetrics.Px(12, this);
+    }
+
+    /// <summary>権利表記の明示 2 行を実測し、150% 設計の余白を足した高さ。</summary>
+    private int MeasureCopyrightPreferredHeight()
+    {
+        if (copyrightLinkLabel is null)
+        {
+            return DesignMetrics.Px(45, this);
+        }
+
+        var textHeight = 0f;
+        using (var g = copyrightLinkLabel.CreateGraphics())
+        {
+            foreach (var line in copyrightLinkLabel.Text.Split('\n'))
+            {
+                textHeight += g.MeasureString(
+                    string.IsNullOrEmpty(line) ? " " : line,
+                    copyrightLinkLabel.Font).Height;
+            }
+        }
+
+        return (int)Math.Ceiling(textHeight) + DesignMetrics.Px(9, this);
+    }
+
+    /// <summary>アクションバー（ロゴ＋権利表記＋操作群）が重ならずに並ぶ最小クライアント幅。</summary>
+    private int MeasureActionBarMinimumClientWidth()
+    {
+        var gap = DesignMetrics.Px(18, this);
+        var copyrightLeft = copyrightLinkLabel.Left;
+        var copyrightW = MeasureCopyrightPreferredWidth();
+        var controlsW = actionControlsPanel.PreferredSize.Width;
+        if (controlsW <= 0)
+        {
+            controlsW = actionControlsPanel.Width;
+        }
+
+        return copyrightLeft
+            + copyrightW
+            + gap
+            + controlsW
+            + actionBar.Padding.Right;
     }
 
     private void ApplyActionBarButtonColors()
@@ -2427,43 +2568,112 @@ public partial class Form1 : Form, IMessageFilter
             SyncProjectNameComboWidthToInfoLane();
             AlignProjectPathTextRect();
         };
-        // EM_SETRECT の整形矩形はリサイズで既定へ戻るため再適用する。
-        projectOutputPathTextBox.Resize += (_, _) => AlignProjectPathTextRect();
-        projectOutputPathTextBox.HandleCreated += (_, _) => AlignProjectPathTextRect();
+        // EM_SETRECT は Resize / Text 変更で戻るため、共通ヘルパーで再適用する。
+        TextBoxVerticalAlign.Configure(projectOutputPathTextBox);
     }
 
     /// <summary>
-    /// プロジェクト名コンボと出力先テキストボックスの高さをバーの内側高さに揃え、
-    /// 双方のテキストをフォント基準で上下中央にする。コンボ幅は情報レーン右端に合わせる。
-    /// 右端アイコン（フォルダ／削除／言語／スペクトラム）は上下中央に揃える。
+    /// プロジェクトバー内コントロールを揃える。
+    /// コンボとパス欄は同じコンパクト高さ（Font.Height＋枠）・同じ Top。
     /// </summary>
     private void AlignProjectBarInputs()
     {
-        var targetHeight = projectBar.DisplayRectangle.Height;
-        if (targetHeight <= 0)
+        var contentHeight = projectBar.DisplayRectangle.Height;
+        if (contentHeight <= 0)
         {
             return;
         }
 
-        projectNameComboBox.SetControlHeight(targetHeight);
+        var inputHeight = MeasureProjectBarInputHeight(contentHeight);
+        var inputTop = projectBar.Padding.Top + Math.Max(0, (contentHeight - inputHeight) / 2);
+
         SyncProjectNameComboWidthToInfoLane();
-        AlignProjectPathTextRect();
-        AlignProjectBarActionIcons(targetHeight);
+        LayoutProjectBarInputs(inputTop, inputHeight);
+        AlignProjectBarActionIcons(contentHeight);
+        if (IsHandleCreated)
+        {
+            BeginInvoke(() =>
+            {
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                var h = projectBar.DisplayRectangle.Height;
+                var ih = MeasureProjectBarInputHeight(h);
+                var it = projectBar.Padding.Top + Math.Max(0, (h - ih) / 2);
+                LayoutProjectBarInputs(it, ih);
+            });
+        }
+    }
+
+    /// <summary>コンボ枠が欠けない最小のコンパクト高さ。</summary>
+    private int MeasureProjectBarInputHeight(int contentHeight)
+    {
+        var font = projectOutputPathTextBox.Font ?? projectNameComboBox.Font;
+        // 12: Combo の上下枠が確実に見える厚さ（薄いと下枠が欠ける）。
+        var height = font.Height + DesignMetrics.Px(12, this);
+        return Math.Max(1, Math.Min(contentHeight, height));
+    }
+
+    /// <summary>コンボ・スペーサ・パス欄を同じ Top／高さで並べる。</summary>
+    private void LayoutProjectBarInputs(int inputTop, int inputHeight)
+    {
+        var combo = projectNameComboBox;
+        combo.Dock = DockStyle.None;
+        combo.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        combo.ApplyListItemHeight();
+
+        var left = projectBar.Padding.Left;
+        var width = Math.Max(1, combo.Width);
+        combo.SetBounds(left, inputTop, width, inputHeight);
+        combo.SetControlHeight(inputHeight);
+
+        var spacer = projectNameSpacer;
+        spacer.Dock = DockStyle.None;
+        spacer.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        spacer.SetBounds(combo.Right, inputTop, spacer.Width, inputHeight);
+
+        var box = projectOutputPathTextBox;
+        box.Dock = DockStyle.None;
+        box.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        var pathLeft = Math.Max(combo.Right, spacer.Right);
+        var pathWidth = Math.Max(1, projectActionPanel.Left - pathLeft);
+        box.SetBounds(pathLeft, inputTop, pathWidth, inputHeight);
+        TextBoxVerticalAlign.Apply(box);
+
+        combo.RefreshEditAlignment();
     }
 
     /// <summary>
-    /// FlowLayout は既定で上寄せのため、正方形アイコンの上下余白が偏る。
-    /// バー内側高さに対して上下中央になるよう Margin.Top を付ける。
+    /// FlowLayout は既定で上寄せのため、バー内側高さに対して上下中央になるよう揃える。
     /// </summary>
     private void AlignProjectBarActionIcons(int contentHeight)
     {
         CenterProjectBarControl(projectFolderButton, contentHeight);
         CenterProjectBarControl(projectDeleteButton, contentHeight);
+        AlignProjectBarCheckBox(keepLastSessionCheckBox, contentHeight);
+        AlignProjectBarCheckBox(topMostCheckBox, contentHeight);
         CenterProjectBarControl(languageFlagButton, contentHeight);
         CenterProjectBarControl(tipsToggleButton, contentHeight);
         CenterProjectBarControl(manualHelpButton, contentHeight);
         CenterProjectBarControl(settingsGearButton, contentHeight);
         CenterProjectBarControl(projectSpectrumView, contentHeight);
+    }
+
+    /// <summary>プロジェクトバーのチェックをバー行高いっぱいにし、グリフ／文字を中央描画させる。</summary>
+    private static void AlignProjectBarCheckBox(FlatOptionCheckBox checkBox, int contentHeight)
+    {
+        checkBox.AutoSize = false;
+        var preferred = checkBox.GetPreferredSize(Size.Empty);
+        var width = Math.Max(1, preferred.Width);
+        var height = Math.Max(1, contentHeight);
+        if (checkBox.Width != width || checkBox.Height != height)
+        {
+            checkBox.Size = new Size(width, height);
+        }
+
+        CenterProjectBarControl(checkBox, contentHeight);
     }
 
     private static void CenterProjectBarControl(Control control, int contentHeight)
@@ -2507,38 +2717,17 @@ public partial class Form1 : Form, IMessageFilter
         projectNameComboBox.Width = width;
     }
 
-    /// <summary>
-    /// 出力先テキストボックス（Multiline）の整形矩形を EM_SETRECT で調整し、
-    /// フォント高さ基準でテキストを上下中央に置く（プロジェクト名コンボと同じ見た目）。
-    /// </summary>
     private void AlignProjectPathTextRect()
     {
-        if (!projectOutputPathTextBox.IsHandleCreated)
+        var contentHeight = projectBar.DisplayRectangle.Height;
+        if (contentHeight <= 0)
         {
             return;
         }
 
-        var client = projectOutputPathTextBox.ClientSize;
-        if (client.Width <= 0 || client.Height <= 0)
-        {
-            return;
-        }
-
-        var textHeight = TextRenderer.MeasureText(
-            "Mg",
-            projectOutputPathTextBox.Font,
-            new Size(int.MaxValue, int.MaxValue),
-            TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Height;
-        var topInset = Math.Max(0, (client.Height - textHeight) / 2);
-
-        var rect = new NativeRect
-        {
-            Left = 4,
-            Top = topInset,
-            Right = Math.Max(4, client.Width - 4),
-            Bottom = client.Height,
-        };
-        _ = SendMessage(projectOutputPathTextBox.Handle, EmSetRect, IntPtr.Zero, ref rect);
+        var inputHeight = MeasureProjectBarInputHeight(contentHeight);
+        var inputTop = projectBar.Padding.Top + Math.Max(0, (contentHeight - inputHeight) / 2);
+        LayoutProjectBarInputs(inputTop, inputHeight);
     }
 
     private void ProjectOutputPathTextBox_GotFocus(object? sender, EventArgs e)
@@ -3195,33 +3384,47 @@ public partial class Form1 : Form, IMessageFilter
         return (fadeIn, fadeOut);
     }
 
+    private bool _updatingPlaylistFadeCurveIcons;
+
     private void UpdatePlaylistFadeCurveIcons()
     {
-        var (fadeIn, fadeOut) = ResolveEditingFadeCurves();
+        if (_updatingPlaylistFadeCurveIcons)
+        {
+            return;
+        }
 
-        LayoutPlaylistFadeCurveIcon(fadeInHeaderLabel, fadeInCurveIcon);
-        LayoutPlaylistFadeCurveIcon(transitionTimeHeaderLabel, fadeOutCurveIcon);
+        _updatingPlaylistFadeCurveIcons = true;
+        try
+        {
+            var (fadeIn, fadeOut) = ResolveEditingFadeCurves();
 
-        var iconSize = Math.Max(8, fadeInCurveIcon.Height);
-        var oldIn = fadeInCurveIcon.Image;
-        fadeInCurveIcon.Image = FadeCurveIcons.Create(
-            fadeIn,
-            isFadeIn: true,
-            selected: false,
-            pixelSize: iconSize,
-            leftMargin: 0);
-        oldIn?.Dispose();
+            LayoutPlaylistFadeCurveIcon(fadeInHeaderLabel, fadeInCurveIcon);
+            LayoutPlaylistFadeCurveIcon(transitionTimeHeaderLabel, fadeOutCurveIcon);
 
-        var oldOut = fadeOutCurveIcon.Image;
-        fadeOutCurveIcon.Image = FadeCurveIcons.Create(
-            fadeOut,
-            isFadeIn: false,
-            selected: false,
-            pixelSize: Math.Max(8, fadeOutCurveIcon.Height),
-            leftMargin: 0);
-        oldOut?.Dispose();
+            var oldIn = fadeInCurveIcon.Image;
+            fadeInCurveIcon.Image = FadeCurveIcons.Create(
+                fadeIn,
+                isFadeIn: true,
+                selected: false,
+                pixelSize: Math.Max(8, fadeInCurveIcon.Height),
+                leftMargin: 0);
+            oldIn?.Dispose();
 
-        UpdatePlaylistFadeCurveTips();
+            var oldOut = fadeOutCurveIcon.Image;
+            fadeOutCurveIcon.Image = FadeCurveIcons.Create(
+                fadeOut,
+                isFadeIn: false,
+                selected: false,
+                pixelSize: Math.Max(8, fadeOutCurveIcon.Height),
+                leftMargin: 0);
+            oldOut?.Dispose();
+
+            UpdatePlaylistFadeCurveTips();
+        }
+        finally
+        {
+            _updatingPlaylistFadeCurveIcons = false;
+        }
     }
 
     /// <summary>
@@ -3239,14 +3442,34 @@ public partial class Form1 : Form, IMessageFilter
         header.BarRightInsetExtra = 0;
 
         var bar = header.GetBarBounds();
+        // Layout イベントは Dock 配置前に走り header.Width が古いことがあるため、
+        // 親パネルの現在幅から帯右端を取り直す（右端超過＝アイコン見切れ防止）。
+        var barRight = bar.Right;
+        if (icon.Parent is { } parent && parent.ClientSize.Width > 0)
+        {
+            barRight = Math.Min(
+                barRight,
+                parent.ClientSize.Width - DesignMetrics.From96(3, header));
+        }
+
         var size = Math.Max(8, (int)Math.Round(bar.Height * 0.75));
+        var iconWidth = FadeCurveIcons.WidthFor(size);
         // 右余白（以前の 2 倍）。
-        var rightInset = Math.Max(4, (int)Math.Round(6 * header.DeviceDpi / 96f));
-        icon.Size = new Size(size, size);
+        var rightInset = Math.Max(DesignMetrics.Px(4, this), DesignMetrics.From96(6, header));
+        icon.Size = new Size(iconWidth, size);
         icon.Location = new Point(
-            Math.Max(bar.Left, bar.Right - rightInset - size),
+            Math.Max(bar.Left, barRight - rightInset - iconWidth),
             bar.Top + Math.Max(0, (bar.Height - size) / 2));
         icon.BringToFront();
+
+        // サイズ確定前に作った画像が残っていると CenterImage で見切れる／小さく見えるため、
+        // 現在サイズと合わないときは作り直す（フラグで再帰防止）。
+        if (icon.Image is { } image
+            && image.Size != icon.Size
+            && !_updatingPlaylistFadeCurveIcons)
+        {
+            UpdatePlaylistFadeCurveIcons();
+        }
     }
 
     /// <summary>
@@ -3902,7 +4125,8 @@ public partial class Form1 : Form, IMessageFilter
     private void PositionLogButtons()
     {
         const int scrollbarGap = 0;
-        const int bottomGap = 10;
+        // 下端に密着（余白を開けるとアイコンが上に浮いて見える）。
+        var bottomGap = 0;
         var scrollbarWidth = SystemInformation.VerticalScrollBarWidth;
         logButtonPanel.Left = Math.Max(
             0,
@@ -3919,7 +4143,109 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// ラジオ行は AutoScale 後も 30px 固定のため、セクションパネルの高さも
+    /// 固定レイアウト寸法（行高・More Options・インデント等）を DesignMetrics で再適用する。
+    /// </summary>
+    private void ApplyFixedUiMetrics()
+    {
+        foreach (var radio in EnumerateAllFlatOptionRadios())
+        {
+            radio.ApplyFixedLayout();
+        }
+
+        foreach (var checkBox in EnumerateAllFlatOptionCheckBoxes())
+        {
+            checkBox.ApplyFixedLayout();
+        }
+
+        markerOptionsPanel.ApplyFixedLayout();
+        transportBar.ApplyFixedLayout();
+        waapiStatusBar.ApplyFixedLayout();
+        ApplyPlaylistRowHeights();
+        AdjustTransitionSectionHeights();
+        ApplyMarkerOptionsPanelFixedHeight();
+        SyncRightSideContentHostHeight();
+        AlignCompactFileNumbersCheckBox();
+        AlignProjectBarInputs();
+        UpdateMinimumWindowSize();
+        UpdatePlaylistSelectorWidth();
+        LayoutActionBarCopyright();
+    }
+
+    private IEnumerable<FlatOptionRadioButton> EnumerateAllFlatOptionRadios()
+    {
+        foreach (var radio in EnumerateExitSourceRadios())
+        {
+            yield return radio;
+        }
+
+        foreach (var radio in EnumerateGroupFadeRadios())
+        {
+            yield return radio;
+        }
+
+        foreach (var radio in EnumerateChangeOccursAtRadios())
+        {
+            yield return radio;
+        }
+
+        foreach (Control control in fadeInChoicesPanel.Controls)
+        {
+            if (control is FlatOptionRadioButton radio)
+            {
+                yield return radio;
+            }
+        }
+
+        foreach (Control control in transitionTimeChoicesPanel.Controls)
+        {
+            if (control is FlatOptionRadioButton radio)
+            {
+                yield return radio;
+            }
+        }
+    }
+
+    private IEnumerable<FlatOptionCheckBox> EnumerateAllFlatOptionCheckBoxes()
+    {
+        yield return detailedLogCheckBox;
+        yield return compactFileNumbersCheckBox;
+        yield return topMostCheckBox;
+        yield return keepLastSessionCheckBox;
+        yield return playMinusECheckBox;
+        yield return additiveLayersCheckBox;
+    }
+
+    private void ApplyPlaylistRowHeights()
+    {
+        var rowH = FlatOptionGlyph.RowHeight(this);
+        var indent = PlaylistItemIndent;
+        foreach (Control control in playlistListLayout.Controls)
+        {
+            switch (control)
+            {
+                case FlatPlaylistButton button:
+                    button.Height = rowH;
+                    button.Margin = new Padding(3, 1, 3, 1);
+                    break;
+                case PlaylistGroupSwatch swatch:
+                    swatch.Height = rowH;
+                    swatch.Margin = new Padding(indent, 1, 0, 1);
+                    break;
+                case Label label:
+                    label.Height = rowH;
+                    label.Margin = new Padding(indent, 1, 3, 1);
+                    break;
+            }
+        }
+
+        if (compactFileNumbersCheckBox.Height != DesignMetrics.Px(28, this))
+        {
+            compactFileNumbersCheckBox.Height = DesignMetrics.Px(28, this);
+        }
+    }
+
+    /// <summary>
+    /// ラジオ行は DesignMetrics で換算した行高のため、セクションパネルの高さも
     /// 実際の中身（ヘッダー＋行数）にフィットさせて余白を除去する。
     /// </summary>
     private void AdjustTransitionSectionHeights()
@@ -4826,12 +5152,12 @@ public partial class Form1 : Form, IMessageFilter
 
     /// <summary>
     /// Compact Num. のチェック枠の左端を、プレイリスト行のグループ枠
-    /// （左マージン <see cref="PlaylistItemIndent"/>、非スケール）と揃える。
-    /// チェック枠は Padding.Left から約 3px（DPI スケール）内側に描画されるため差し引く。
+    /// （左マージン <see cref="PlaylistItemIndent"/>）と揃える。
+    /// チェック枠は Padding.Left から約 3px（旧 96dpi 基準）内側に描画されるため差し引く。
     /// </summary>
     private void AlignCompactFileNumbersCheckBox()
     {
-        var glyphInset = (int)Math.Round(3f * DeviceDpi / 96f);
+        var glyphInset = DesignMetrics.From96(3, this);
         compactFileNumbersCheckBox.Padding = new Padding(
             Math.Max(0, PlaylistItemIndent - glyphInset),
             0,
@@ -4899,7 +5225,7 @@ public partial class Form1 : Form, IMessageFilter
                     Enabled = true,
                     Font = new Font("Yu Gothic UI", 8.5F),
                     ForeColor = UiColors.PlaylistDefaultFore,
-                    Height = 30,
+                    Height = FlatOptionGlyph.RowHeight(this),
                     Margin = new Padding(3, 1, 3, 1),
                     Padding = new Padding(2, 0, 2, 0),
                     TabStop = false,
@@ -4926,7 +5252,7 @@ public partial class Form1 : Form, IMessageFilter
                     AllowDrop = true,
                     BackColor = UiColors.ForControlBack(UiColors.PlaylistBack),
                     Dock = DockStyle.Fill,
-                    Height = 30,
+                    Height = FlatOptionGlyph.RowHeight(this),
                     // ヘッダー「Music Playlist」より少し内側へインデントする。
                     Margin = new Padding(PlaylistItemIndent, 1, 0, 1),
                     Tag = part,
@@ -5108,7 +5434,7 @@ public partial class Form1 : Form, IMessageFilter
             AutoEllipsis = true,
             Dock = DockStyle.Fill,
             Font = new Font("Yu Gothic UI", 9F),
-            Height = 30,
+            Height = FlatOptionGlyph.RowHeight(this),
             // プレイリスト項目（スウォッチ）のインデントと揃える。
             Margin = new Padding(PlaylistItemIndent, 1, 3, 1),
             Padding = new Padding(2, 0, 2, 0),
@@ -7330,7 +7656,11 @@ public partial class Form1 : Form, IMessageFilter
 
     private void ApplyLocalizedUiText()
     {
-        Text = UiStrings.FormTitle;
+        Text = UiStrings.FormTitle
+#if DEBUG
+            + GetUiScaleSimulateTitleSuffix()
+#endif
+            ;
         languageFlagButton.RefreshAppearance();
         tipsToggleButton.RefreshAppearance();
         manualHelpButton.RefreshAppearance();
@@ -7354,6 +7684,10 @@ public partial class Form1 : Form, IMessageFilter
         {
             RefreshWaapiStatusDisplay();
         }
+
+        // 著作権文言幅が言語で変わるため、見切れ防止の最小幅を再計算する。
+        LayoutActionBarCopyright();
+        UpdateMinimumWindowSize();
     }
 
     /// <summary>Form1 の固定ラベル・ボタン・チェックボックス・見出し・著作権表記を言語切替時に反映する。</summary>
@@ -7502,7 +7836,12 @@ public partial class Form1 : Form, IMessageFilter
             _appSettings.DefaultWaveformFadeOutCurve,
             _appSettings.DefaultPlaylistFadeInCurve,
             _appSettings.DefaultPlaylistFadeOutCurve,
-            _appSettings.ToExpectedWaveformFormat())
+            _appSettings.ToExpectedWaveformFormat()
+#if DEBUG
+            ,
+            _uiScaleSimulateDpi
+#endif
+            )
         {
             // メインが最前面でもダイアログが背面に回らないようにする
             TopMost = TopMost,
@@ -7549,6 +7888,10 @@ public partial class Form1 : Form, IMessageFilter
 
         _appSettings.SaveExpectedWaveformFormat(dialog.SelectedExpectedFormat);
         waveformView.SetExpectedWaveformFormat(dialog.SelectedExpectedFormat);
+
+#if DEBUG
+        SetUiScaleSimulateDpi(dialog.SelectedUiScaleSimulateDpi);
+#endif
 
         ReleaseFocusToWaveform();
     }
@@ -8214,7 +8557,7 @@ public partial class Form1 : Form, IMessageFilter
     {
         var nonClientWidth = Math.Max(0, Width - ClientSize.Width);
         var nonClientHeight = Math.Max(0, Height - ClientSize.Height);
-        var safetyMargin = (int)Math.Ceiling(8f * DeviceDpi / 96f);
+        var safetyMargin = (int)Math.Ceiling(DesignMetrics.From96F(8f, this));
 
         // Fade In / Fade Out（各々 Group 区分込み）と Exit Source At を 1 行に並べる。
         var transitionRowsHeight = Math.Max(
@@ -8229,9 +8572,19 @@ public partial class Form1 : Form, IMessageFilter
             + waapiStatusBar.Height
             + actionBar.Height;
 
+        var minClientWidth = Math.Max(
+            transportBar.RequiredWidth,
+            MeasureActionBarMinimumClientWidth());
         MinimumSize = new Size(
-            transportBar.RequiredWidth + nonClientWidth + safetyMargin,
+            minClientWidth + nonClientWidth + safetyMargin,
             fixedChromeHeight + requiredLogAreaHeight + nonClientHeight + safetyMargin);
+
+        // 現在幅が最小を下回るときは引き上げ（権利表記の見切れを防ぐ）。
+        if (WindowState == FormWindowState.Normal
+            && Width < MinimumSize.Width)
+        {
+            Width = MinimumSize.Width;
+        }
     }
 
     private void ApplyDarkTitleBar()

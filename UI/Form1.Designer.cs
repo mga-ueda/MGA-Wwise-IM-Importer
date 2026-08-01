@@ -255,7 +255,9 @@ partial class Form1
         //
         // projectNameComboBox
         //
-        projectNameComboBox.Dock = DockStyle.Left;
+        // 高さは AlignProjectBarInputs でパス欄と共通のコンパクト高に揃える。
+        projectNameComboBox.Dock = DockStyle.None;
+        projectNameComboBox.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         projectNameComboBox.Font = new Font("Yu Gothic UI", 9F);
         projectNameComboBox.Name = "projectNameComboBox";
         projectNameComboBox.Size = new Size(168, 24);
@@ -264,7 +266,8 @@ partial class Form1
         //
         // projectNameSpacer
         //
-        projectNameSpacer.Dock = DockStyle.Left;
+        projectNameSpacer.Dock = DockStyle.None;
+        projectNameSpacer.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         projectNameSpacer.Name = "projectNameSpacer";
         projectNameSpacer.Size = new Size(8, 24);
         projectNameSpacer.TabStop = false;
@@ -291,12 +294,13 @@ partial class Form1
         //
         // projectOutputPathTextBox
         //
+        // Dock.Fill だと EM_SETRECT でも上寄りが残るため、AlignProjectBarInputs で
+        // Font.Height 相当の高さに縮めバー内でコントロール自体を上下中央にする。
         projectOutputPathTextBox.BorderStyle = BorderStyle.FixedSingle;
         projectOutputPathTextBox.Cursor = Cursors.Default;
-        projectOutputPathTextBox.Dock = DockStyle.Fill;
+        projectOutputPathTextBox.Dock = DockStyle.None;
+        projectOutputPathTextBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
         projectOutputPathTextBox.Font = new Font("Yu Gothic UI", 9F);
-        // Pês EDIT ÍeLXgªãñ¹`æ³êé½ßAMultiline + EM_SETRECT Å
-        // R{{bNXÌ¶Æ¯¶cÊuÉí¹éiAlignProjectBarTextjB
         projectOutputPathTextBox.Multiline = true;
         projectOutputPathTextBox.WordWrap = false;
         projectOutputPathTextBox.Name = "projectOutputPathTextBox";
@@ -323,9 +327,9 @@ partial class Form1
         //
         // keepLastSessionCheckBox
         //
-        keepLastSessionCheckBox.AutoSize = true;
+        keepLastSessionCheckBox.AutoSize = false;
         keepLastSessionCheckBox.Font = new Font("Yu Gothic UI", 9F);
-        keepLastSessionCheckBox.Margin = new Padding(0, 3, 8, 0);
+        keepLastSessionCheckBox.Margin = new Padding(0, 0, 8, 0);
         keepLastSessionCheckBox.Name = "keepLastSessionCheckBox";
         keepLastSessionCheckBox.TabIndex = 3;
         keepLastSessionCheckBox.Text = "Keep Last Session";
@@ -428,8 +432,8 @@ partial class Form1
         logButtonPanel.BackColor = UiColors.LogBack;
         logButtonPanel.FlowDirection = FlowDirection.RightToLeft;
         logButtonPanel.Name = "logButtonPanel";
-        logButtonPanel.Padding = new Padding(2, 0, 2, 2);
-        logButtonPanel.Size = new Size(82, 28);
+        logButtonPanel.Padding = new Padding(2, 4, 2, 0);
+        logButtonPanel.Size = new Size(82, 30);
         logButtonPanel.TabIndex = 1;
         logButtonPanel.WrapContents = false;
         logButtonPanel.Controls.Add(logDownloadButton);
@@ -439,7 +443,7 @@ partial class Form1
         // logClearButton
         //
         logClearButton.AccessibleName = "Clear log";
-        logClearButton.Margin = new Padding(2, 0, 0, 1);
+        logClearButton.Margin = new Padding(2, 0, 0, 0);
         logClearButton.Name = "logClearButton";
         logClearButton.Size = new Size(24, 24);
         logClearButton.TabIndex = 0;
@@ -448,7 +452,7 @@ partial class Form1
         // logCopyButton
         //
         logCopyButton.AccessibleName = "Copy log";
-        logCopyButton.Margin = new Padding(2, 0, 0, 1);
+        logCopyButton.Margin = new Padding(2, 0, 0, 0);
         logCopyButton.Name = "logCopyButton";
         logCopyButton.Size = new Size(24, 24);
         logCopyButton.TabIndex = 1;
@@ -457,7 +461,7 @@ partial class Form1
         // logDownloadButton
         //
         logDownloadButton.AccessibleName = "Download log";
-        logDownloadButton.Margin = new Padding(2, 0, 0, 1);
+        logDownloadButton.Margin = new Padding(2, 0, 0, 0);
         logDownloadButton.Name = "logDownloadButton";
         logDownloadButton.Size = new Size(24, 24);
         logDownloadButton.TabIndex = 2;
@@ -1317,10 +1321,9 @@ partial class Form1
         //
         // topMostCheckBox
         //
-        topMostCheckBox.AutoSize = true;
+        topMostCheckBox.AutoSize = false;
         topMostCheckBox.Font = new Font("Yu Gothic UI", 9F);
-        // projectActionPanel àÌ 24px {^Æ¶x[XCðµ¦é½ßÌã}[WB
-        topMostCheckBox.Margin = new Padding(0, 3, 8, 0);
+        topMostCheckBox.Margin = new Padding(0, 0, 8, 0);
         topMostCheckBox.Name = "topMostCheckBox";
         topMostCheckBox.TabIndex = 4;
         topMostCheckBox.Text = "Always on Top";
@@ -1383,7 +1386,7 @@ partial class Form1
         MinimumSize = new Size(480, 320);
         Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
-        Text = "MGA Wwise IM Importer - Version 1.1.2-beta";
+        Text = "MGA Wwise IM Importer - Version 1.1.3-beta";
         ((System.ComponentModel.ISupportInitialize)brandLogoPictureBox).EndInit();
         projectActionPanel.ResumeLayout(false);
         projectActionPanel.PerformLayout();

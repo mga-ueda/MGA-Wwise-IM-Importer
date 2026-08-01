@@ -1,10 +1,22 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>FlatOptionRadioButton / FlatOptionCheckBox 共通のグリフ配色・DPI 換算。</summary>
 internal static class FlatOptionGlyph
 {
+    /// <summary>ラジオ外円・チェック枠スロット（150% 設計）。</summary>
+    public const int LayoutGlyphSizeDesign = 21;
+
+    /// <summary>チェック枠の描画サイズ（150% 設計）。</summary>
+    public const int DrawnGlyphSizeDesign = 15;
+
+    public const int GlyphGapDesign = 9;
+    public const int TextGapDesign = 11;
+
+    /// <summary>プレイリスト項目と同じ行高（150% 設計）。</summary>
+    public const int RowHeightDesign = 30;
+
     public static Color ResolveBorderColor(bool enabled, bool isChecked, bool hovered)
     {
         if (!enabled)
@@ -20,25 +32,31 @@ internal static class FlatOptionGlyph
         return hovered ? UiColors.OptionGlyphHover : UiColors.OptionGlyphBorder;
     }
 
-    public static int ScaleLogical(int deviceDpi, int value) =>
-        (int)Math.Round(value * deviceDpi / 96f);
+    public static int RowHeight(Control? c = null) => DesignMetrics.Px(RowHeightDesign, c);
 
-    public static float ScaleLogical(int deviceDpi, float value) =>
-        value * deviceDpi / 96f;
+    public static int LayoutGlyphSize(Control? c = null) => DesignMetrics.Px(LayoutGlyphSizeDesign, c);
+
+    public static int DrawnGlyphSize(Control? c = null) => DesignMetrics.Px(DrawnGlyphSizeDesign, c);
+
+    public static int GlyphGap(Control? c = null) => DesignMetrics.Px(GlyphGapDesign, c);
+
+    public static int TextGap(Control? c = null) => DesignMetrics.Px(TextGapDesign, c);
 }
 
 internal sealed class FlatOptionRadioButton : RadioButton
 {
-    /// <summary>プレイリスト項目と同じ行高（AutoScale 後も固定）。</summary>
-    public const int RowHeight = 30;
+    /// <summary>プレイリスト項目と同じ行高（150% 設計値。適用時は DesignMetrics で換算）。</summary>
+    public const int RowHeightDesign = FlatOptionGlyph.RowHeightDesign;
+
+    public static int GetRowHeight(Control? c = null) => FlatOptionGlyph.RowHeight(c);
 
     private bool _hovered;
 
     public FlatOptionRadioButton()
     {
         AutoSize = false;
-        Height = RowHeight;
-        Margin = new Padding(3, 1, 3, 1);
+        Height = FlatOptionGlyph.RowHeight(this);
+        Margin = DesignMetrics.Pad(3, 1, 3, 1, this);
         FlatStyle = FlatStyle.Flat;
         TabStop = false;
         SetStyle(
@@ -55,24 +73,33 @@ internal sealed class FlatOptionRadioButton : RadioButton
 
     public void ApplyColors() => Invalidate();
 
+    /// <summary>DPI / シミュレート変更後に行高・余白を再適用する。</summary>
+    public void ApplyFixedLayout()
+    {
+        Height = FlatOptionGlyph.RowHeight(this);
+        Margin = DesignMetrics.Pad(3, 1, 3, 1, this);
+        Invalidate();
+    }
+
     public override Size GetPreferredSize(Size proposedSize)
     {
-        var glyph = ScaleLogical(14);
-        var gap = ScaleLogical(6);
+        var glyph = FlatOptionGlyph.LayoutGlyphSize(this);
+        var gap = FlatOptionGlyph.GlyphGap(this);
         var text = TextRenderer.MeasureText(
             Text,
             Font,
             Size.Empty,
             TextFormatFlags.NoPadding | TextFormatFlags.SingleLine);
-        return new Size(glyph + gap + text.Width + ScaleLogical(2), RowHeight);
+        return new Size(
+            glyph + gap + text.Width + DesignMetrics.Px(3, this),
+            FlatOptionGlyph.RowHeight(this));
     }
 
     protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
     {
         base.ScaleControl(factor, specified);
-        // ランタイム生成のプレイリスト行と行間を揃えるため、縦方向の AutoScale を打ち消す。
-        Height = RowHeight;
-        Margin = new Padding(3, 1, 3, 1);
+        // ランタイム生成のプレイリスト行と行間を揃えるため、縦方向の AutoScale を打ち消し DesignMetrics で再適用。
+        ApplyFixedLayout();
     }
 
     protected override void OnMouseEnter(EventArgs e)
@@ -107,21 +134,22 @@ internal sealed class FlatOptionRadioButton : RadioButton
         g.Clear(BackColor);
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        var glyphSize = ScaleLogical(14);
+        var glyphSize = FlatOptionGlyph.LayoutGlyphSize(this);
         var glyph = new RectangleF(
-            ScaleLogical(1),
+            DesignMetrics.Px(2, this),
             (Height - glyphSize) / 2f,
             glyphSize - 1f,
             glyphSize - 1f);
         var borderColor = ResolveBorderColor();
-        using (var border = new Pen(borderColor, ScaleLogical(1.4f)))
+        var penW = Math.Max(1f, DesignMetrics.From96F(1.4f, this));
+        using (var border = new Pen(borderColor, penW))
         {
             g.DrawEllipse(border, glyph);
         }
 
         if (Checked)
         {
-            var inset = ScaleLogical(4f);
+            var inset = DesignMetrics.From96F(4f, this);
             var dot = RectangleF.Inflate(glyph, -inset, -inset);
             using var fill = new SolidBrush(UiColors.OptionGlyphChecked);
             g.FillEllipse(fill, dot);
@@ -135,7 +163,7 @@ internal sealed class FlatOptionRadioButton : RadioButton
 
     private void DrawText(Graphics g, int glyphSize)
     {
-        var textLeft = glyphSize + ScaleLogical(7);
+        var textLeft = glyphSize + FlatOptionGlyph.TextGap(this);
         TextRenderer.DrawText(
             g,
             Text,
@@ -148,17 +176,10 @@ internal sealed class FlatOptionRadioButton : RadioButton
             | TextFormatFlags.NoPrefix
             | TextFormatFlags.SingleLine);
     }
-
-    private int ScaleLogical(int value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
-
-    private float ScaleLogical(float value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
 }
 
 internal sealed class FlatOptionCheckBox : CheckBox
 {
-    private const int LayoutGlyphSize = 14;
-    private const int DrawnGlyphSize = 10;
-
     private bool _hovered;
 
     public FlatOptionCheckBox()
@@ -180,11 +201,22 @@ internal sealed class FlatOptionCheckBox : CheckBox
 
     public void ApplyColors() => Invalidate();
 
+    /// <summary>DPI / シミュレート変更後に再描画する（AutoSize は PreferredSize に追従）。</summary>
+    public void ApplyFixedLayout()
+    {
+        if (AutoSize)
+        {
+            Size = GetPreferredSize(Size.Empty);
+        }
+
+        Invalidate();
+    }
+
     public override Size GetPreferredSize(Size proposedSize)
     {
         // コントロール寸法とテキスト位置は従来どおりに保ち、枠だけを小さく描画する。
-        var glyph = ScaleLogical(LayoutGlyphSize);
-        var gap = ScaleLogical(6);
+        var glyph = FlatOptionGlyph.LayoutGlyphSize(this);
+        var gap = FlatOptionGlyph.GlyphGap(this);
         var textFlags = GetTextFormatFlags();
         var text = TextRenderer.MeasureText(
             Text,
@@ -195,8 +227,8 @@ internal sealed class FlatOptionCheckBox : CheckBox
                 : new Size(short.MaxValue, short.MaxValue),
             textFlags);
         return new Size(
-            Padding.Horizontal + glyph + gap + text.Width + ScaleLogical(2),
-            Padding.Vertical + Math.Max(glyph, text.Height) + ScaleLogical(4));
+            Padding.Horizontal + glyph + gap + text.Width + DesignMetrics.Px(3, this),
+            Padding.Vertical + Math.Max(glyph, text.Height) + DesignMetrics.Px(6, this));
     }
 
     protected override void OnMouseEnter(EventArgs e)
@@ -231,14 +263,15 @@ internal sealed class FlatOptionCheckBox : CheckBox
         g.Clear(BackColor);
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
-        var glyphSlotSize = ScaleLogical(LayoutGlyphSize);
-        var glyphSize = ScaleLogical(DrawnGlyphSize);
+        var glyphSlotSize = FlatOptionGlyph.LayoutGlyphSize(this);
+        var glyphSize = FlatOptionGlyph.DrawnGlyphSize(this);
         var glyph = new RectangleF(
-            Padding.Left + ScaleLogical(1) + (glyphSlotSize - glyphSize) / 2f,
+            Padding.Left + DesignMetrics.Px(2, this) + (glyphSlotSize - glyphSize) / 2f,
             (Height - glyphSize) / 2f,
             glyphSize - 1f,
             glyphSize - 1f);
         var borderColor = ResolveBorderColor();
+        var penW = Math.Max(1f, DesignMetrics.From96F(1.4f, this));
         if (Checked)
         {
             using var fill = new SolidBrush(Enabled
@@ -247,14 +280,16 @@ internal sealed class FlatOptionCheckBox : CheckBox
             g.FillRectangle(fill, glyph);
         }
 
-        using (var border = new Pen(borderColor, ScaleLogical(1.4f)))
+        using (var border = new Pen(borderColor, penW))
         {
             g.DrawRectangle(border, glyph.X, glyph.Y, glyph.Width, glyph.Height);
         }
 
         if (Checked)
         {
-            using var check = new Pen(UiColors.OptionGlyphCheckMark, ScaleLogical(1.8f))
+            using var check = new Pen(
+                UiColors.OptionGlyphCheckMark,
+                Math.Max(1f, DesignMetrics.From96F(1.8f, this)))
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round,
@@ -268,7 +303,7 @@ internal sealed class FlatOptionCheckBox : CheckBox
             ]);
         }
 
-        var textLeft = Padding.Left + glyphSlotSize + ScaleLogical(7);
+        var textLeft = Padding.Left + glyphSlotSize + FlatOptionGlyph.TextGap(this);
         TextRenderer.DrawText(
             g,
             Text,
@@ -295,8 +330,4 @@ internal sealed class FlatOptionCheckBox : CheckBox
 
     private Color ResolveBorderColor() =>
         FlatOptionGlyph.ResolveBorderColor(Enabled, Checked, _hovered);
-
-    private int ScaleLogical(int value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
-
-    private float ScaleLogical(float value) => FlatOptionGlyph.ScaleLogical(DeviceDpi, value);
 }

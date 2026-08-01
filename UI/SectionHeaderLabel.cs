@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// セクション見出しラベル。行の中へ上下左右にマージンを取った
@@ -27,7 +27,7 @@ internal sealed class SectionHeaderLabel : Label
         }
     }
 
-    /// <summary>帯上側の余白（96 DPI 基準 px）。</summary>
+    /// <summary>帯上側の余白（150% 設計 px。描画時に DesignMetrics で換算）。</summary>
     public int BarMarginTop
     {
         get => _barMarginTop;
@@ -44,7 +44,7 @@ internal sealed class SectionHeaderLabel : Label
         }
     }
 
-    /// <summary>帯下側の余白（96 DPI 基準 px）。下の UI との間隔用。</summary>
+    /// <summary>帯下側の余白（150% 設計 px。描画時に DesignMetrics で換算）。</summary>
     public int BarMarginBottom
     {
         get => _barMarginBottom;
@@ -90,10 +90,11 @@ internal sealed class SectionHeaderLabel : Label
     /// <summary>見出し帯（BarColor）の描画矩形。</summary>
     public Rectangle GetBarBounds()
     {
-        var marginLeft = S(3);
-        var marginRight = S(3) + _barRightInsetExtra;
-        var marginTop = S(_barMarginTop);
-        var marginBottom = S(_barMarginBottom);
+        // BarMargin* は従来 96dpi 基準で渡されるため From96。左右の 3 も同様。
+        var marginLeft = DesignMetrics.From96(3, this);
+        var marginRight = DesignMetrics.From96(3, this) + _barRightInsetExtra;
+        var marginTop = DesignMetrics.From96(_barMarginTop, this);
+        var marginBottom = DesignMetrics.From96(_barMarginBottom, this);
         return new Rectangle(
             marginLeft,
             marginTop,
@@ -130,6 +131,4 @@ internal sealed class SectionHeaderLabel : Label
             | TextFormatFlags.NoPadding
             | TextFormatFlags.SingleLine);
     }
-
-    private int S(int value) => (int)Math.Round(value * DeviceDpi / 96f);
 }

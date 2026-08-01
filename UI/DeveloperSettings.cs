@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -12,6 +12,12 @@ internal sealed class DeveloperSettings
     /// <summary>Playlist／再生エンジンの詳細診断ログを出すか。既定はオン。</summary>
     public bool DetailedPlaybackLog { get; init; } = true;
 
+    /// <summary>
+    /// DEBUG 専用。UI スケールシミュレート対象 DPI。
+    /// 0 = ディスプレイどおり、96 = 100% 相当、144 = 150% 相当。
+    /// </summary>
+    public int UiScaleSimulateDpi { get; init; }
+
     public static DeveloperSettings Load()
     {
         EnsureDefaultsWritten();
@@ -22,6 +28,9 @@ internal sealed class DeveloperSettings
             DetailedPlaybackLog = values.TryGetValue("DetailedPlaybackLog", out var detailedLog)
                 ? ParseBool(detailedLog, defaultValue: true)
                 : true,
+            UiScaleSimulateDpi = values.TryGetValue("UiScaleSimulateDpi", out var dpiText)
+                ? ParseInt(dpiText, defaultValue: 0)
+                : 0,
         };
     }
 
@@ -31,13 +40,25 @@ internal sealed class DeveloperSettings
     public static void EnsureDefaultsWritten()
     {
         var values = IniFile.ReadSection(Section);
-        if (values.ContainsKey("DetailedPlaybackLog"))
+        var changed = false;
+        if (!values.ContainsKey("DetailedPlaybackLog"))
         {
-            return;
+            values["DetailedPlaybackLog"] = "1";
+            changed = true;
         }
 
-        values["DetailedPlaybackLog"] = "1";
-        WriteSection(values);
+#if DEBUG
+        if (!values.ContainsKey("UiScaleSimulateDpi"))
+        {
+            values["UiScaleSimulateDpi"] = "0";
+            changed = true;
+        }
+#endif
+
+        if (changed)
+        {
+            WriteSection(values);
+        }
     }
 
     /// <summary>[Developer] DetailedPlaybackLog だけ更新する（他キーは維持）。</summary>
@@ -49,14 +70,40 @@ internal sealed class DeveloperSettings
         WriteSection(values);
     }
 
+#if DEBUG
+    /// <summary>[Developer] UiScaleSimulateDpi だけ更新する（他キーは維持）。</summary>
+    public static void SaveUiScaleSimulateDpi(int dpi)
+    {
+        EnsureDefaultsWritten();
+        var values = IniFile.ReadSection(Section);
+        values["UiScaleSimulateDpi"] = dpi.ToString(CultureInfo.InvariantCulture);
+        WriteSection(values);
+    }
+#endif
+
     private static void WriteSection(Dictionary<string, string> values)
     {
-        IniFile.WriteSection(Section, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var section = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["DetailedPlaybackLog"] = values.TryGetValue("DetailedPlaybackLog", out var detailedLog)
                 ? detailedLog
                 : "1",
-        });
+        };
+
+        // DEBUG で書いたシミュレート値を Release の他キー更新で消さない。
+        if (values.TryGetValue("UiScaleSimulateDpi", out var dpiText))
+        {
+            section["UiScaleSimulateDpi"] = dpiText;
+        }
+
+        IniFile.WriteSection(Section, section);
+    }
+
+    private static int ParseInt(string text, int defaultValue)
+    {
+        return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number)
+            ? number
+            : defaultValue;
     }
 
     private static bool ParseBool(string text, bool defaultValue)

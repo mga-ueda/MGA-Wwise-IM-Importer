@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 internal enum MarkerEditMode
 {
@@ -5793,7 +5793,6 @@ internal sealed class WaveformView : Control
         }
 
         using var brush = new SolidBrush(UiColors.OutputPartFg);
-        using var shadowBrush = new SolidBrush(UiColors.OutputPartShadow);
 
         for (var i = 0; i < parts.Count; i++)
         {
@@ -5837,13 +5836,11 @@ internal sealed class WaveformView : Control
                 var state = g.Save();
                 g.TranslateTransform(x, y);
                 g.ScaleTransform(scaleX, 1f);
-                g.DrawString(parts[i].Text, labelFont, shadowBrush, 1f, 1f);
                 g.DrawString(parts[i].Text, labelFont, brush, 0f, 0f);
                 g.Restore(state);
             }
             else
             {
-                g.DrawString(parts[i].Text, labelFont, shadowBrush, x + 1f, y + 1f);
                 g.DrawString(parts[i].Text, labelFont, brush, x, y);
             }
         }

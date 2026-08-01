@@ -3,14 +3,19 @@
 /// <summary>
 /// 右ペイン下部の More Options パネル。
 /// 折りたたみ内に Stream／Layer Music Option／Marker Comment／Marker Grid をまとめる。
-/// 行高はプレイリスト項目（30px）に合わせ、DPI スケールの影響を受けないよう
-/// 子コントロールは固定ピクセルで配置する。
+/// 行高はプレイリスト項目（150% 設計 30px）に合わせ、
+/// <see cref="DesignMetrics"/> で 100% / 150% の比率を揃えて配置する。
 /// </summary>
 internal sealed class MarkerOptionsPanel : UserControl
 {
-    private const int HeaderHeight = 26;
-    private const int RowPitch = 32;
-    private const int RowHeight = 30;
+    /// <summary>見出し高（旧 96dpi 26 → 150% 設計）。</summary>
+    private const int HeaderHeightDesign = 39;
+
+    /// <summary>行ピッチ（150% 設計。従来は非スケール固定）。</summary>
+    private const int RowPitchDesign = 32;
+
+    /// <summary>行高（150% 設計。プレイリスト／ラジオと同一）。</summary>
+    private const int RowHeightDesign = FlatOptionGlyph.RowHeightDesign;
     private const int StreamMsMin = 0;
     private const int StreamMsMax = 9999;
     private const int StreamMsDefault = 500;
@@ -50,8 +55,12 @@ internal sealed class MarkerOptionsPanel : UserControl
     private readonly TextBox _joinerTextBox;
 
     private readonly Control[] _moreOptionsBodyControls;
-    private readonly int _collapsedHeight;
-    private readonly int _expandedHeight;
+    private int _collapsedHeight;
+    private int _expandedHeight;
+    private int _leftColW;
+    private int _rightColW;
+    private int _leftX = 1;
+    private int _rightX;
 
     private MarkerSettings? _settings;
     private bool _updating;
@@ -106,9 +115,10 @@ internal sealed class MarkerOptionsPanel : UserControl
         var loudnessPadL = S(12);
         var loudnessPadR = S(8);
         // FlatOptionCheckBox は glyph + gap + テキストが必要なので、文字幅だけでは足りない。
-        var keepLayerBalanceCheckW = S(14) + S(6)
+        var keepLayerBalanceCheckW = FlatOptionGlyph.LayoutGlyphSize(this)
+            + FlatOptionGlyph.GlyphGap(this)
             + MeasureLabelWidth("Keep Layer Balance", baseFont)
-            + S(2);
+            + DesignMetrics.Px(3, this);
         var loudnessCheckW = Math.Max(
             MeasureLabelWidth("Layer Music Option", headerFont),
             keepLayerBalanceCheckW);
@@ -134,15 +144,15 @@ internal sealed class MarkerOptionsPanel : UserControl
 
         // 閉じた状態は More Options 見出しのみ。開くと直後に各セクションが続く。
         var moreOptionsHeaderY = 1;
-        var row1HeaderY = moreOptionsHeaderY + S(HeaderHeight) + 1;
-        var row1ContentTop = row1HeaderY + S(HeaderHeight) + 1;
+        var row1HeaderY = moreOptionsHeaderY + HeaderHeight + 1;
+        var row1ContentTop = row1HeaderY + HeaderHeight + 1;
         // 上段は各列とも 3 行。
         var primaryBottom = row1ContentTop + RowPitch * 2 + RowHeight;
         // 見出し帯の下マージン（SectionHeaderLabel）と同程度の間隔を空ける。
         var row2HeaderY = primaryBottom + S(8);
-        var row2ContentTop = row2HeaderY + S(HeaderHeight) + 1;
-        _collapsedHeight = moreOptionsHeaderY + S(HeaderHeight) + 2;
-        _expandedHeight = row2ContentTop + RowPitch * 3 + RowHeight + 2;
+        var row2ContentTop = row2HeaderY + HeaderHeight + 1;
+        _collapsedHeight = moreOptionsHeaderY + HeaderHeight + DesignMetrics.Px(2, this);
+        _expandedHeight = row2ContentTop + RowPitch * 3 + RowHeight + DesignMetrics.Px(2, this);
         Height = _expandedHeight;
 
         _moreOptionsHeaderLabel = CreateHeader(
@@ -247,14 +257,15 @@ internal sealed class MarkerOptionsPanel : UserControl
         {
             BorderStyle = BorderStyle.FixedSingle,
             Font = baseFont,
-            Size = new Size(S(46), 25),
+            Size = new Size(S(46), EditorHeight),
             TextAlign = HorizontalAlignment.Center,
             MaxLength = 1,
             Text = "3",
         };
+        TextBoxVerticalAlign.Configure(_digitsTextBox);
         _digitsTextBox.Location = new Point(
             commentDigitsX + S(12) + S(50),
-            CenterInRow(row2ContentTop, _digitsTextBox.PreferredHeight));
+            CenterInRow(row2ContentTop, EditorHeight));
         _digitsTextBox.KeyPress += DigitsTextBox_KeyPress;
         _digitsTextBox.TextChanged += (_, _) => OnUiChanged();
         WireTextEditingFocus(_digitsTextBox);
@@ -364,6 +375,7 @@ internal sealed class MarkerOptionsPanel : UserControl
 
         Controls.Add(_leftSeparator);
 
+        ApplyFixedLayout();
         ApplyMoreOptionsVisibility();
         ApplyTips();
         _languageChangedHandler = (_, _) =>
@@ -425,10 +437,45 @@ internal sealed class MarkerOptionsPanel : UserControl
     protected override bool ScaleChildren => false;
 
     /// <summary>全カラムが収まるために必要な幅（DPI 反映済み）。</summary>
-    public int RequiredWidth { get; }
+    public int RequiredWidth { get; private set; }
 
     /// <summary>現在の開閉状態で必要な固定高さ（DPI 反映済み）。</summary>
     public int RequiredHeight => _moreOptionsExpanded ? _expandedHeight : _collapsedHeight;
+
+    private int HeaderHeight => DesignMetrics.Px(HeaderHeightDesign, this);
+
+    /// <summary>
+    /// 行内 TextBox 高さ。150% 設計 28 を主とし、フォントは食い込み防止の下限のみ
+    /// （Multiline の PreferredHeight は使わない＝複数行前提で肥大するため）。
+    /// DEBUG の LayoutDpiOverride 時も設計値が主になるよう、厚い font pad は使わない。
+    /// </summary>
+    private int EditorHeight
+    {
+        get
+        {
+            var design = DesignMetrics.Px(28, this);
+            var font = _streamEnabledCheckBox?.Font
+                ?? _digitsTextBox?.Font
+                ?? Font;
+            // 枠込みの下限（150% 設計 6）。設計 28 が通常勝つ。
+            var fontFloor = font.Height + DesignMetrics.Px(6, this);
+            return Math.Max(design, fontFloor);
+        }
+    }
+
+    /// <summary>
+    /// 行高。RowPitch を超えない（超えると前の行の不透明ラベル／チェックが
+    /// 次の行のエディタ上枠 1px を覆い、枠線が消える。100% で顕在化）。
+    /// </summary>
+    private int RowHeight => Math.Min(
+        RowPitch,
+        Math.Max(
+            DesignMetrics.Px(RowHeightDesign, this),
+            EditorHeight + DesignMetrics.Px(4, this)));
+
+    private int RowPitch => Math.Max(
+        DesignMetrics.Px(RowPitchDesign, this),
+        EditorHeight + DesignMetrics.Px(2, this));
 
     protected override void OnResize(EventArgs e)
     {
@@ -500,12 +547,188 @@ internal sealed class MarkerOptionsPanel : UserControl
         UpdateDependentStates();
     }
 
-    /// <summary>DPI スケール（96dpi 基準）を適用する。</summary>
-    private int S(int value) => (int)Math.Round(value * DeviceDpi / 96f);
+    /// <summary>旧 96dpi 基準の論理 px を DesignMetrics で換算する。</summary>
+    private int S(int value) => DesignMetrics.From96(value, this);
 
-    /// <summary>行（高さ 30px）の中に指定高さのコントロールを縦中央配置する Y を返す。</summary>
-    private static int CenterInRow(int rowY, int controlHeight) =>
+    /// <summary>行の中に指定高さのコントロールを縦中央配置する Y を返す。</summary>
+    private int CenterInRow(int rowY, int controlHeight) =>
         rowY + Math.Max(0, (RowHeight - controlHeight) / 2);
+
+    /// <summary>DPI / シミュレート変更後に固定レイアウトを再適用する。</summary>
+    public void ApplyFixedLayout()
+    {
+        var baseFont = _streamEnabledCheckBox.Font;
+        var headerFont = _moreOptionsHeaderLabel.Font;
+        var commentColumnGap = S(4);
+        var streamPadL = S(12);
+        var streamGap = S(6);
+        var streamPadR = S(8);
+        var streamLabelW = Math.Max(
+            MeasureLabelWidth("Look-ahead Time", baseFont),
+            MeasureLabelWidth("Prefetch Length", baseFont));
+        var streamMsBoxW = Math.Max(S(36), MeasureLabelWidth("9999", baseFont) + S(14));
+        var streamUnitW = MeasureLabelWidth("ms", baseFont);
+        var streamNeededW = streamPadL
+            + streamLabelW
+            + streamGap
+            + streamMsBoxW
+            + streamGap
+            + streamUnitW
+            + streamPadR;
+
+        var gridContentW = Math.Max(
+            MeasureLabelWidth("Timeline", baseFont),
+            MeasureLabelWidth("Marker Grid", headerFont));
+        var gridNeededW = S(12) + gridContentW + S(8);
+
+        var loudnessPadL = S(12);
+        var loudnessPadR = S(8);
+        var keepLayerBalanceCheckW = FlatOptionGlyph.LayoutGlyphSize(this)
+            + FlatOptionGlyph.GlyphGap(this)
+            + MeasureLabelWidth("Keep Layer Balance", baseFont)
+            + DesignMetrics.Px(3, this);
+        var loudnessCheckW = Math.Max(
+            MeasureLabelWidth("Layer Music Option", headerFont),
+            keepLayerBalanceCheckW);
+        var loudnessColW = loudnessPadL + loudnessCheckW + loudnessPadR;
+
+        var col2W = S(114);
+        var col3PadL = S(12);
+        var col3Gap = S(6);
+        var col3PadR = S(8);
+        var col3LabelW = Math.Max(
+            MeasureLabelWidth("Prefix", baseFont),
+            Math.Max(
+                MeasureLabelWidth("Suffix", baseFont),
+                MeasureLabelWidth("Separator", baseFont)));
+        var col3EditorW = S(44);
+        var commentW = col2W + commentColumnGap + col3PadL + col3LabelW + col3Gap + col3EditorW + col3PadR;
+
+        _leftX = 1;
+        _leftColW = Math.Max(streamNeededW, commentW);
+        _rightX = _leftX + _leftColW;
+        _rightColW = Math.Max(loudnessColW, gridNeededW);
+        RequiredWidth = _rightX + _rightColW + S(8);
+
+        var moreOptionsHeaderY = 1;
+        var row1HeaderY = moreOptionsHeaderY + HeaderHeight + 1;
+        var row1ContentTop = row1HeaderY + HeaderHeight + 1;
+        var primaryBottom = row1ContentTop + RowPitch * 2 + RowHeight;
+        var row2HeaderY = primaryBottom + S(8);
+        var row2ContentTop = row2HeaderY + HeaderHeight + 1;
+        _collapsedHeight = moreOptionsHeaderY + HeaderHeight + DesignMetrics.Px(2, this);
+        _expandedHeight = row2ContentTop + RowPitch * 3 + RowHeight + DesignMetrics.Px(2, this);
+
+        _moreOptionsHeaderLabel.Location = new Point(_leftX, moreOptionsHeaderY);
+        _moreOptionsHeaderLabel.Size = new Size(Math.Max(1, RequiredWidth - _leftX), HeaderHeight);
+
+        _streamHeaderLabel.Location = new Point(_leftX, row1HeaderY);
+        _streamHeaderLabel.Size = new Size(_leftColW, HeaderHeight);
+        _streamEnabledCheckBox.Location = new Point(_leftX + streamPadL, row1ContentTop);
+        _streamEnabledCheckBox.Size = new Size(_leftColW - streamPadL - streamPadR, RowHeight);
+
+        _prefetchLabel.Location = new Point(_leftX + streamPadL, row1ContentTop + RowPitch);
+        _prefetchLabel.Size = new Size(streamLabelW, RowHeight);
+        var editorH = EditorHeight;
+        _prefetchTextBox.Size = new Size(streamMsBoxW, editorH);
+        _prefetchTextBox.Location = new Point(
+            _leftX + streamPadL + streamLabelW + streamGap,
+            CenterInRow(row1ContentTop + RowPitch, editorH));
+        _prefetchUnitLabel.Location = new Point(_prefetchTextBox.Right + streamGap, row1ContentTop + RowPitch);
+        _prefetchUnitLabel.Size = new Size(streamUnitW, RowHeight);
+
+        _lookAheadLabel.Location = new Point(_leftX + streamPadL, row1ContentTop + RowPitch * 2);
+        _lookAheadLabel.Size = new Size(streamLabelW, RowHeight);
+        _lookAheadTextBox.Size = new Size(streamMsBoxW, editorH);
+        _lookAheadTextBox.Location = new Point(
+            _leftX + streamPadL + streamLabelW + streamGap,
+            CenterInRow(row1ContentTop + RowPitch * 2, editorH));
+        _lookAheadUnitLabel.Location = new Point(_lookAheadTextBox.Right + streamGap, row1ContentTop + RowPitch * 2);
+        _lookAheadUnitLabel.Size = new Size(streamUnitW, RowHeight);
+
+        _loudnessHeaderLabel.Location = new Point(_rightX, row1HeaderY);
+        _loudnessHeaderLabel.Size = new Size(loudnessColW, HeaderHeight);
+        _loudnessGroupBalanceCheckBox.Location = new Point(_rightX + loudnessPadL, row1ContentTop);
+        _loudnessGroupBalanceCheckBox.Size = new Size(loudnessColW - loudnessPadL - loudnessPadR, RowHeight);
+
+        var commentDigitsX = _leftX;
+        var commentFieldsX = _leftX + col2W + commentColumnGap;
+        _commentHeaderLabel.Location = new Point(_leftX, row2HeaderY);
+        _commentHeaderLabel.Size = new Size(_leftColW, HeaderHeight);
+
+        _digitsLabel.Location = new Point(commentDigitsX + S(12), row2ContentTop);
+        _digitsLabel.Size = new Size(S(48), RowHeight);
+        _digitsTextBox.Size = new Size(S(46), editorH);
+        _digitsTextBox.Location = new Point(
+            commentDigitsX + S(12) + S(50),
+            CenterInRow(row2ContentTop, editorH));
+
+        _zeroPadCheckBox.Location = new Point(commentDigitsX + S(12), row2ContentTop + RowPitch);
+        _zeroPadCheckBox.Size = new Size(col2W - S(16), RowHeight);
+        _resetPerPartCheckBox.Location = new Point(commentDigitsX + S(12), row2ContentTop + RowPitch * 2);
+        _resetPerPartCheckBox.Size = new Size(col2W - S(12), RowHeight);
+        _previewLabel.Location = new Point(commentDigitsX + S(12), row2ContentTop + RowPitch * 3);
+        _previewLabel.Size = new Size(_leftColW - S(12), RowHeight);
+
+        var commentFieldX = commentFieldsX + col3PadL;
+        var commentEditorX = commentFieldX + col3LabelW + col3Gap;
+        PlaceField(_prefixLabel, _prefixTextBox, commentFieldX, commentEditorX, row2ContentTop, col3LabelW, col3EditorW);
+        PlaceField(_suffixLabel, _suffixTextBox, commentFieldX, commentEditorX, row2ContentTop + RowPitch, col3LabelW, col3EditorW);
+        PlaceField(_joinerLabel, _joinerTextBox, commentFieldX, commentEditorX, row2ContentTop + RowPitch * 2, col3LabelW, col3EditorW);
+
+        _gridHeaderLabel.Location = new Point(_rightX, row2HeaderY);
+        _gridHeaderLabel.Size = new Size(_rightColW, HeaderHeight);
+        _gridBarRadio.Location = new Point(_rightX + S(12), row2ContentTop);
+        _gridBarRadio.Size = new Size(_rightColW - S(16), RowHeight);
+        _gridBeatRadio.Location = new Point(_rightX + S(12), row2ContentTop + RowPitch);
+        _gridBeatRadio.Size = new Size(_rightColW - S(16), RowHeight);
+        _gridDefaultRadio.Location = new Point(_rightX + S(12), row2ContentTop + RowPitch * 2);
+        _gridDefaultRadio.Size = new Size(_rightColW - S(16), RowHeight);
+
+        foreach (var radio in new[] { _gridBarRadio, _gridBeatRadio, _gridDefaultRadio })
+        {
+            radio.ApplyFixedLayout();
+            radio.Height = RowHeight;
+        }
+
+        _streamEnabledCheckBox.ApplyFixedLayout();
+        _loudnessGroupBalanceCheckBox.ApplyFixedLayout();
+        _zeroPadCheckBox.ApplyFixedLayout();
+        _resetPerPartCheckBox.ApplyFixedLayout();
+
+        foreach (var box in new[]
+        {
+            _prefetchTextBox,
+            _lookAheadTextBox,
+            _digitsTextBox,
+            _prefixTextBox,
+            _suffixTextBox,
+            _joinerTextBox,
+        })
+        {
+            TextBoxVerticalAlign.Apply(box);
+        }
+
+        SyncMoreOptionsHeaderWidth();
+        Height = RequiredHeight;
+        RequiredHeightChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void PlaceField(
+        Label label,
+        TextBox textBox,
+        int labelX,
+        int editorX,
+        int rowY,
+        int labelW,
+        int editorW)
+    {
+        label.Location = new Point(labelX, rowY);
+        label.Size = new Size(labelW, RowHeight);
+        var editorH = EditorHeight;
+        textBox.Size = new Size(editorW, editorH);
+        textBox.Location = new Point(editorX, CenterInRow(rowY, editorH));
+    }
 
     /// <summary>設定を UI へ反映し、以後の UI 操作でこの設定を書き換える。</summary>
     public void Bind(MarkerSettings settings)
@@ -701,23 +924,25 @@ internal sealed class MarkerOptionsPanel : UserControl
         Font = font,
         Location = new Point(x, y),
         Padding = new Padding(S(10), 0, S(4), 0),
-        Size = new Size(width, S(HeaderHeight)),
+        Size = new Size(width, HeaderHeight),
         Text = text,
         TextAlign = ContentAlignment.MiddleLeft,
     };
 
     private TextBox CreateStreamMsTextBox(Font font, int x, int rowY, int width)
     {
+        var editorH = EditorHeight;
         var textBox = new TextBox
         {
             BorderStyle = BorderStyle.FixedSingle,
             Font = font,
-            Size = new Size(width, 25),
+            Size = new Size(width, editorH),
             TextAlign = HorizontalAlignment.Center,
             MaxLength = 4,
             Text = StreamMsDefault.ToString(),
         };
-        textBox.Location = new Point(x, CenterInRow(rowY, textBox.PreferredHeight));
+        TextBoxVerticalAlign.Configure(textBox);
+        textBox.Location = new Point(x, CenterInRow(rowY, editorH));
         textBox.KeyPress += StreamMsTextBox_KeyPress;
         textBox.Leave += StreamMsTextBox_Leave;
         textBox.TextChanged += (_, _) => OnStreamUiChanged();
@@ -786,14 +1011,16 @@ internal sealed class MarkerOptionsPanel : UserControl
 
     private TextBox CreateTextBox(Font font, int x, int rowY, int width)
     {
+        var editorH = EditorHeight;
         var textBox = new TextBox
         {
             BorderStyle = BorderStyle.FixedSingle,
             Font = font,
-            Size = new Size(width, 25),
+            Size = new Size(width, editorH),
             TextAlign = HorizontalAlignment.Center,
         };
-        textBox.Location = new Point(x, CenterInRow(rowY, textBox.PreferredHeight));
+        TextBoxVerticalAlign.Configure(textBox);
+        textBox.Location = new Point(x, CenterInRow(rowY, editorH));
         textBox.TextChanged += (_, _) => OnUiChanged();
         WireTextEditingFocus(textBox);
         return textBox;

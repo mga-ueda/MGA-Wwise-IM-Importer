@@ -1,4 +1,4 @@
-﻿using System.Drawing.Text;
+using System.Drawing.Text;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -18,7 +18,8 @@ internal sealed class SmoothLinkLabel : LinkLabel
     {
         e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         var state = e.Graphics.Save();
-        e.Graphics.TranslateTransform(0f, 2f);
+        // 小サイズ英字の視覚上寄りを 150% 設計 nudge で下げる（生 px 固定にしない）。
+        e.Graphics.TranslateTransform(0f, DesignMetrics.VisualTextNudgeY(this));
         base.OnPaint(e);
         e.Graphics.Restore(state);
     }

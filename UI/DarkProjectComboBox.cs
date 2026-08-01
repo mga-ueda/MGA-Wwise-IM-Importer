@@ -134,9 +134,16 @@ internal sealed class DarkProjectComboBox : ComboBox
         DropDownStyle = ComboBoxStyle.DropDown;
         FlatStyle = FlatStyle.Flat;
         IntegralHeight = false;
-        ItemHeight = 24;
+        // コンストラクタ時点では親 DPI が未確定なことがある。OnHandleCreated で確定する。
+        ApplyListItemHeight();
         MaxDropDownItems = 12;
         ApplyColors();
+    }
+
+    /// <summary>ドロップダウン各行の高さ（フォント＋薄い余白。選択欄より太くしない）。</summary>
+    public void ApplyListItemHeight()
+    {
+        ItemHeight = Math.Max(1, Font.Height + DesignMetrics.Px(6, this));
     }
 
     public void ApplyColors()
@@ -214,6 +221,7 @@ internal sealed class DarkProjectComboBox : ComboBox
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
+        ApplyListItemHeight();
         // ドロップダウン一覧のスクロールバーへ対応 OS のダークテーマを適用する。
         _ = SetWindowTheme(Handle, "DarkMode_CFD", null);
         ApplyControlHeightTarget();
@@ -236,17 +244,22 @@ internal sealed class DarkProjectComboBox : ComboBox
     protected override void OnFontChanged(EventArgs e)
     {
         base.OnFontChanged(e);
+        ApplyListItemHeight();
         CenterEditChild();
     }
 
     /// <summary>
     /// コントロール全体の高さを指定値に合わせる。
-    /// ItemHeight（ドロップダウン項目の高さ）は変えず、選択フィールドの高さ
-    /// （CB_SETITEMHEIGHT の -1）だけを調整する。ハンドル再作成後も維持される。
+    /// ドロップダウン項目高（ItemHeight）は変えず、選択欄だけを調整する。
     /// </summary>
     public void SetControlHeight(int targetHeight)
     {
         _controlHeightTarget = targetHeight;
+        if (targetHeight > 0 && Dock == DockStyle.None && Height != targetHeight)
+        {
+            Height = targetHeight;
+        }
+
         ApplyControlHeightTarget();
     }
 
@@ -257,23 +270,36 @@ internal sealed class DarkProjectComboBox : ComboBox
             return;
         }
 
-        var fieldHeight = (int)SendMessage(Handle, CbGetItemHeight, (IntPtr)(-1), IntPtr.Zero);
-        if (fieldHeight <= 0)
+        if (Dock == DockStyle.None && Height != target)
         {
-            return;
+            Height = target;
         }
 
-        // コントロール高 = 選択フィールド高 + 固定枠。枠分を実測して差し引く。
-        var chrome = Height - fieldHeight;
-        var desired = Math.Max(8, target - chrome);
+        // 選択フィールド高。枠分を確保しないと下端の枠線が欠ける。
+        var chrome = DesignMetrics.Px(6, this);
+        var fieldHeight = (int)SendMessage(Handle, CbGetItemHeight, (IntPtr)(-1), IntPtr.Zero);
+        if (fieldHeight > 0 && Height > fieldHeight)
+        {
+            chrome = Math.Max(chrome, Height - fieldHeight);
+        }
+
+        var desired = Math.Max(Font.Height, target - chrome);
         if (desired != fieldHeight)
         {
             _ = SendMessage(Handle, CbSetItemHeight, (IntPtr)(-1), (IntPtr)desired);
         }
 
-        // CB_SETITEMHEIGHT 後は EDIT が上寄せで伸びるため、フォント高に戻して中央へ。
+        if (Dock == DockStyle.None && Height != target)
+        {
+            Height = target;
+        }
+
         CenterEditChild();
+        Invalidate();
     }
+
+    /// <summary>子 EDIT の上下中央を再適用する（バーレイアウト後用）。</summary>
+    public void RefreshEditAlignment() => CenterEditChild();
 
     /// <summary>
     /// 子 EDIT を選択フィールド内で上下中央に置く。
@@ -293,16 +319,15 @@ internal sealed class DarkProjectComboBox : ComboBox
             return;
         }
 
-        const int border = 1;
+        var border = DesignMetrics.Px(1, this);
         var fieldTop = border;
         var fieldHeight = Height - border * 2;
-        var textHeight = TextRenderer.MeasureText(
-            "Mg",
-            Font,
-            new Size(int.MaxValue, int.MaxValue),
-            TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding).Height;
-        var editHeight = Math.Min(fieldHeight, Math.Max(Font.Height, textHeight));
-        var top = fieldTop + Math.Max(0, (fieldHeight - editHeight) / 2);
+        // パス欄と同じ GDI 行高で中央を取り、光学補正ぶんだけ上げる（子 EDIT は下寄りに見えるため）。
+        var cellHeight = TextBoxVerticalAlign.MeasureGdiLineHeight(this, Font);
+        var editHeight = Math.Min(fieldHeight, Math.Max(1, cellHeight));
+        var top = fieldTop + Math.Max(0, (fieldHeight - editHeight) / 2)
+            - TextBoxVerticalAlign.OpticalNudge(this);
+        top = Math.Max(fieldTop, top);
         var left = Math.Max(border, item.Left);
         var right = button.Width > 0 ? button.Left : Width - border;
         var width = Math.Max(0, right - left);
@@ -466,10 +491,11 @@ internal sealed class DarkProjectComboBox : ComboBox
         using var backBrush = new SolidBrush(back);
         e.Graphics.FillRectangle(backBrush, e.Bounds);
 
+        var textPad = DesignMetrics.Px(12, this);
         var textBounds = new Rectangle(
-            e.Bounds.Left + 8,
+            e.Bounds.Left + textPad,
             e.Bounds.Top,
-            Math.Max(0, e.Bounds.Width - 16),
+            Math.Max(0, e.Bounds.Width - textPad * 2),
             e.Bounds.Height);
         TextRenderer.DrawText(
             e.Graphics,
@@ -652,8 +678,13 @@ internal sealed class DarkProjectComboBox : ComboBox
         }
         else
         {
-            var buttonWidth = Math.Min(24, Width);
-            buttonBounds = new Rectangle(Width - buttonWidth, 1, buttonWidth - 1, Height - 2);
+            var buttonWidth = Math.Min(DesignMetrics.Px(36, this), Width);
+            var edge = DesignMetrics.Px(1, this);
+            buttonBounds = new Rectangle(
+                Width - buttonWidth,
+                edge,
+                Math.Max(1, buttonWidth - edge),
+                Math.Max(1, Height - edge * 2));
         }
 
         var state = g.Save();
@@ -678,20 +709,23 @@ internal sealed class DarkProjectComboBox : ComboBox
         var fore = Enabled ? UiColors.ProjectBarInputFore : UiColors.ChromeDim;
         var centerX = buttonBounds.Left + buttonBounds.Width / 2f;
         var centerY = buttonBounds.Top + buttonBounds.Height / 2f;
+        // 150% 設計: 半幅 6 / 縦 3 / ペン 2.4（旧 4 / 2 / 1.6 @96）。
+        var ax = DesignMetrics.PxF(6f, this);
+        var ay = DesignMetrics.PxF(3f, this);
         var arrow = DroppedDown
             ? new[]
             {
-                new PointF(centerX - 4f, centerY + 2f),
-                new PointF(centerX, centerY - 2f),
-                new PointF(centerX + 4f, centerY + 2f),
+                new PointF(centerX - ax, centerY + ay),
+                new PointF(centerX, centerY - ay),
+                new PointF(centerX + ax, centerY + ay),
             }
             : new[]
             {
-                new PointF(centerX - 4f, centerY - 2f),
-                new PointF(centerX, centerY + 2f),
-                new PointF(centerX + 4f, centerY - 2f),
+                new PointF(centerX - ax, centerY - ay),
+                new PointF(centerX, centerY + ay),
+                new PointF(centerX + ax, centerY - ay),
             };
-        using (var arrowPen = new Pen(fore, 1.6f)
+        using (var arrowPen = new Pen(fore, Math.Max(1f, DesignMetrics.PxF(2.4f, this)))
         {
             StartCap = LineCap.Round,
             EndCap = LineCap.Round,
@@ -703,8 +737,12 @@ internal sealed class DarkProjectComboBox : ComboBox
 
         g.Restore(state);
 
+        // 整数座標の DrawRectangle は下端 1px が欠けやすいので、0.5 オフセットで描く。
         using var borderPen = new Pen(
-            Enabled ? UiColors.ProjectBarBorder : UiColors.ChromeMid);
-        g.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
+            Enabled ? UiColors.ProjectBarBorder : UiColors.ChromeMid)
+        {
+            Alignment = PenAlignment.Inset,
+        };
+        g.DrawRectangle(borderPen, 0, 0, Math.Max(1, Width - 1), Math.Max(1, Height - 1));
     }
 }

@@ -28,6 +28,12 @@ internal sealed class AudioSettingsForm : Form
     private readonly RoundedButton _cancelButton;
     private ContextMenuStrip? _fadeCurveMenu;
     private bool _suppressDeviceReload;
+#if DEBUG
+    private readonly SectionHeaderLabel _uiScaleHeader;
+    private readonly FlatOptionRadioButton _optScaleDisplay;
+    private readonly FlatOptionRadioButton _optScale100;
+    private readonly FlatOptionRadioButton _optScale150;
+#endif
 
     public AudioOutputSettings SelectedSettings { get; private set; }
 
@@ -41,16 +47,29 @@ internal sealed class AudioSettingsForm : Form
 
     public ExpectedWaveformFormat SelectedExpectedFormat { get; private set; }
 
+#if DEBUG
+    /// <summary>0 = ディスプレイどおり。96/144 = その DPI 相当のレイアウト寸法。</summary>
+    public int SelectedUiScaleSimulateDpi { get; private set; }
+#endif
+
     public AudioSettingsForm(
         AudioOutputSettings current,
         RegionFadeCurveKind waveformFadeIn,
         RegionFadeCurveKind waveformFadeOut,
         RegionFadeCurveKind playlistFadeIn,
         RegionFadeCurveKind playlistFadeOut,
-        ExpectedWaveformFormat expectedFormat)
+        ExpectedWaveformFormat expectedFormat
+#if DEBUG
+        ,
+        int uiScaleSimulateDpi = 0
+#endif
+        )
     {
         SelectedSettings = current;
         SelectedExpectedFormat = expectedFormat;
+#if DEBUG
+        SelectedUiScaleSimulateDpi = NormalizeUiScaleSimulateDpi(uiScaleSimulateDpi);
+#endif
 
         Text = UiStrings.DialogSettingsTitle;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -59,24 +78,32 @@ internal sealed class AudioSettingsForm : Form
         MinimizeBox = false;
         ShowInTaskbar = false;
         KeyPreview = true;
-        AutoScaleMode = AutoScaleMode.Font;
+        // 寸法は 150% 設計＋ DesignMetrics。AutoScale は使わない（二重スケール防止）。
+        AutoScaleMode = AutoScaleMode.None;
         Font = new Font("Yu Gothic UI", 9F);
         BackColor = UiColors.ForControlBack(UiColors.WindowBack);
         ForeColor = UiColors.PrimaryFore;
-        Padding = new Padding(20);
-
-        const int left = 20;
-        const int fieldWidth = 400;
-        const int comboHeight = 30;
-        const int labelToField = 8;
-        const int sectionGap = 22;
-        const int rowHeight = 28;
-        const int rowGap = 6;
+        // 行高・行間・見出しはメイン（More Options／FlatOption）と同じ 150% 設計値。
+        // フォントは pt のまま（OS DPI に追従）。
+        var left = D(18);
+        // 旧 600 はラベルと右端コントロールの間が空きすぎる。長文ラジオが収まる程度に抑える。
+        var fieldWidth = D(450);
+        var comboHeight = D(FlatOptionGlyph.RowHeightDesign); // 30 — プロジェクトバー行と同系
+        var labelToField = D(3);
+        var sectionGap = D(12); // More Options 帯間 S(8)@96 = 12@144
+        var rowHeight = D(FlatOptionGlyph.RowHeightDesign); // 30
+        var rowPitch = D(32); // MarkerOptionsPanel.RowPitchDesign
+        var rowGap = Math.Max(0, rowPitch - rowHeight);
+        var labelLine = Math.Max(D(21), Font.Height);
+        var headerContentGap = D(3);
+        var pad = D(18);
+        Padding = new Padding(pad);
 
         _apiLabel = new Label
         {
             AutoSize = true,
-            Location = new Point(left, 20),
+            Location = new Point(left, pad),
+            Font = Font,
             Text = UiStrings.LabelAudioApi,
             ForeColor = UiColors.PrimaryFore,
             BackColor = BackColor,
@@ -84,10 +111,11 @@ internal sealed class AudioSettingsForm : Form
 
         _apiCombo = new DarkDropDownComboBox
         {
-            Location = new Point(left, _apiLabel.Location.Y + 18 + labelToField),
+            Location = new Point(left, _apiLabel.Location.Y + labelLine + labelToField),
             Width = fieldWidth,
             Height = comboHeight,
             Font = Font,
+            ItemHeight = Math.Max(1, comboHeight - D(6)),
         };
         _apiCombo.ApplyColors();
         _apiCombo.Items.Add(new ApiItem(AudioOutputApi.WaveOut, UiStrings.LabelAudioApiWaveOut));
@@ -111,34 +139,41 @@ internal sealed class AudioSettingsForm : Form
             BackColor = BackColor,
         };
 
+        _deviceLabel.Font = Font;
         _deviceCombo = new DarkDropDownComboBox
         {
-            Location = new Point(left, deviceLabelY + 18 + labelToField),
+            Location = new Point(left, deviceLabelY + labelLine + labelToField),
             Width = fieldWidth,
             Height = comboHeight,
             Font = Font,
+            ItemHeight = Math.Max(1, comboHeight - D(6)),
         };
         _deviceCombo.ApplyColors();
 
         var fadeHeaderY = _deviceCombo.Location.Y + comboHeight + sectionGap;
-        // More Options の Stream／Marker Grid と同じ見出し寸法（高さ 26・帯マージン既定）。
-        var fadeHeaderHeight = S(26);
+        // More Options の Stream／Marker Grid と同じ見出し寸法（150% 設計 39）。
+        var fadeHeaderHeight = D(39);
+        var headerBarMargin = D(3);
+        // 見出し帯だけ左右マージンを設計 10 ずつ狭める（帯をコンテンツより左右に伸ばす）。
+        var headerSideExtend = D(10);
+        var headerLeft = Math.Max(0, left - headerSideExtend);
+        var headerWidth = fieldWidth + headerSideExtend * 2;
         _fadeDefaultsHeader = new SectionHeaderLabel
         {
-            Location = new Point(left, fadeHeaderY),
-            Size = new Size(fieldWidth, fadeHeaderHeight),
+            Location = new Point(headerLeft, fadeHeaderY),
+            Size = new Size(headerWidth, fadeHeaderHeight),
             Text = UiStrings.LabelFadeCurveDefaults,
             Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold),
             ForeColor = UiColors.PrimaryFore,
             BackColor = BackColor,
             BarColor = UiColors.ForControlBack(UiColors.SectionHeaderBack),
-            BarMarginTop = 3,
-            BarMarginBottom = 3,
-            Padding = new Padding(S(10), 0, S(4), 0),
+            BarMarginTop = headerBarMargin,
+            BarMarginBottom = headerBarMargin,
+            Padding = new Padding(D(15), 0, D(6), 0),
             TextAlign = ContentAlignment.MiddleLeft,
         };
 
-        var rowY = fadeHeaderY + fadeHeaderHeight + S(4);
+        var rowY = fadeHeaderY + fadeHeaderHeight + headerContentGap;
         _waveformFadeInRow = CreateFadeRow(
             left,
             rowY,
@@ -178,24 +213,24 @@ internal sealed class AudioSettingsForm : Form
         var expectedHeaderY = rowY + rowHeight + sectionGap;
         _expectedFormatHeader = new SectionHeaderLabel
         {
-            Location = new Point(left, expectedHeaderY),
-            Size = new Size(fieldWidth, fadeHeaderHeight),
+            Location = new Point(headerLeft, expectedHeaderY),
+            Size = new Size(headerWidth, fadeHeaderHeight),
             Text = UiStrings.LabelExpectedWaveformFormat,
             Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold),
             ForeColor = UiColors.PrimaryFore,
             BackColor = BackColor,
             BarColor = UiColors.ForControlBack(UiColors.SectionHeaderBack),
-            BarMarginTop = 3,
-            BarMarginBottom = 3,
-            Padding = new Padding(S(10), 0, S(4), 0),
+            BarMarginTop = headerBarMargin,
+            BarMarginBottom = headerBarMargin,
+            Padding = new Padding(D(15), 0, D(6), 0),
             TextAlign = ContentAlignment.MiddleLeft,
         };
         TipService.Set(_expectedFormatHeader, UiStrings.TipExpectedWaveformFormat);
 
-        const int expectedBoxWidth = 108;
-        const int expectedLabelGap = 10;
+        var expectedBoxWidth = D(120);
+        var expectedLabelGap = D(12);
         var expectedLabelWidth = fieldWidth - expectedBoxWidth - expectedLabelGap;
-        var expectedRowY = expectedHeaderY + fadeHeaderHeight + S(4);
+        var expectedRowY = expectedHeaderY + fadeHeaderHeight + headerContentGap;
 
         _expectedSampleRateLabel = CreateExpectedFieldLabel(
             left,
@@ -248,10 +283,62 @@ internal sealed class AudioSettingsForm : Form
         TipService.Set(_expectedBitDepthTextBox, UiStrings.TipExpectedWaveformFormat);
         TipService.Set(_expectedChannelsTextBox, UiStrings.TipExpectedWaveformFormat);
 
-        const int buttonWidth = 108;
-        const int buttonHeight = 34;
-        const int buttonGap = 12;
-        var buttonY = expectedRowY + rowHeight + sectionGap;
+        var contentBottom = expectedRowY + rowHeight;
+
+#if DEBUG
+        var scaleHeaderY = contentBottom + sectionGap;
+        var scaleHeaderHeight = fadeHeaderHeight;
+        _uiScaleHeader = new SectionHeaderLabel
+        {
+            Location = new Point(headerLeft, scaleHeaderY),
+            Size = new Size(headerWidth, scaleHeaderHeight),
+            Text = "表示スケールのプレビュー",
+            Font = new Font("Yu Gothic UI", 8.5F, FontStyle.Bold),
+            ForeColor = UiColors.PrimaryFore,
+            BackColor = BackColor,
+            BarColor = UiColors.ForControlBack(UiColors.SectionHeaderBack),
+            BarMarginTop = headerBarMargin,
+            BarMarginBottom = headerBarMargin,
+            Padding = new Padding(D(15), 0, D(6), 0),
+            TextAlign = ContentAlignment.MiddleLeft,
+        };
+
+        // メインの FlatOption ラジオと同じ行高・ピッチ。
+        var scaleRowY = scaleHeaderY + scaleHeaderHeight + headerContentGap;
+        var scaleRowH = rowHeight;
+        var scaleRowPitch = rowPitch;
+        _optScaleDisplay = CreateScaleRadio(
+            left,
+            scaleRowY,
+            fieldWidth,
+            scaleRowH,
+            "ディスプレイ設定に合わせる（DPI 連動）");
+        scaleRowY += scaleRowPitch;
+        _optScale100 = CreateScaleRadio(
+            left,
+            scaleRowY,
+            fieldWidth,
+            scaleRowH,
+            "100% 相当の余白感をシミュレート（Ctrl+1）");
+        scaleRowY += scaleRowPitch;
+        _optScale150 = CreateScaleRadio(
+            left,
+            scaleRowY,
+            fieldWidth,
+            scaleRowH,
+            "150% 相当（設計どおり）（Ctrl+2）");
+        ApplyUiScaleSimulateRadios(SelectedUiScaleSimulateDpi);
+        TipService.Set(_optScaleDisplay, "ディスプレイ設定の DPI に合わせてレイアウト寸法を換算する。");
+        TipService.Set(_optScale100, "100%（96 DPI）相当の余白・行高をシミュレートする（Ctrl+1）。");
+        TipService.Set(_optScale150, "150%（144 DPI）設計どおりの寸法をシミュレートする（Ctrl+2）。");
+        contentBottom = scaleRowY + scaleRowH;
+#endif
+
+        // CLEAR / EXPORT（Designer 32@96 → 150% 設計 48）と同系。
+        var buttonWidth = D(162);
+        var buttonHeight = D(48);
+        var buttonGap = D(12);
+        var buttonY = contentBottom + sectionGap;
         var cancelX = left + fieldWidth - buttonWidth;
         var okX = cancelX - buttonGap - buttonWidth;
 
@@ -262,7 +349,7 @@ internal sealed class AudioSettingsForm : Form
         _cancelButton = CreateDialogButton(UiStrings.ButtonAudioSettingsCancel, new Point(cancelX, buttonY), buttonWidth, buttonHeight);
         _cancelButton.DialogResult = DialogResult.Cancel;
 
-        ClientSize = new Size(left * 2 + fieldWidth, buttonY + buttonHeight + 20);
+        ClientSize = new Size(left * 2 + fieldWidth, buttonY + buttonHeight + pad);
 
         Controls.Add(_apiLabel);
         Controls.Add(_apiCombo);
@@ -280,6 +367,12 @@ internal sealed class AudioSettingsForm : Form
         Controls.Add(_expectedSampleRateTextBox);
         Controls.Add(_expectedBitDepthTextBox);
         Controls.Add(_expectedChannelsTextBox);
+#if DEBUG
+        Controls.Add(_uiScaleHeader);
+        Controls.Add(_optScaleDisplay);
+        Controls.Add(_optScale100);
+        Controls.Add(_optScale150);
+#endif
         Controls.Add(_okButton);
         Controls.Add(_cancelButton);
 
@@ -308,11 +401,13 @@ internal sealed class AudioSettingsForm : Form
             BackColor = BackColor,
         };
 
+        // メインのフェードカーブアイコン帯に合わせる（アイコンは横長）。
+        var iconSide = FadeCurveIcons.WidthFor(height);
         var label = new Label
         {
             AutoSize = false,
             Location = new Point(0, 0),
-            Size = new Size(width - 36, height),
+            Size = new Size(Math.Max(1, width - iconSide - D(9)), height),
             Text = labelText,
             TextAlign = ContentAlignment.MiddleLeft,
             ForeColor = UiColors.PrimaryFore,
@@ -323,8 +418,8 @@ internal sealed class AudioSettingsForm : Form
         {
             Cursor = Cursors.Hand,
             SizeMode = PictureBoxSizeMode.CenterImage,
-            Size = new Size(28, height),
-            Location = new Point(width - 28, 0),
+            Size = new Size(iconSide, height),
+            Location = new Point(width - iconSide, 0),
             BackColor = UiColors.ForControlBack(UiColors.ProjectBarInputBack),
             TabStop = false,
         };
@@ -356,16 +451,19 @@ internal sealed class AudioSettingsForm : Form
 
     private TextBox CreateExpectedNumberTextBox(int x, int y, int width, int rowHeight, int maxLength)
     {
+        // More Options の EditorHeight（設計 28）と同系。行高を超えない。
+        var boxH = Math.Min(rowHeight, Math.Max(D(28), Font.Height + D(6)));
         var textBox = new TextBox
         {
             BorderStyle = BorderStyle.FixedSingle,
             Font = Font,
-            Size = new Size(width, 26),
+            Size = new Size(width, boxH),
             TextAlign = HorizontalAlignment.Center,
             MaxLength = maxLength,
             BackColor = UiColors.ForControlBack(UiColors.ProjectBarInputBack),
             ForeColor = UiColors.ProjectBarInputFore,
         };
+        TextBoxVerticalAlign.Configure(textBox);
         textBox.Location = new Point(x, y + Math.Max(0, (rowHeight - textBox.Height) / 2));
         textBox.KeyPress += ExpectedNumberTextBox_KeyPress;
         textBox.Leave += ExpectedNumberTextBox_Leave;
@@ -441,7 +539,7 @@ internal sealed class AudioSettingsForm : Form
             row.Curve,
             row.IsFadeIn,
             selected: false,
-            pixelSize: FadeCurveIcons.IconSize,
+            pixelSize: DesignMetrics.Px(FadeCurveIcons.IconSize, row.Icon),
             leftMargin: 0);
         old?.Dispose();
         TipService.Set(row.Icon, UiStrings.LabelRegionFadeCurve(row.Curve));
@@ -455,9 +553,9 @@ internal sealed class AudioSettingsForm : Form
             Text = text,
             Size = new Size(width, height),
             Location = location,
-            CornerRadius = 6,
+            CornerRadius = D(6),
             Font = Font,
-            Padding = new Padding(12, 4, 12, 4),
+            Padding = new Padding(D(12), D(3), D(12), D(3)),
             TabStop = true,
         };
         ApplyDialogButtonColors(button);
@@ -491,6 +589,11 @@ internal sealed class AudioSettingsForm : Form
         {
             TopMost = true;
         }
+
+        // ハンドル生成・初期 Text 反映後に縦中央を確定する。
+        TextBoxVerticalAlign.Apply(_expectedSampleRateTextBox);
+        TextBoxVerticalAlign.Apply(_expectedBitDepthTextBox);
+        TextBoxVerticalAlign.Apply(_expectedChannelsTextBox);
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
@@ -539,7 +642,8 @@ internal sealed class AudioSettingsForm : Form
         base.OnKeyDown(e);
     }
 
-    private int S(int value) => (int)Math.Round(value * DeviceDpi / 96f);
+    /// <summary>150% 設計 px を現在の LayoutDpi へ換算する。</summary>
+    private int D(int design150) => DesignMetrics.Px(design150, this);
 
     private void OkButton_Click(object? sender, EventArgs e)
     {
@@ -552,7 +656,67 @@ internal sealed class AudioSettingsForm : Form
 
         SelectedSettings = new AudioOutputSettings(api, deviceId);
         SelectedExpectedFormat = ReadExpectedFormatFromFields();
+#if DEBUG
+        SelectedUiScaleSimulateDpi = GetUiScaleSimulateTargetDpi();
+#endif
     }
+
+#if DEBUG
+    private FlatOptionRadioButton CreateScaleRadio(int x, int y, int width, int height, string text)
+    {
+        var radio = new FlatOptionRadioButton
+        {
+            AutoSize = false,
+            Location = new Point(x, y),
+            Size = new Size(width, height),
+            Margin = Padding.Empty,
+            Text = text,
+            ForeColor = UiColors.PrimaryFore,
+            BackColor = BackColor,
+            Font = Font,
+        };
+        // ApplyFixedLayout は行高 30 設計に戻すため使わず、ダイアログ行高を維持する。
+        radio.ApplyColors();
+        return radio;
+    }
+
+    private static int NormalizeUiScaleSimulateDpi(int dpi) =>
+        dpi is 96 or 144 ? dpi : 0;
+
+    private int GetUiScaleSimulateTargetDpi()
+    {
+        if (_optScale100.Checked)
+        {
+            return 96;
+        }
+
+        if (_optScale150.Checked)
+        {
+            return 144;
+        }
+
+        return 0;
+    }
+
+    private void ApplyUiScaleSimulateRadios(int dpi)
+    {
+        _optScaleDisplay.Checked = false;
+        _optScale100.Checked = false;
+        _optScale150.Checked = false;
+        if (dpi == 96)
+        {
+            _optScale100.Checked = true;
+        }
+        else if (dpi == 144)
+        {
+            _optScale150.Checked = true;
+        }
+        else
+        {
+            _optScaleDisplay.Checked = true;
+        }
+    }
+#endif
 
     private void SelectApi(AudioOutputApi api)
     {

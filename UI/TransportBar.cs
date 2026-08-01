@@ -38,6 +38,18 @@ internal readonly record struct TransportPositionInfo(
 /// <summary>波形操作のショートカットをアイコンで実行するフラットなトランスポートバー。</summary>
 internal sealed class TransportBar : UserControl
 {
+    /// <summary>
+    /// 旧定数（ボタン 30・バー 36 等）は AutoScale 前。150% 画面実寸は約 ×1.5。
+    /// DesignMetrics の設計値はその実寸（ボタン 45・バー 54）とする。
+    /// </summary>
+    private const int ButtonSideDesign = 45;
+    private const int BarHeightDesign = 54;
+    private const int ButtonPitchDesign = 47;
+    private const int GroupGapDesign = 6;
+    private const int ButtonGapDesign = 2;
+    private const int PadXDesign = 12;
+    private const int PadYDesign = 5;
+
     private readonly FlowLayoutPanel _groups = new();
     private readonly TransportPositionDisplay _positionDisplay = new();
     private readonly Dictionary<TransportCommand, TransportIconButton> _commandButtons = [];
@@ -58,11 +70,11 @@ internal sealed class TransportBar : UserControl
             | ControlStyles.ResizeRedraw,
             true);
 
-        AutoScroll = true;
+        // 幅不足時はフォーム MinimumSize で止め、バー内スクロールバーで潰さない。
+        AutoScroll = false;
         BackColor = UiColors.ForControlBack(UiColors.TransportBack);
-        // ボタン 30 + 上下 Padding 3（正方形化後の余白過多を避ける）。
-        Height = 36;
-        Padding = new Padding(8, 3, 8, 3);
+        Height = DesignMetrics.Px(BarHeightDesign, this);
+        Padding = DesignMetrics.Pad(PadXDesign, PadYDesign, PadXDesign, PadYDesign, this);
         TabStop = false;
 
         _groups.AutoSize = true;
@@ -71,7 +83,7 @@ internal sealed class TransportBar : UserControl
         _groups.FlowDirection = FlowDirection.LeftToRight;
         _groups.Location = new Point(Padding.Left, Padding.Top);
         _groups.Margin = Padding.Empty;
-        _groups.MinimumSize = new Size(1, 30);
+        _groups.MinimumSize = new Size(1, DesignMetrics.Px(ButtonSideDesign, this));
         _groups.Padding = Padding.Empty;
         _groups.WrapContents = false;
         Controls.Add(_groups);
@@ -245,48 +257,13 @@ internal sealed class TransportBar : UserControl
 
         foreach (var (label, titleProvider) in _groupLabels)
         {
-            RelayoutGroupLabel(label, titleProvider());
+            label.Text = titleProvider();
         }
 
         _positionDisplay.AccessibleName = UiStrings.AccessibleTransportPositionDisplay;
         _positionDisplay.ApplyLocalizedTips();
+        RelayoutGroups();
         TightenVerticalLayout();
-    }
-
-    /// <summary>グループ見出しの文言変更に合わせてラベル幅とボタングループ位置を更新する。</summary>
-    private static void RelayoutGroupLabel(Label label, string title)
-    {
-        label.Text = title;
-        if (label.Parent is not Panel group)
-        {
-            return;
-        }
-
-        var labelWidth = TextRenderer.MeasureText(
-            title,
-            label.Font,
-            Size.Empty,
-            TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + 4;
-        labelWidth = Math.Max(labelWidth, 8);
-        label.Width = labelWidth;
-
-        FlowLayoutPanel? buttons = null;
-        foreach (Control child in group.Controls)
-        {
-            if (child is FlowLayoutPanel flow)
-            {
-                buttons = flow;
-                break;
-            }
-        }
-
-        if (buttons is null)
-        {
-            return;
-        }
-
-        buttons.Left = labelWidth;
-        group.Width = labelWidth + buttons.Width;
     }
 
     /// <summary>キーボード操作中のボタンをマウスオーバーと同じ表示にする。</summary>
@@ -352,10 +329,9 @@ internal sealed class TransportBar : UserControl
 
     protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
     {
-        // 描画座標はピクセル基準なので、DPI拡大時も右側に空白を増やさない。
+        // 寸法は DesignMetrics で再適用する（AutoScale の幅拡大は打ち消す）。
         base.ScaleControl(factor, specified & ~BoundsSpecified.Width);
-        // アイコン正方形化で縦が短くなった分、バー高さとグループ高さを詰める。
-        TightenVerticalLayout();
+        ApplyFixedLayout();
     }
 
     /// <summary>
@@ -366,7 +342,7 @@ internal sealed class TransportBar : UserControl
         var side = _playButton.Height;
         if (side <= 0)
         {
-            side = 30;
+            side = DesignMetrics.Px(ButtonSideDesign, this);
         }
 
         foreach (Control group in _groups.Controls)
@@ -401,14 +377,14 @@ internal sealed class TransportBar : UserControl
         }
 
         _groups.MinimumSize = new Size(1, side);
-        var desiredHeight = Math.Max(36, Padding.Vertical + side);
+        var desiredHeight = Math.Max(DesignMetrics.Px(BarHeightDesign, this), Padding.Vertical + side);
         if (Height != desiredHeight)
         {
             Height = desiredHeight;
         }
 
         // Dock レイアウト後に潰れた場合のガード。
-        if (Height < 24)
+        if (Height < DesignMetrics.Px(36, this))
         {
             Height = desiredHeight;
         }
@@ -420,7 +396,76 @@ internal sealed class TransportBar : UserControl
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
+        ApplyFixedLayout();
+    }
+
+    /// <summary>DPI / シミュレート変更後にボタン辺・グループ幅・バー高さを再適用する。</summary>
+    public void ApplyFixedLayout()
+    {
+        Padding = DesignMetrics.Pad(PadXDesign, PadYDesign, PadXDesign, PadYDesign, this);
+        _positionDisplay.ApplyFixedLayout();
+        RelayoutGroups();
         TightenVerticalLayout();
+    }
+
+    /// <summary>グループ見出し幅・ボタンピッチを現在の LayoutDpi で組み直す。</summary>
+    private void RelayoutGroups()
+    {
+        var buttonSide = DesignMetrics.Px(ButtonSideDesign, this);
+        var buttonPitch = DesignMetrics.Px(ButtonPitchDesign, this);
+        var buttonGap = DesignMetrics.Px(ButtonGapDesign, this);
+        var groupMargin = DesignMetrics.Pad(0, 0, GroupGapDesign, 0, this);
+        var labelPad = DesignMetrics.Px(6, this);
+        var labelMin = DesignMetrics.Px(12, this);
+
+        foreach (Control control in _groups.Controls)
+        {
+            if (control is TransportPositionDisplay || control is not Panel group)
+            {
+                continue;
+            }
+
+            Label? label = null;
+            FlowLayoutPanel? buttonsHost = null;
+            foreach (Control child in group.Controls)
+            {
+                switch (child)
+                {
+                    case Label l:
+                        label = l;
+                        break;
+                    case FlowLayoutPanel flow:
+                        buttonsHost = flow;
+                        break;
+                }
+            }
+
+            if (label is null || buttonsHost is null)
+            {
+                continue;
+            }
+
+            using var groupFont = new Font("Yu Gothic UI", 7F, FontStyle.Bold);
+            var labelWidth = TextRenderer.MeasureText(
+                label.Text,
+                groupFont,
+                Size.Empty,
+                TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + labelPad;
+            labelWidth = Math.Max(labelWidth, labelMin);
+            var count = buttonsHost.Controls.Count;
+            label.Size = new Size(labelWidth, buttonSide);
+            label.Padding = new Padding(0, 0, DesignMetrics.Px(3, this), 0);
+            buttonsHost.Location = new Point(labelWidth, 0);
+            buttonsHost.Size = new Size(Math.Max(1, count * buttonPitch), buttonSide);
+            foreach (Control child in buttonsHost.Controls)
+            {
+                child.Size = new Size(buttonSide, buttonSide);
+                child.Margin = new Padding(0, 0, buttonGap, 0);
+            }
+
+            group.Margin = groupMargin;
+            group.Size = new Size(labelWidth + count * buttonPitch, buttonSide);
+        }
     }
 
     protected override void OnPaintBackground(PaintEventArgs e)
@@ -433,22 +478,23 @@ internal sealed class TransportBar : UserControl
         bool repeatOnHold,
         params (TransportCommand Command, TransportIcon Icon)[] definitions)
     {
-        const int buttonHeight = 30;
-        const int buttonPitch = 31;
+        var buttonHeight = DesignMetrics.Px(ButtonSideDesign, this);
+        var buttonPitch = DesignMetrics.Px(ButtonPitchDesign, this);
+        var buttonGap = DesignMetrics.Px(ButtonGapDesign, this);
         var title = titleProvider();
         using var groupFont = new Font("Yu Gothic UI", 7F, FontStyle.Bold);
         var labelWidth = TextRenderer.MeasureText(
             title,
             groupFont,
             Size.Empty,
-            TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + 4;
-        labelWidth = Math.Max(labelWidth, 8);
+            TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine).Width + DesignMetrics.Px(6, this);
+        labelWidth = Math.Max(labelWidth, DesignMetrics.Px(12, this));
         var groupWidth = labelWidth + definitions.Length * buttonPitch;
         var group = new Panel
         {
             AutoSize = false,
             BackColor = BackColor,
-            Margin = new Padding(0, 0, 4, 0),
+            Margin = DesignMetrics.Pad(0, 0, GroupGapDesign, 0, this),
             Padding = Padding.Empty,
             Size = new Size(groupWidth, buttonHeight),
         };
@@ -458,7 +504,7 @@ internal sealed class TransportBar : UserControl
             Font = new Font(groupFont.FontFamily, groupFont.Size, groupFont.Style),
             ForeColor = UiColors.TransportSectionFore,
             Location = Point.Empty,
-            Padding = new Padding(0, 0, 2, 0),
+            Padding = new Padding(0, 0, DesignMetrics.Px(3, this), 0),
             Size = new Size(labelWidth, buttonHeight),
             Text = title,
             TextAlign = ContentAlignment.MiddleRight,
@@ -486,7 +532,7 @@ internal sealed class TransportBar : UserControl
             var button = new TransportIconButton(definition.Icon)
             {
                 AccessibleName = tip,
-                Margin = new Padding(0, 0, 1, 0),
+                Margin = new Padding(0, 0, buttonGap, 0),
                 Tag = definition.Command,
             };
             if (repeatOnHold)
@@ -594,8 +640,19 @@ internal sealed class TransportBar : UserControl
 
 internal sealed class TransportPositionDisplay : Control
 {
-    /// <summary>音符＋テンポ数値を囲むヒット領域の幅（描画座標は従来どおり）。</summary>
-    private const int MetronomeHitWidth = 54;
+    /// <summary>
+    /// 位置表示の幅・列座標は旧コードでも AutoScale されず画面実寸のまま。
+    /// 高さだけボタン辺（150% 設計 45）に合わせる。
+    /// </summary>
+    private const int WidthDesign = 315;
+    private const int HeightDesign = 45;
+    private const int MetronomeHitWidthDesign = 57;
+    private const int SignatureLeftDesign = 67;
+    private const int SignatureWidthDesign = 38;
+    private const int MusicalLeftDesign = 110;
+    private const int MusicalWidthDesign = 74;
+    private const int TimeLeftDesign = 189;
+    private const int TimeWidthDesign = 124;
 
     private readonly TransportMetronomeButton _metronomeButton = new();
     private TransportPositionInfo? _position;
@@ -608,7 +665,6 @@ internal sealed class TransportPositionDisplay : Control
         ForeColor = UiColors.TransportFore;
         Font = new Font("Yu Gothic UI", 9.5F, FontStyle.Bold);
         Margin = Padding.Empty;
-        Size = new Size(312, 30);
         TabStop = false;
         SetStyle(
             ControlStyles.AllPaintingInWmPaint
@@ -617,14 +673,16 @@ internal sealed class TransportPositionDisplay : Control
             true);
 
         _metronomeButton.Location = new Point(0, 0);
-        _metronomeButton.Size = new Size(MetronomeHitWidth, 30);
         _metronomeButton.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom;
         _metronomeButton.Font = Font;
         _metronomeButton.Click += (_, _) => MetronomeInvoked?.Invoke(this, EventArgs.Empty);
         Controls.Add(_metronomeButton);
+        ApplyFixedLayout();
         ApplyLocalizedTips();
         SyncMetronomeButtonContent();
     }
+
+    private int MetronomeHitWidth => DesignMetrics.Px(MetronomeHitWidthDesign, this);
 
     public event EventHandler? MetronomeInvoked;
 
@@ -680,6 +738,15 @@ internal sealed class TransportPositionDisplay : Control
         ForeColor = UiColors.TransportFore;
         _metronomeButton.ApplyColors();
         SyncMetronomeButtonContent();
+        Invalidate();
+    }
+
+    /// <summary>DPI / シミュレート変更後に幅・ヒット領域を再適用する。</summary>
+    public void ApplyFixedLayout()
+    {
+        Size = new Size(DesignMetrics.Px(WidthDesign, this), DesignMetrics.Px(HeightDesign, this));
+        var hitW = MetronomeHitWidth;
+        _metronomeButton.SetBounds(0, 0, hitW, Height);
         Invalidate();
     }
 
@@ -742,24 +809,50 @@ internal sealed class TransportPositionDisplay : Control
         var time = $"{hours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}.{elapsed.Milliseconds:000}";
 
         // BPM はメトロノームヒット領域側で描画（ホバー／クリック範囲を音符＋テンポで共有）。
-        DrawText(g, signature, new Rectangle(64, 0, 38, Height), musicalFore);
-        DrawText(g, musicalPosition, new Rectangle(107, 0, 74, Height), musicalFore);
-        DrawText(g, time, new Rectangle(186, 0, 124, Height), timeFore);
+        DrawText(
+            g,
+            signature,
+            new Rectangle(
+                DesignMetrics.Px(SignatureLeftDesign, this),
+                0,
+                DesignMetrics.Px(SignatureWidthDesign, this),
+                Height),
+            musicalFore);
+        DrawText(
+            g,
+            musicalPosition,
+            new Rectangle(
+                DesignMetrics.Px(MusicalLeftDesign, this),
+                0,
+                DesignMetrics.Px(MusicalWidthDesign, this),
+                Height),
+            musicalFore);
+        DrawText(
+            g,
+            time,
+            new Rectangle(
+                DesignMetrics.Px(TimeLeftDesign, this),
+                0,
+                DesignMetrics.Px(TimeWidthDesign, this),
+                Height),
+            timeFore);
     }
 
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
-        if (_metronomeButton.Height != Height || _metronomeButton.Width != MetronomeHitWidth)
+        var hitW = MetronomeHitWidth;
+        if (_metronomeButton.Height != Height || _metronomeButton.Width != hitW)
         {
-            _metronomeButton.SetBounds(0, 0, MetronomeHitWidth, Height);
+            _metronomeButton.SetBounds(0, 0, hitW, Height);
         }
     }
 
     protected override void ScaleControl(SizeF factor, BoundsSpecified specified)
     {
-        // 描画座標はピクセル基準なので、DPI拡大時も右側に空白を増やさない。
+        // 幅・内部座標は DesignMetrics で再適用するため、AutoScale の幅拡大は打ち消す。
         base.ScaleControl(factor, specified & ~BoundsSpecified.Width);
+        ApplyFixedLayout();
     }
 
     private void DrawText(Graphics g, string text, Rectangle bounds, Color foreColor)
@@ -785,8 +878,12 @@ internal sealed class TransportPositionDisplay : Control
 internal sealed class TransportMetronomeButton : Button
 {
     private const double ShortcutFadeDurationMs = 180d;
-    private const int BpmTextLeft = 22;
-    private const int BpmTextWidth = 32;
+    // 音符ステムとの間隔を少し確保（旧 22 → 25）。
+    private const int BpmTextLeftDesign = 25;
+    private const int BpmTextWidthDesign = 32;
+    /// <summary>音符グリフの設計座標空間（スケール前）。ボタン高さ 45 とは別。</summary>
+    private const int NoteGlyphDesign = 30;
+    private const int DesignHeight = 45;
     private readonly System.Windows.Forms.Timer _shortcutFadeTimer = new() { Interval = 16 };
     private bool _hovered;
     private bool _pressed;
@@ -800,7 +897,7 @@ internal sealed class TransportMetronomeButton : Button
         AccessibleRole = AccessibleRole.PushButton;
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
-        Size = new Size(54, 30);
+        Size = new Size(DesignMetrics.Px(54, this), DesignMetrics.Px(DesignHeight, this));
         TabStop = false;
         UseVisualStyleBackColor = false;
         Cursor = Cursors.Hand;
@@ -956,7 +1053,13 @@ internal sealed class TransportMetronomeButton : Button
             : BlendColor(BackColor, HoverBackColor, hoverLevel);
         if (_pressed || hoverLevel > 0d)
         {
-            var hoverBounds = new Rectangle(1, 3, Width - 2, Height - 6);
+            var insetX = DesignMetrics.Px(2, this);
+            var insetY = DesignMetrics.Px(5, this);
+            var hoverBounds = new Rectangle(
+                insetX,
+                insetY,
+                Math.Max(0, Width - insetX * 2),
+                Math.Max(0, Height - insetY * 2));
             using var hoverBrush = new SolidBrush(back);
             g.FillRectangle(hoverBrush, hoverBounds);
         }
@@ -966,20 +1069,32 @@ internal sealed class TransportMetronomeButton : Button
             : _isActive
                 ? ActiveForeColor
                 : ForeColor;
-        using var iconPen = new Pen(fore, 1.6f)
+        // 音符は 30 設計座標を高さへ均一スケール（150% で従来どおり約 1.5 倍）。
+        var noteScale = Height > 0 ? Height / (float)NoteGlyphDesign : 0f;
+        if (noteScale > 0f)
         {
-            StartCap = LineCap.Round,
-            EndCap = LineCap.Round,
-            LineJoin = LineJoin.Round,
-        };
-        using var iconBrush = new SolidBrush(fore);
-        var iconTop = Math.Max(0f, (Height - 30f) / 2f);
-        DrawQuarterNote(g, iconPen, iconBrush, 5, iconTop + 7f);
+            using var iconPen = new Pen(fore, Math.Max(1f, DesignMetrics.PxF(1.6f, this)))
+            {
+                StartCap = LineCap.Round,
+                EndCap = LineCap.Round,
+                LineJoin = LineJoin.Round,
+            };
+            using var iconBrush = new SolidBrush(fore);
+            var noteState = g.Save();
+            g.ScaleTransform(noteScale, noteScale);
+            DrawQuarterNote(g, iconPen, iconBrush, 5f, 7f);
+            g.Restore(noteState);
+        }
+
         TextRenderer.DrawText(
             g,
             _bpmText,
             Font,
-            new Rectangle(BpmTextLeft, 0, BpmTextWidth, Height),
+            new Rectangle(
+                DesignMetrics.Px(BpmTextLeftDesign, this),
+                0,
+                DesignMetrics.Px(BpmTextWidthDesign, this),
+                Height),
             fore,
             TextFormatFlags.Left
             | TextFormatFlags.VerticalCenter
@@ -1012,10 +1127,11 @@ internal sealed class TransportMetronomeButton : Button
             (int)Math.Round(from.B + (to.B - from.B) * amount));
     }
 
+    /// <summary>30×30 設計座標で四分音符を描く（呼び出し側で ScaleTransform する）。</summary>
     private static void DrawQuarterNote(Graphics g, Pen pen, Brush brush, float x, float y)
     {
-        g.FillEllipse(brush, x, y + 11, 7, 5);
-        g.DrawLine(pen, x + 6, y + 12, x + 6, y);
+        g.FillEllipse(brush, x, y + 11f, 7f, 5f);
+        g.DrawLine(pen, x + 6f, y + 12f, x + 6f, y);
     }
 }
 
@@ -1066,7 +1182,8 @@ internal sealed class TransportIconButton : Button
         AccessibleRole = AccessibleRole.PushButton;
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
-        Size = new Size(30, 30);
+        var side = DesignMetrics.Px(45, this);
+        Size = new Size(side, side);
         TabStop = false;
         UseVisualStyleBackColor = false;
         SetStyle(
@@ -1240,12 +1357,17 @@ internal sealed class TransportIconButton : Button
             : BlendColor(BackColor, HoverBackColor, hoverLevel);
         if (_pressed || hoverLevel > 0d)
         {
-            var hoverBounds = new Rectangle(3, 3, Width - 6, Height - 6);
+            var inset = Math.Max(1, DesignMetrics.Px(3, this));
+            var hoverBounds = new Rectangle(
+                inset,
+                inset,
+                Math.Max(0, Width - inset * 2),
+                Math.Max(0, Height - inset * 2));
             using var hoverBrush = new SolidBrush(back);
             g.FillRectangle(hoverBrush, hoverBounds);
             if (!AccentColor.IsEmpty)
             {
-                using var accent = new Pen(AccentColor, 1f);
+                using var accent = new Pen(AccentColor, Math.Max(1f, DesignMetrics.From96F(1f, this)));
                 g.DrawRectangle(
                     accent,
                     hoverBounds.X + 0.5f,
@@ -1255,14 +1377,6 @@ internal sealed class TransportIconButton : Button
             }
         }
 
-        using var pen = new Pen(
-            Enabled ? ForeColor : UiColors.TransportDisabledFore,
-            1.8f)
-        {
-            StartCap = LineCap.Round,
-            EndCap = LineCap.Round,
-            LineJoin = LineJoin.Round,
-        };
         using var brush = new SolidBrush(
             !Enabled
                 ? UiColors.TransportDisabledFore
@@ -1276,8 +1390,33 @@ internal sealed class TransportIconButton : Button
             return;
         }
 
+        // グリフは 34×36 設計。幅／高さで別スケールすると 100% で歪むため均一スケール＋中央配置。
+        const float designW = 34f;
+        const float designH = 36f;
+        var scale = Math.Min(Width / designW, Height / designH);
+        if (scale <= 0f)
+        {
+            return;
+        }
+
+        using var pen = new Pen(
+            Enabled ? ForeColor : UiColors.TransportDisabledFore,
+            Math.Max(1f, DesignMetrics.PxF(1.8f, this)))
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+            LineJoin = LineJoin.Round,
+        };
+
         var iconState = g.Save();
-        g.ScaleTransform(Width / 34f, Height / 36f);
+        // Clear/Copy/Download は設計座標がやや上寄りなので、ログボタン等で見た目中央へ下げる。
+        var glyphNudgeY = Icon is TransportIcon.Clear or TransportIcon.Copy or TransportIcon.Download
+            ? DesignMetrics.PxF(2f, this)
+            : 0f;
+        g.TranslateTransform(
+            (Width - designW * scale) * 0.5f,
+            (Height - designH * scale) * 0.5f + glyphNudgeY);
+        g.ScaleTransform(scale, scale);
         DrawIcon(g, pen, brush);
         g.Restore(iconState);
     }

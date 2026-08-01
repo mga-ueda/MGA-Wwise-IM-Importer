@@ -76,9 +76,15 @@ internal sealed class DarkDropDownComboBox : ComboBox
         DropDownStyle = ComboBoxStyle.DropDownList;
         FlatStyle = FlatStyle.Flat;
         IntegralHeight = false;
-        ItemHeight = 24;
+        ApplyListItemHeight();
         MaxDropDownItems = 12;
         ApplyColors();
+    }
+
+    /// <summary>ドロップダウン各行の高さ（フォント＋薄い余白）。</summary>
+    public void ApplyListItemHeight()
+    {
+        ItemHeight = Math.Max(1, Font.Height + DesignMetrics.Px(6, this));
     }
 
     public void ApplyColors()
@@ -91,6 +97,7 @@ internal sealed class DarkDropDownComboBox : ComboBox
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
+        ApplyListItemHeight();
         _ = SetWindowTheme(Handle, "DarkMode_CFD", null);
     }
 
@@ -285,9 +292,19 @@ internal sealed class DarkDropDownComboBox : ComboBox
         }
         else
         {
-            var buttonWidth = Math.Min(24, Width);
-            buttonBounds = new Rectangle(Width - buttonWidth, 1, buttonWidth - 1, Height - 2);
-            itemBounds = new Rectangle(4, 1, Math.Max(0, Width - buttonWidth - 8), Height - 2);
+            var buttonWidth = Math.Min(DesignMetrics.Px(36, this), Width);
+            var edge = DesignMetrics.Px(1, this);
+            var textPad = DesignMetrics.Px(6, this);
+            buttonBounds = new Rectangle(
+                Width - buttonWidth,
+                edge,
+                Math.Max(1, buttonWidth - edge),
+                Math.Max(1, Height - edge * 2));
+            itemBounds = new Rectangle(
+                textPad,
+                edge,
+                Math.Max(0, Width - buttonWidth - textPad * 2),
+                Math.Max(1, Height - edge * 2));
         }
 
         var inputBack = UiColors.ForControlBack(UiColors.ProjectBarInputBack);
@@ -309,10 +326,11 @@ internal sealed class DarkDropDownComboBox : ComboBox
             : string.Empty;
         if (!string.IsNullOrEmpty(text))
         {
+            var textInset = DesignMetrics.Px(6, this);
             var textBounds = new Rectangle(
-                itemBounds.Left + 4,
+                itemBounds.Left + textInset,
                 itemBounds.Top,
-                Math.Max(0, itemBounds.Width - 4),
+                Math.Max(0, itemBounds.Width - textInset),
                 itemBounds.Height);
             TextRenderer.DrawText(
                 g,
@@ -328,20 +346,22 @@ internal sealed class DarkDropDownComboBox : ComboBox
 
         var centerX = buttonBounds.Left + buttonBounds.Width / 2f;
         var centerY = buttonBounds.Top + buttonBounds.Height / 2f;
+        var ax = DesignMetrics.PxF(6f, this);
+        var ay = DesignMetrics.PxF(3f, this);
         var arrow = DroppedDown
             ? new[]
             {
-                new PointF(centerX - 4f, centerY + 2f),
-                new PointF(centerX, centerY - 2f),
-                new PointF(centerX + 4f, centerY + 2f),
+                new PointF(centerX - ax, centerY + ay),
+                new PointF(centerX, centerY - ay),
+                new PointF(centerX + ax, centerY + ay),
             }
             : new[]
             {
-                new PointF(centerX - 4f, centerY - 2f),
-                new PointF(centerX, centerY + 2f),
-                new PointF(centerX + 4f, centerY - 2f),
+                new PointF(centerX - ax, centerY - ay),
+                new PointF(centerX, centerY + ay),
+                new PointF(centerX + ax, centerY - ay),
             };
-        using (var arrowPen = new Pen(fore, 1.6f)
+        using (var arrowPen = new Pen(fore, Math.Max(1f, DesignMetrics.PxF(2.4f, this)))
         {
             StartCap = LineCap.Round,
             EndCap = LineCap.Round,

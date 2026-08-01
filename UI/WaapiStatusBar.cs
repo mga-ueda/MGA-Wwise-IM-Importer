@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// エディタ下の WAAPI / Wwise 接続ステータス表示。
@@ -32,9 +32,9 @@ internal sealed class WaapiStatusBar : Panel
 
     public WaapiStatusBar()
     {
-        Height = 30;
+        Height = DesignMetrics.Px(30, this);
         Dock = DockStyle.Bottom;
-        Padding = new Padding(10, 0, 10, 0);
+        Padding = DesignMetrics.Pad(10, 0, 10, 0, this);
         TabStop = false;
         DoubleBuffered = true;
 
@@ -61,7 +61,7 @@ internal sealed class WaapiStatusBar : Panel
 
         _keepLockButton = new TransportIconButton(TransportIcon.Unlock)
         {
-            Size = new Size(24, 24),
+            Size = new Size(DesignMetrics.Px(24, this), DesignMetrics.Px(24, this)),
             TabStop = false,
         };
         _keepLockButton.Click += KeepLockButton_Click;
@@ -146,6 +146,18 @@ internal sealed class WaapiStatusBar : Panel
 
         ProjectNameClick?.Invoke(this, EventArgs.Empty);
         return true;
+    }
+
+    /// <summary>DPI / シミュレート変更後にバー高さと鍵ボタンを再適用する。</summary>
+    public void ApplyFixedLayout()
+    {
+        Height = DesignMetrics.Px(30, this);
+        Padding = DesignMetrics.Pad(10, 0, 10, 0, this);
+        // 鍵はバー高さを超えない（100% で 24→16 でもバー 20 内に収める）。
+        var side = Math.Min(DesignMetrics.Px(24, this), Math.Max(1, Height - DesignMetrics.Px(2, this)));
+        _keepLockButton.Size = new Size(side, side);
+        _autoActiveCheckBox.ApplyFixedLayout();
+        LayoutLabels();
     }
 
     public bool KeepTargetChecked
@@ -676,10 +688,10 @@ internal sealed class WaapiStatusBar : Panel
         var titleMidY = Math.Max(0, (ClientSize.Height - _titleLabel.Height) / 2);
         _titleLabel.Location = new Point(Padding.Left, titleMidY);
 
-        const int padX = 8;
-        const int padY = 3;
+        var padX = DesignMetrics.From96(8, this);
+        var padY = DesignMetrics.From96(3, this);
         // Yu Gothic UI はメトリクス上の中央より文字が下に見えるため、塗りだけ少し下げる。
-        const int fillNudgeY = 2;
+        var fillNudgeY = DesignMetrics.From96(2, this);
         var badgeTextSize = TextRenderer.MeasureText(
             _badgeText,
             _badgeFont,
@@ -688,7 +700,7 @@ internal sealed class WaapiStatusBar : Panel
         var textTop = titleMidY
             + Math.Max(0, (_titleLabel.Height - badgeTextSize.Height) / 2);
         var badgeWidth = badgeTextSize.Width + padX * 2;
-        var badgeLeft = _titleLabel.Left + _titleLabel.Width + 8;
+        var badgeLeft = _titleLabel.Left + _titleLabel.Width + DesignMetrics.From96(8, this);
         _badgeTextBounds = new Rectangle(badgeLeft, textTop, badgeWidth, badgeTextSize.Height);
         _badgeFillBounds = new Rectangle(
             badgeLeft,
@@ -697,17 +709,18 @@ internal sealed class WaapiStatusBar : Panel
             badgeTextSize.Height + padY * 2);
 
         // 省略なし。全文＋末尾鍵＋状態ラベルをそのまま並べる。
-        const int gapBeforeLock = 6;
-        const int gapBeforeState = 2;
-        var x = _badgeFillBounds.Right + 12;
+        var gapBeforeLock = DesignMetrics.From96(6, this);
+        var gapBeforeState = DesignMetrics.From96(2, this);
+        var x = _badgeFillBounds.Right + DesignMetrics.From96(12, this);
         x = PlaceDetailLabel(_versionLabel, x, Measure);
         x = PlaceDetailLabel(_sepAfterVersion, x, Measure);
         x = PlaceDetailLabel(_projectNameLabel, x, Measure);
         x = PlaceDetailLabel(_sepAfterProject, x, Measure);
         x = PlaceDetailLabel(_pathLabel, x, Measure);
 
-        // Auto Active は右端固定（長パスでも見失わない）。
+        // Auto Active は右端固定（長パスでも見失わない）。行高はバーに収める。
         var autoSize = _autoActiveCheckBox.GetPreferredSize(Size.Empty);
+        autoSize.Height = Math.Min(autoSize.Height, Math.Max(1, ClientSize.Height));
         var autoLeft = Math.Max(
             Padding.Left,
             ClientSize.Width - Padding.Right - autoSize.Width);
@@ -728,7 +741,7 @@ internal sealed class WaapiStatusBar : Panel
             _keepStateLabel.AutoSize = false;
             _keepStateLabel.Size = stateSize;
 
-            const int gapBeforeAuto = 10;
+            var gapBeforeAuto = DesignMetrics.From96(10, this);
             var lockClusterWidth = _keepLockButton.Width + gapBeforeState + stateSize.Width;
             var lockLeft = Math.Min(
                 x + gapBeforeLock,
