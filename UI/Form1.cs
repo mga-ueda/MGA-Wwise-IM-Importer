@@ -2566,7 +2566,7 @@ public partial class Form1 : Form, IMessageFilter
         waveformView.InfoLaneWidthChanged += (_, _) =>
         {
             SyncProjectNameComboWidthToInfoLane();
-            AlignProjectPathTextRect();
+            AlignProjectBarInputs();
         };
         // EM_SETRECT は Resize / Text 変更で戻るため、共通ヘルパーで再適用する。
         TextBoxVerticalAlign.Configure(projectOutputPathTextBox);
@@ -2715,19 +2715,6 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         projectNameComboBox.Width = width;
-    }
-
-    private void AlignProjectPathTextRect()
-    {
-        var contentHeight = projectBar.DisplayRectangle.Height;
-        if (contentHeight <= 0)
-        {
-            return;
-        }
-
-        var inputHeight = MeasureProjectBarInputHeight(contentHeight);
-        var inputTop = projectBar.Padding.Top + Math.Max(0, (contentHeight - inputHeight) / 2);
-        LayoutProjectBarInputs(inputTop, inputHeight);
     }
 
     private void ProjectOutputPathTextBox_GotFocus(object? sender, EventArgs e)

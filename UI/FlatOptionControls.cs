@@ -1,4 +1,4 @@
-using System.Drawing.Drawing2D;
+﻿using System.Drawing.Drawing2D;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -47,8 +47,6 @@ internal sealed class FlatOptionRadioButton : RadioButton
 {
     /// <summary>プレイリスト項目と同じ行高（150% 設計値。適用時は DesignMetrics で換算）。</summary>
     public const int RowHeightDesign = FlatOptionGlyph.RowHeightDesign;
-
-    public static int GetRowHeight(Control? c = null) => FlatOptionGlyph.RowHeight(c);
 
     private bool _hovered;
 

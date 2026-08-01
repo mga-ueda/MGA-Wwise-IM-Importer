@@ -245,7 +245,7 @@ partial class Form1
         projectBar.Dock = DockStyle.Top;
         projectBar.Height = 30;
         projectBar.Name = "projectBar";
-        // ãº}[WÍÎÌÉ·éieLXgcÊuÍ AlignProjectBarText ÅÀªí¹jB
+        // 上下マージンは対称にする（文字縦位置は AlignProjectBarInputs で実測合わせ）。
         projectBar.Padding = new Padding(8, 3, 8, 3);
         projectBar.TabIndex = 0;
         projectBar.Controls.Add(projectOutputPathTextBox);
@@ -1206,7 +1206,7 @@ partial class Form1
         playlistScrollPanel.AllowDrop = true;
         playlistScrollPanel.Dock = DockStyle.Fill;
         playlistScrollPanel.Name = "playlistScrollPanel";
-        // Fade In / Fade Out ÔiMargin 0jÆ¯¶­A¼OñÆÔÈ­Ú·éB
+        // Fade In / Fade Out 間（Margin 0）と同じく、直前列と隙間なく接する。
         playlistScrollPanel.Padding = new Padding(0, 0, 8, 8);
         playlistScrollPanel.TabIndex = 1;
         playlistScrollPanel.Controls.Add(playlistListLayout);
@@ -1230,7 +1230,7 @@ partial class Form1
         playlistListLayout.DragEnter += EditorTextBox_DragEnter;
         playlistListLayout.DragDrop += EditorTextBox_DragDrop;
         //
-        // actionBariºjBNA^[h^EXPORT ÈÇB
+        // actionBar（下部）。クリア／リロード／EXPORT など。
         //
         actionBar.Dock = DockStyle.Bottom;
         actionBar.Height = 44;
@@ -1253,8 +1253,8 @@ partial class Form1
         //
         // copyrightLinkLabel
         //
-        // Sibottom=38jÆ \L2sÌ{gCðµ¦éB
-        // Í LayoutActionBarCopyright ÅE¤Rg[ÆdÈçÈ¢æ¤²®·éB
+        // ロゴ（bottom=38）と権利表記2行のボトムラインを揃える。
+        // 幅は LayoutActionBarCopyright で右側コントロールと重ならないよう調整する。
         copyrightLinkLabel.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
         copyrightLinkLabel.AutoEllipsis = true;
         copyrightLinkLabel.BackColor = Color.Transparent;
@@ -1269,7 +1269,7 @@ partial class Form1
             "c 2026 MIYABI GAME AUDIO INC.  GitHub"
             + "\nWwiseR and AudiokineticR are trademarks of Audiokinetic Inc.";
         copyrightLinkLabel.TextAlign = ContentAlignment.BottomLeft;
-        // "GitHub" Í1sÚÌ31¶Ú©çi¤WsÌÇÁÅÏíçÈ¢jB
+        // "GitHub" は1行目の31文字目から（商標行の追加で変わらない）。
         copyrightLinkLabel.LinkArea = new LinkArea(31, 6);
         copyrightLinkLabel.LinkClicked += CopyrightLinkLabel_LinkClicked;
         //
@@ -1307,8 +1307,8 @@ partial class Form1
         compactFileNumbersCheckBox.Checked = false;
         compactFileNumbersCheckBox.CheckState = CheckState.Unchecked;
         compactFileNumbersCheckBox.Enabled = false;
-        // Music Playlist êiXN[ÌæjÌOAplº[ÌÅèGAÉzuB
-        // ¶ Padding Í AlignCompactFileNumbersCheckBox ªO[vgÆµ¤æ¤ÄvZ·éB
+        // Music Playlist 一覧（スクロール領域）の外、パネル下端の固定エリアに配置。
+        // 左 Padding は AlignCompactFileNumbersCheckBox がグループ枠と揃うよう再計算する。
         compactFileNumbersCheckBox.Dock = DockStyle.Bottom;
         compactFileNumbersCheckBox.Font = new Font("Yu Gothic UI", 9F);
         compactFileNumbersCheckBox.Height = 28;
@@ -1373,7 +1373,7 @@ partial class Form1
         AutoScaleMode = AutoScaleMode.Font;
         BackColor = UiColors.WindowBack;
         ClientSize = new Size(960, 640);
-        // Dock: Fill / Bottom / TopBã©ç Add µ½ Top ÙÇã[ÉñéB
+        // Dock: Fill / Bottom / Top。後から Add した Top ほど上端に寄る。
         Controls.Add(logAreaPanel);
         Controls.Add(actionBar);
         Controls.Add(waapiStatusBar);

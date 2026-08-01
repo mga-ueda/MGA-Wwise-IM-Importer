@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.UI;
+﻿namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// レイアウト設計 DPI（150% = 144）基準のピクセルを、現在の DPI へ換算する。
@@ -61,9 +61,6 @@ internal static class DesignMetrics
     /// 生ピクセル固定ではなく LayoutDpi に連動させる。
     /// </summary>
     public static float VisualTextNudgeY(Control? c = null) => PxF(1.5f, c);
-
-    public static int VisualTextNudgeYInt(Control? c = null)
-        => Math.Max(0, (int)Math.Round(VisualTextNudgeY(c)));
 
     public static Padding Pad(int all, Control? c = null)
         => new(Px(all, c));
