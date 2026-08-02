@@ -18,12 +18,10 @@ internal static class AppEmbeddedResources
 
     public static Stream? OpenLogFont() => Open(LogFontName);
 
-    public static Stream? OpenUdevGothicLicense() => Open(UdevGothicLicenseName);
-
     /// <summary>埋め込みの UDEV Gothic ライセンス全文。欠落時は空文字。</summary>
     public static string ReadUdevGothicLicenseText()
     {
-        using var stream = OpenUdevGothicLicense();
+        using var stream = Open(UdevGothicLicenseName);
         if (stream is null)
         {
             return string.Empty;

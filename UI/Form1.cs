@@ -70,23 +70,10 @@ public partial class Form1 : Form, IMessageFilter
     private const int VkControl = 0x11;
     private const int VkMenu = 0x12;
 
-    private const int EmSetRect = 0x00B3;
     private const int WmSetRedraw = 0x000B;
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, ref NativeRect lParam);
 
     [DllImport("user32.dll", EntryPoint = "SendMessage", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessagePtr(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct NativeRect
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
 
     private DeveloperSettings _developerSettings = new();
     private WaapiSettings _waapiSettings = new();
