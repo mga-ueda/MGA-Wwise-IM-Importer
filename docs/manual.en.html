@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -119,8 +119,9 @@
         <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
         <p><strong>Implementation combines WAAPI with the app's own processing.</strong> On top of remote-controlling Wwise through WAAPI, the app handles WAV cutting, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:</p>
         <ul>
-          <li>Preview transitions between Music Playlists by ear while switching Exit Source At / Fade In / Fade Out / Play -E</li>
-          <li>Group playlists into vertical layers and check layer switching with additive-layer playback, Group Fade, and Change Occurs At</li>          <li><strong>Implement groups with their volume balance preserved</strong> (automatically compensates, via Make-Up Gain, the layer balance that Loudness Normalization would otherwise destroy; recommended when using it)</li>
+          <li>Preview switches from one piece to another by ear while trying exit timing, fade in/out, and whether a one-shot still plays after a loop</li>
+          <li>Group pieces into vertical layers and check stacking parts on top of each other, as well as crossfading when swapping layers</li>
+          <li><strong>Implement groups with their volume balance preserved</strong> (automatically compensates, via Make-Up Gain, the layer balance that Loudness Normalization would otherwise destroy; recommended when using it)</li>
           <li>Set easy-to-forget streaming options (Prefetch Length / Look-ahead Time) from the UI and have them written out</li>
           <li>Have everything you decided by ear generated automatically as a Music hierarchy in Wwise over WAAPI</li>
           <li><strong>Drop multiple waves at once, or use marker-track XML, to implement any number of pieces together</strong></li>
@@ -420,6 +421,7 @@
           <tr><td class="ui">Spectrum</td><td>Simple output spectrum.</td></tr>
         </tbody>
       </table>
+      <p>Project settings, window bounds, and audio output are stored as JSON under <code>%LocalAppData%\MGA\MGA Wwise IM Importer\</code> (<code>settings.json</code> and <code>sessions\</code>), not next to the exe.</p>
 
       <h2 id="waveform">9. Waveform preview</h2>
       <p>Measure / Tempo / Signature / Marker lanes, waveform, then Music Segment Name / Music Playlist Name (bar lanes are inactive without XML).</p>

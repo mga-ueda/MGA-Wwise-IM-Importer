@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.UI;
+﻿namespace MgaWwiseIMImporter.UI;
 
 internal enum MarkerEditMode
 {
@@ -4418,7 +4418,7 @@ internal sealed class WaveformView : Control
             format);
     }
 
-    private void DrawLabelRows(Graphics g, Rectangle labels, float rowHeight, int visibleRowCount)
+    private static void DrawLabelRows(Graphics g, Rectangle labels, float rowHeight, int visibleRowCount)
     {
         if (labels.Width <= 0 || labels.Height <= 0 || visibleRowCount <= 0)
         {

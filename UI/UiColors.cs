@@ -3,12 +3,10 @@
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// アプリ全体の色定義。既定値はこのクラス、実行時の調整は [Colors] INI と開発者パネル。
+/// アプリ全体の色定義。既定値はこのクラス、実行時の調整は settings.json の colors と開発者パネル。
 /// </summary>
 internal static class UiColors
 {
-    public const string IniSection = "Colors";
-
     // --- 共通トークン ---
     public static Color PrimaryFore { get; set; } = Color.FromArgb(235, 235, 235);
     public static Color MutedFore { get; set; } = Color.FromArgb(150, 150, 150);
@@ -213,7 +211,7 @@ internal static class UiColors
     public static Color ColorPanelInputBack { get; set; } = Color.FromArgb(28, 28, 30);
     public static Color ColorPanelInputFore => PrimaryFore;
 
-    /// <summary>パネル表示用の一覧（キー＝INI、表示名は UiStrings.ColorLabel で日英切替）。</summary>
+    /// <summary>パネル表示用の一覧（キー＝settings.json、表示名は UiStrings.ColorLabel で日英切替）。</summary>
     public static IReadOnlyList<UiColorEntry> Entries { get; } =
     [
         new("PrimaryFore", () => PrimaryFore, c => PrimaryFore = c),
@@ -319,13 +317,13 @@ internal static class UiColors
         }
     }
 
-    public static void LoadFromIni()
+    public static void Load()
     {
 #if DEBUG
-        var values = IniFile.ReadSection(IniSection);
-        if (values.Count == 0)
+        var values = JsonSettingsStore.Document.Colors;
+        if (values is null || values.Count == 0)
         {
-            SaveToIni();
+            Save();
             return;
         }
 
@@ -333,25 +331,28 @@ internal static class UiColors
         {
             if (values.TryGetValue(entry.Key, out var text) && TryParseColor(text, out var color))
             {
-                // アルファはコード既定を使う（INI で A=0 になっても起動不能にしない）
+                // アルファはコード既定を使う（設定で A=0 になっても起動不能にしない）
                 var alpha = Defaults.TryGetValue(entry.Key, out var def) ? def.A : (byte)255;
                 entry.Set(Color.FromArgb(alpha, color.R, color.G, color.B));
             }
         }
 
-        // 新規キーの追記に加え、INI の [Colors] もパネルと同じ UI 順へ揃える。
+        // 新規キーの追記に加え、colors もパネルと同じ UI 順へ揃える。
         var expectedKeys = Entries.Select(entry => entry.Key);
         if (!values.Keys.SequenceEqual(expectedKeys, StringComparer.OrdinalIgnoreCase))
         {
-            SaveToIni();
+            Save();
         }
 #else
-        // リリースでは色パネル無しのためコード既定のみ使い、[Colors] は除去する。
-        IniFile.RemoveSection(IniSection);
+        // リリースでは色パネル無しのためコード既定のみ使い、colors は除去する。
+        if (JsonSettingsStore.Document.Colors is not null)
+        {
+            JsonSettingsStore.Update(doc => doc.Colors = null);
+        }
 #endif
     }
 
-    public static void SaveToIni()
+    public static void Save()
     {
 #if DEBUG
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -365,7 +366,7 @@ internal static class UiColors
             values[entry.Key] = FormatColor(normalized);
         }
 
-        IniFile.WriteSection(IniSection, values);
+        JsonSettingsStore.Update(doc => doc.Colors = values);
 #endif
     }
 
@@ -377,7 +378,7 @@ internal static class UiColors
     public static Color ForControlBack(Color color) =>
         Color.FromArgb(255, color.R, color.G, color.B);
 
-    /// <summary>INI／パネル用。RGB のみ（<c>#RRGGBB</c>）。アルファは各色のコード既定を使う。</summary>
+    /// <summary>settings／パネル用。RGB のみ（<c>#RRGGBB</c>）。アルファは各色のコード既定を使う。</summary>
     public static string FormatColor(Color color) =>
         $"#{color.R:X2}{color.G:X2}{color.B:X2}";
 

@@ -86,7 +86,7 @@ public partial class Form1 : Form, IMessageFilter
     private bool _suppressProjectUiEvents;
     private string _projectOutputDirectory = string.Empty;
     private string _lastWavePath = string.Empty;
-    /// <summary>最後に読み込んだ波形パス一覧（複数波形モードは全本）。INI の LastWavePaths と同期。</summary>
+    /// <summary>最後に読み込んだ波形パス一覧（複数波形モードは全本）。設定の LastWavePaths と同期。</summary>
     private IReadOnlyList<string> _lastWavePaths = [];
     /// <summary>
     /// いまの作業中に実際に読み込んだ直前の波形パス一覧。
@@ -281,7 +281,7 @@ public partial class Form1 : Form, IMessageFilter
     private bool _resumePlaybackAfterBackwardSeek;
     private TransportCommand? _activeTransportShortcutCommand;
     private Keys _activeTransportShortcutKeyCode = Keys.None;
-    /// <summary>G ジャンプで最後に確定した小節番号（リロードで破棄。INI には書かない）。</summary>
+    /// <summary>G ジャンプで最後に確定した小節番号（リロードで破棄。永続化しない）。</summary>
     private int? _lastJumpedBarNumber;
     private readonly MarkerSettings _markerSettings = new();
 #if DEBUG
@@ -301,7 +301,7 @@ public partial class Form1 : Form, IMessageFilter
 
     public Form1()
     {
-        UiColors.LoadFromIni();
+        UiColors.Load();
         AppFonts.EnsureRegistered();
         InitializeComponent();
         TipService.BindDisplay(tipsLabel, tipsPanel);
@@ -3055,7 +3055,7 @@ public partial class Form1 : Form, IMessageFilter
         return best;
     }
 
-    private void SelectFadeRadio(
+    private static void SelectFadeRadio(
         FlowLayoutPanel panel,
         double seconds,
         EventHandler handler)
@@ -3758,7 +3758,7 @@ public partial class Form1 : Form, IMessageFilter
         profile.AutoActive = waapiStatusBar.AutoActiveChecked;
         profile.LastWavePath = _lastWavePath?.Trim() ?? string.Empty;
         profile.LastWavePaths = _lastWavePaths.Count > 1
-            ? LastWaveSessionState.JoinWavePathsForIni(_lastWavePaths)
+            ? LastWaveSessionState.JoinWavePaths(_lastWavePaths)
             : string.Empty;
         profile.KeepTarget = _keepTarget;
         profile.KeptTargetPath = _keptTargetPath?.Trim() ?? string.Empty;
@@ -8040,7 +8040,7 @@ public partial class Form1 : Form, IMessageFilter
         TipService.Set(changeOccursExitCueRadio, UiStrings.TipExitExitCue);
     }
 
-    private void ApplyFadeRadioTip(RadioButton radio)
+    private static void ApplyFadeRadioTip(RadioButton radio)
     {
         var seconds = radio.Tag is double value ? value : 0d;
         var tip = seconds <= 0
@@ -8438,7 +8438,7 @@ public partial class Form1 : Form, IMessageFilter
         return result;
     }
 
-    private IReadOnlyDictionary<int, double> BuildExportFadeSeconds(
+    private static IReadOnlyDictionary<int, double> BuildExportFadeSeconds(
         IReadOnlySet<int> enabledNumbers,
         Func<int, double> resolver)
     {
@@ -8451,7 +8451,7 @@ public partial class Form1 : Form, IMessageFilter
         return result;
     }
 
-    private IReadOnlyDictionary<int, RegionFadeCurveKind> BuildExportFadeCurves(
+    private static IReadOnlyDictionary<int, RegionFadeCurveKind> BuildExportFadeCurves(
         IReadOnlySet<int> enabledNumbers,
         Func<int, RegionFadeCurveKind> resolver)
     {
@@ -8878,7 +8878,7 @@ public partial class Form1 : Form, IMessageFilter
         return true;
     }
 
-    /// <summary>INI / サイドカーから復元用の波形パス一覧を得る。</summary>
+    /// <summary>設定／セッションから復元用の波形パス一覧を得る。</summary>
     private IReadOnlyList<string> ResolveLastWavePathsForRestore()
     {
         if (_lastWavePaths.Count > 0)
@@ -8889,10 +8889,10 @@ public partial class Form1 : Form, IMessageFilter
         if (_projectStore.TryReadLastWaveSession(_loadedProjectName, out var state)
             && state is not null)
         {
-            var fromSidecar = state.GetWavePaths();
-            if (fromSidecar.Count > 0)
+            var fromSession = state.GetWavePaths();
+            if (fromSession.Count > 0)
             {
-                return fromSidecar;
+                return fromSession;
             }
         }
 
@@ -8903,7 +8903,7 @@ public partial class Form1 : Form, IMessageFilter
         string? primaryPath,
         string? joinedPaths)
     {
-        var fromJoined = LastWaveSessionState.SplitWavePathsFromIni(joinedPaths);
+        var fromJoined = LastWaveSessionState.SplitWavePaths(joinedPaths);
         if (fromJoined.Count > 0)
         {
             return fromJoined;

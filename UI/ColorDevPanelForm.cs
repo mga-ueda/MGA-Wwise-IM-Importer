@@ -287,7 +287,7 @@ internal sealed class ColorDevPanelForm : Form
         var pos = _scroll.AutoScrollPosition;
         ApplyPanelColors();
         RefreshRowsCore();
-        UiColors.SaveToIni();
+        UiColors.Save();
         ColorsChanged?.Invoke(this, EventArgs.Empty);
         // メイン側の色適用やレイアウト後も位置を維持する。
         RestoreScrollPosition(pos);

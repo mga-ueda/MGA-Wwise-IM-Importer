@@ -31,7 +31,7 @@ internal static class AudioOutputFactory
             || !string.IsNullOrWhiteSpace(settings.DeviceId))
         {
             fallbackMessage =
-                $"Requested {AudioOutputSettings.ToIniValue(settings.Api)}"
+                $"Requested {AudioOutputSettings.ToStoredValue(settings.Api)}"
                 + $" device '{settings.DeviceId}' failed ({ex.Message}); falling back to WaveOut default.";
             return CreateWaveOut(deviceNumber: -1);
         }

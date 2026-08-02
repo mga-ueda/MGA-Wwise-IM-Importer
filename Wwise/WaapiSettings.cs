@@ -1,7 +1,7 @@
 ﻿namespace MgaWwiseIMImporter.Wwise;
 
 /// <summary>
-/// WAAPI 接続設定（アプリ内固定。INI には書かない）。
+/// WAAPI 接続設定（アプリ内固定。ユーザー設定には書かない）。
 /// </summary>
 internal sealed class WaapiSettings
 {

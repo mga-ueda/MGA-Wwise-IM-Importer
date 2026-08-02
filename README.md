@@ -25,8 +25,8 @@ Wwise の Interactive Music は、コンテナ・トランジション・Cue・�
 
 **実装は WAAPI ＋ 独自処理の組み合わせです。** Wwise の遠隔操作（WAAPI）に加えて、WAV の切り出し・ラウドネス計測・フェードのプロパティ変換などをアプリ側の独自処理で補っているため、WAAPI を呼ぶだけの自動実装ツールでは実現できない実装まで踏み込めます。具体的には次のようなことができます。
 
-- Music Playlist 間の遷移を、Exit Source At／Fade In／Fade Out／Play -E を切り替えながら実際に聴いてプレビューできます
-- Playlist をグループ化して縦レイヤーを組み、上乗せ再生（Additive Layer）・Group Fade・Change Occurs At によるレイヤー切替を確認できます
+- 曲から曲への切り替えを、抜けタイミングやフェードの入り／抜け、ループ後のワンショット有無などを変えながら、実際に聴いてプレビューできます
+- 複数の曲をグループにまとめて縦に重ね、上乗せ再生や、レイヤー同士をクロスフェードで差し替える切替も確認できます
 - **グループの音量バランスを維持したまま実装できます**（Loudness Normalization で崩れがちなレイヤー間バランスを Make-Up Gain で自動補正。利用時に推奨）
 - 設定を忘れがちなストリーミング設定（Prefetch Length／Look-ahead Time）も UI から指定して書き出せます
 - 聴いて決めた内容は、WAAPI 経由で Wwise 上に Music 構造として自動生成されます
@@ -38,5 +38,6 @@ Wwise の Interactive Music は、コンテナ・トランジション・Cue・�
 - 初めての方: WAV 1 本だけで試せる [クイックスタート](https://mga-ueda.github.io/MGA-Wwise-IM-Importer/manual.ja.html#quickstart) と、XML などの [素材の準備と方式の選び方](https://mga-ueda.github.io/MGA-Wwise-IM-Importer/manual.ja.html#prepare) をどうぞ
 - アプリ内: プロジェクトバーの **マニュアル（`?`）**（歯車の左。JP／EN 追従）
 - 配布: [Releases](https://github.com/mga-ueda/MGA-Wwise-IM-Importer/releases)
+- 設定データ: `%LocalAppData%\MGA\MGA Wwise IM Importer\`（`settings.json` / `sessions\`。exe 横には書きません）
 
 Wwise®／Audiokinetic®、Nuendo®／Cubase®／Steinberg® は各権利者の商標です。本ツールは非公式です。

@@ -10,6 +10,10 @@ insert_final_newline = true
 dotnet_style_namespace_match_folder = true
 # 日本語コメント／文字列を含むため BOM 付き UTF-8 で統一し、エディタの誤判定を防ぐ。
 charset = utf-8-bom
+# IReadOnly* を意図的に使う箇所への具体型変更提案は採用しない。
+dotnet_diagnostic.CA1859.severity = none
+# Win32 P/Invoke は DllImport 維持（csproj の NoWarn と揃える）。
+dotnet_diagnostic.SYSLIB1054.severity = none
 
 [*.{md,xml,resx,csproj,props,targets,json,yml,yaml,editorconfig,gitignore,gitattributes}]
 charset = utf-8-bom

@@ -279,7 +279,7 @@ internal sealed class BarJumpDialogForm : Form
         SelectObject(memDc, oldBitmap);
         DeleteObject(hBitmap);
         DeleteDC(memDc);
-        ReleaseDC(IntPtr.Zero, screenDc);
+        _ = ReleaseDC(IntPtr.Zero, screenDc);
     }
 
     private Bitmap BuildFrameBitmap()

@@ -534,7 +534,7 @@ internal sealed class AudioSettingsForm : Form, IMessageFilter
             ref _fadeCurveMenu);
     }
 
-    private void RefreshFadeRowIcon(FadeCurveRow row)
+    private static void RefreshFadeRowIcon(FadeCurveRow row)
     {
         var old = row.Icon.Image;
         row.Icon.Image = FadeCurveIcons.Create(

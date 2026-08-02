@@ -1,11 +1,7 @@
-﻿using System.Globalization;
-
-namespace MgaWwiseIMImporter.UI;
+﻿namespace MgaWwiseIMImporter.UI;
 
 internal sealed class WindowSettings
 {
-    private const string Section = "Window";
-
     public int X { get; set; }
     public int Y { get; set; }
     public int Width { get; set; }
@@ -15,21 +11,20 @@ internal sealed class WindowSettings
     {
         try
         {
-            var values = IniFile.ReadSection(Section);
-            if (!TryGetInt(values, "X", out var x)
-                || !TryGetInt(values, "Y", out var y)
-                || !TryGetInt(values, "Width", out var width)
-                || !TryGetInt(values, "Height", out var height))
+            var data = JsonSettingsStore.Document.Window;
+            if (data is null
+                || data.Width <= 0
+                || data.Height <= 0)
             {
                 return null;
             }
 
             return new WindowSettings
             {
-                X = x,
-                Y = y,
-                Width = width,
-                Height = height,
+                X = data.X,
+                Y = data.Y,
+                Width = data.Width,
+                Height = data.Height,
             };
         }
         catch
@@ -40,13 +35,14 @@ internal sealed class WindowSettings
 
     public void Save()
     {
-        IniFile.WriteSection(Section, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        var data = new WindowSettingsData
         {
-            ["X"] = X.ToString(CultureInfo.InvariantCulture),
-            ["Y"] = Y.ToString(CultureInfo.InvariantCulture),
-            ["Width"] = Width.ToString(CultureInfo.InvariantCulture),
-            ["Height"] = Height.ToString(CultureInfo.InvariantCulture),
-        });
+            X = X,
+            Y = Y,
+            Width = Width,
+            Height = Height,
+        };
+        JsonSettingsStore.Update(doc => doc.Window = data);
     }
 
     public static WindowSettings FromForm(Form form)
@@ -93,12 +89,5 @@ internal sealed class WindowSettings
             Math.Max(1, bounds.Height - margin * 2));
 
         return Screen.AllScreens.Any(screen => screen.WorkingArea.IntersectsWith(visibleArea));
-    }
-
-    private static bool TryGetInt(Dictionary<string, string> values, string key, out int value)
-    {
-        value = 0;
-        return values.TryGetValue(key, out var text)
-            && int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     }
 }

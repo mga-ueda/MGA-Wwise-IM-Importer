@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
@@ -119,8 +119,9 @@
         <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。</p>
         <p><strong>実装は WAAPI ＋ 独自処理の組み合わせです。</strong> Wwise の遠隔操作（WAAPI）に加えて、WAV の切り出し・ラウドネス計測・フェードのプロパティ変換などをアプリ側の独自処理で補っているため、WAAPI を呼ぶだけの自動実装ツールでは実現できない実装まで踏み込めます。具体的には次のようなことができます。</p>
         <ul>
-          <li>Music Playlist 間の遷移を、Exit Source At／Fade In／Fade Out／Play -E を切り替えながら実際に聴いてプレビューできます</li>
-          <li>Playlist をグループ化して縦レイヤーを組み、上乗せ再生（Additive Layer）・Group Fade・Change Occurs At によるレイヤー切替を確認できます</li>          <li><strong>グループの音量バランスを維持したまま実装できます</strong>（Loudness Normalization で崩れがちなレイヤー間バランスを Make-Up Gain で自動補正。利用時に推奨）</li>
+          <li>曲から曲への切り替えを、抜けタイミングやフェードの入り／抜け、ループ後のワンショット有無などを変えながら、実際に聴いてプレビューできます</li>
+          <li>複数の曲をグループにまとめて縦に重ね、上乗せ再生や、レイヤー同士をクロスフェードで差し替える切替も確認できます</li>
+          <li><strong>グループの音量バランスを維持したまま実装できます</strong>（Loudness Normalization で崩れがちなレイヤー間バランスを Make-Up Gain で自動補正。利用時に推奨）</li>
           <li>設定を忘れがちなストリーミング設定（Prefetch Length／Look-ahead Time）も UI から指定して書き出せます</li>
           <li>聴いて決めた内容は、WAAPI 経由で Wwise 上に Music 構造として自動生成されます</li>
           <li><strong>複数波形の同時ドロップやマーカートラック XML の利用により、何曲でもまとめて実装できます</strong></li>
@@ -420,6 +421,7 @@
           <tr><td class="ui">スペクトラム</td><td>再生出力の簡易表示。</td></tr>
         </tbody>
       </table>
+      <p>プロジェクト設定・ウィンドウ位置・音声出力などは exe 横ではなく、<code>%LocalAppData%\MGA\MGA Wwise IM Importer\</code> に JSON（<code>settings.json</code> と <code>sessions\</code>）で保存されます。</p>
 
       <h2 id="waveform">9. 波形プレビュー</h2>
       <p>Measure／Tempo／Signature／Marker レーン、波形、Music Segment Name／Music Playlist Name レーンで構成されます（XML 無しモードでは小節系レーンは使えません）。</p>

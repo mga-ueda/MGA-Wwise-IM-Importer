@@ -6,7 +6,7 @@ namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// プロジェクト単位の Last Session 作業状態（グループ／無効化／トランジション設定／アプリ追加マーカー）。
-/// exe 横 JSON サイドカーへ保存する。
+/// AppData の sessions\ 配下 JSON へ保存する。
 /// </summary>
 internal sealed class LastWaveSessionState
 {
@@ -79,12 +79,10 @@ internal sealed class LastWaveSessionState
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public static string SidecarPath(string projectName)
+    public static string SessionPath(string projectName)
     {
         var safe = SanitizeFileName(projectName);
-        return Path.Combine(
-            Path.GetDirectoryName(IniFile.Path) ?? AppContext.BaseDirectory,
-            $"MgaWwiseIMImporter.lastwave.{safe}.json");
+        return Path.Combine(AppStorage.SessionsDirectory, $"lastwave.{safe}.json");
     }
 
     public static string SanitizeFileName(string projectName)
@@ -267,10 +265,10 @@ internal sealed class LastWaveSessionState
         return true;
     }
 
-    public static string JoinWavePathsForIni(IReadOnlyList<string> paths) =>
+    public static string JoinWavePaths(IReadOnlyList<string> paths) =>
         string.Join("|", NormalizeWavePaths(paths, primaryPath: null));
 
-    public static IReadOnlyList<string> SplitWavePathsFromIni(string? joined) =>
+    public static IReadOnlyList<string> SplitWavePaths(string? joined) =>
         string.IsNullOrWhiteSpace(joined)
             ? []
             : NormalizeWavePaths(

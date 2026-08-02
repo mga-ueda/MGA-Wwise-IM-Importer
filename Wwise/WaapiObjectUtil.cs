@@ -5,6 +5,8 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <summary>WAAPI 上のオブジェクト存在確認。</summary>
 internal static class WaapiObjectUtil
 {
+    private static readonly string[] ReturnFieldsIdPath = ["id", "path"];
+
     public static async Task<bool> ExistsAsync(
         WaapiSettings settings,
         string objectPath,
@@ -26,7 +28,7 @@ internal static class WaapiObjectUtil
             var result = await client.CallAsync(
                     "ak.wwise.core.object.get",
                     new Dictionary<string, object?> { ["waql"] = $"$ \"{escaped}\"" },
-                    new Dictionary<string, object?> { ["return"] = new[] { "id", "path" } },
+                    new Dictionary<string, object?> { ["return"] = ReturnFieldsIdPath },
                     cancellationToken)
                 .ConfigureAwait(false);
 

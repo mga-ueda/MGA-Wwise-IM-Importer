@@ -1,4 +1,6 @@
-﻿namespace MgaWwiseIMImporter;
+﻿using MgaWwiseIMImporter.UI;
+
+namespace MgaWwiseIMImporter;
 
 static class Program
 {
@@ -6,6 +8,7 @@ static class Program
     static void Main()
     {
         ApplicationConfiguration.Initialize();
+        AppStorage.Initialize();
         Application.Run(new Form1());
     }
 }

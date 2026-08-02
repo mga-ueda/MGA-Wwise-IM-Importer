@@ -1,7 +1,7 @@
 ﻿namespace MgaWwiseIMImporter.Wwise;
 
 /// <summary>
-/// Wwise へのインポート設定（アプリ内固定。INI には書かない）。
+/// Wwise へのインポート設定（アプリ内固定。ユーザー設定には書かない）。
 /// LookAhead／Prefetch はプロジェクト設定（[Project.*]）。
 /// </summary>
 internal sealed class WwiseImportSettings

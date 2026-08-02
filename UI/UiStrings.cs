@@ -42,7 +42,7 @@ internal static class UiStrings
         return UiLanguage.Japanese;
     }
 
-    public static string ToIniValue(UiLanguage language) =>
+    public static string ToStoredValue(UiLanguage language) =>
         language == UiLanguage.English ? "en" : "ja";
 
     public static string Get(string japanese, string english) =>

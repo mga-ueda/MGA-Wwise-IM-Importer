@@ -1,4 +1,4 @@
-# MGA Wwise IM Importer
+﻿# MGA Wwise IM Importer
 
 [日本語](README.md)
 
@@ -25,8 +25,8 @@ The workflow assumes **the Interactive Music data in Wwise is the master**. Keep
 
 **Implementation combines WAAPI with the app's own processing.** On top of remote-controlling Wwise through WAAPI, the app handles WAV cutting, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:
 
-- Preview transitions between Music Playlists by ear while switching Exit Source At / Fade In / Fade Out / Play -E
-- Group playlists into vertical layers and check layer switching with additive-layer playback, Group Fade, and Change Occurs At
+- Preview switches from one piece to another by ear while trying exit timing, fade in/out, and whether a one-shot still plays after a loop
+- Group pieces into vertical layers and check stacking parts on top of each other, as well as crossfading when swapping layers
 - **Implement groups with their volume balance preserved** (automatically compensates, via Make-Up Gain, the layer balance that Loudness Normalization would otherwise destroy; recommended when using it)
 - Set easy-to-forget streaming options (Prefetch Length / Look-ahead Time) from the UI and have them written out
 - Have everything you decided by ear generated automatically as a Music hierarchy in Wwise over WAAPI
@@ -38,5 +38,6 @@ The workflow assumes **the Interactive Music data in Wwise is the master**. Keep
 - New here? Start with the [quick start](https://mga-ueda.github.io/MGA-Wwise-IM-Importer/manual.en.html#quickstart) (a single WAV is enough) and [preparing your material](https://mga-ueda.github.io/MGA-Wwise-IM-Importer/manual.en.html#prepare) (XML and marker rules)
 - In-app: project-bar **Manual (`?`)** (left of the gear; follows JP/EN)
 - Builds: [Releases](https://github.com/mga-ueda/MGA-Wwise-IM-Importer/releases)
+- Settings: `%LocalAppData%\MGA\MGA Wwise IM Importer\` (`settings.json` / `sessions\`; not written next to the exe)
 
 Wwise® / Audiokinetic® and Nuendo® / Cubase® / Steinberg® are trademarks of their respective owners. This tool is unofficial.

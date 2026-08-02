@@ -17,7 +17,6 @@ internal sealed class DarkDropDownComboBox : ComboBox
     private DropDownBorderWindow? _dropDownBorderWindow;
 
     // PaintStruct の ByValArray など、LibraryImport へ置き換えるとマーシャリングが壊れやすいため DllImport を維持する。
-#pragma warning disable SYSLIB1054
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
     private static extern int SetWindowTheme(IntPtr hWnd, string? pszSubAppName, string? pszSubIdList);
 
@@ -38,8 +37,6 @@ internal sealed class DarkDropDownComboBox : ComboBox
 
     [DllImport("user32.dll")]
     private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
-#pragma warning restore SYSLIB1054
-
     [StructLayout(LayoutKind.Sequential)]
     private struct NativeRect
     {

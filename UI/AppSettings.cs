@@ -1,15 +1,12 @@
-﻿using System.Globalization;
-using MgaWwiseIMImporter.Wave;
+﻿using MgaWwiseIMImporter.Wave;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// アプリ全体の作業設定（exe 横 INI の [App]）。プロジェクト切替では変わらない。
+/// アプリ全体の作業設定（AppData の settings.json / app）。プロジェクト切替では変わらない。
 /// </summary>
 internal sealed class AppSettings
 {
-    public const string Section = "App";
-
     public bool AlwaysOnTop { get; set; }
 
     /// <summary>UI／ログの表示言語（既定 ja）。</summary>
@@ -69,19 +66,13 @@ internal sealed class AppSettings
             ExpectedBitsPerSample,
             ExpectedChannels);
 
-    public static AppSettings Load()
+    public static AppSettings Load() => FromData(JsonSettingsStore.Document.App);
+
+    public void Save()
     {
-        var values = IniFile.ReadSection(Section);
-        var settings = Parse(values);
-        if (!HasKnownKeys(values))
-        {
-            settings.Save();
-        }
-
-        return settings;
+        var data = ToData();
+        JsonSettingsStore.Update(doc => doc.App = data);
     }
-
-    public void Save() => IniFile.WriteSection(Section, ToDictionary());
 
     public void SaveAlwaysOnTop(bool enabled)
     {
@@ -151,119 +142,63 @@ internal sealed class AppSettings
         Save();
     }
 
-    private Dictionary<string, string> ToDictionary() => new(StringComparer.OrdinalIgnoreCase)
+    private AppSettingsData ToData() => new()
     {
-        ["AlwaysOnTop"] = AlwaysOnTop ? "1" : "0",
-        ["UiLanguage"] = UiStrings.ToIniValue(UiLanguage),
-        ["SkippedUpdateVersion"] = SkippedUpdateVersion ?? string.Empty,
-        ["ShowTips"] = ShowTips ? "1" : "0",
-        ["AudioApi"] = AudioOutputSettings.ToIniValue(AudioApi),
-        ["AudioDeviceId"] = AudioDeviceId ?? string.Empty,
-        ["WaveformHeightScale"] = WaveformHeightScale.ToString(CultureInfo.InvariantCulture),
-        ["DefaultWaveformFadeInCurve"] = DefaultWaveformFadeInCurve.ToString(),
-        ["DefaultWaveformFadeOutCurve"] = DefaultWaveformFadeOutCurve.ToString(),
-        ["DefaultPlaylistFadeInCurve"] = DefaultPlaylistFadeInCurve.ToString(),
-        ["DefaultPlaylistFadeOutCurve"] = DefaultPlaylistFadeOutCurve.ToString(),
-        ["ExpectedSampleRateHz"] = ExpectedSampleRateHz.ToString(CultureInfo.InvariantCulture),
-        ["ExpectedBitsPerSample"] = ExpectedBitsPerSample.ToString(CultureInfo.InvariantCulture),
-        ["ExpectedChannels"] = ExpectedChannels.ToString(CultureInfo.InvariantCulture),
-        ["MetronomeVolume"] = MetronomeVolume.ToString("0.###", CultureInfo.InvariantCulture),
+        AlwaysOnTop = AlwaysOnTop,
+        UiLanguage = UiStrings.ToStoredValue(UiLanguage),
+        SkippedUpdateVersion = SkippedUpdateVersion ?? string.Empty,
+        ShowTips = ShowTips,
+        AudioApi = AudioOutputSettings.ToStoredValue(AudioApi),
+        AudioDeviceId = AudioDeviceId ?? string.Empty,
+        WaveformHeightScale = WaveformHeightScale,
+        DefaultWaveformFadeInCurve = DefaultWaveformFadeInCurve.ToString(),
+        DefaultWaveformFadeOutCurve = DefaultWaveformFadeOutCurve.ToString(),
+        DefaultPlaylistFadeInCurve = DefaultPlaylistFadeInCurve.ToString(),
+        DefaultPlaylistFadeOutCurve = DefaultPlaylistFadeOutCurve.ToString(),
+        ExpectedSampleRateHz = ExpectedSampleRateHz,
+        ExpectedBitsPerSample = ExpectedBitsPerSample,
+        ExpectedChannels = ExpectedChannels,
+        MetronomeVolume = MetronomeVolume,
     };
 
-    private static AppSettings Parse(Dictionary<string, string> values) => new()
+    private static AppSettings FromData(AppSettingsData data)
     {
-        AlwaysOnTop = IniFile.ReadBool(values, "AlwaysOnTop", defaultValue: false),
-        UiLanguage = values.TryGetValue("UiLanguage", out var languageText)
-            ? UiStrings.ParseLanguage(languageText)
-            : UiLanguage.Japanese,
-        SkippedUpdateVersion = values.TryGetValue("SkippedUpdateVersion", out var skipped)
-            ? AppVersion.NormalizeTag(skipped)
-            : string.Empty,
-        ShowTips = IniFile.ReadBool(values, "ShowTips", defaultValue: true),
-        AudioApi = values.TryGetValue("AudioApi", out var audioApiText)
-            ? AudioOutputSettings.ParseApi(audioApiText)
-            : AudioOutputApi.WaveOut,
-        AudioDeviceId = values.TryGetValue("AudioDeviceId", out var deviceId)
-            ? deviceId
-            : string.Empty,
-        WaveformHeightScale = values.TryGetValue("WaveformHeightScale", out var scaleText)
-            ? NormalizeWaveformHeightScale(scaleText)
-            : 1,
-        DefaultWaveformFadeInCurve = ParseFadeCurve(
-            values,
-            "DefaultWaveformFadeInCurve",
-            RegionEdgeFade.BuiltinWaveformFadeInCurve),
-        DefaultWaveformFadeOutCurve = ParseFadeCurve(
-            values,
-            "DefaultWaveformFadeOutCurve",
-            RegionEdgeFade.BuiltinWaveformFadeOutCurve),
-        DefaultPlaylistFadeInCurve = ParseFadeCurve(
-            values,
-            "DefaultPlaylistFadeInCurve",
-            RegionEdgeFade.BuiltinPlaylistFadeInCurve),
-        DefaultPlaylistFadeOutCurve = ParseFadeCurve(
-            values,
-            "DefaultPlaylistFadeOutCurve",
-            RegionEdgeFade.BuiltinPlaylistFadeOutCurve),
-        ExpectedSampleRateHz = ParseExpectedUInt(
-            values,
-            "ExpectedSampleRateHz",
-            ExpectedWaveformFormat.Default.SampleRateHz),
-        ExpectedBitsPerSample = (ushort)ParseExpectedUInt(
-            values,
-            "ExpectedBitsPerSample",
-            ExpectedWaveformFormat.Default.BitsPerSample),
-        ExpectedChannels = (ushort)ParseExpectedUInt(
-            values,
-            "ExpectedChannels",
-            ExpectedWaveformFormat.Default.Channels),
-        MetronomeVolume = values.TryGetValue("MetronomeVolume", out var metroVolumeText)
-            ? NormalizeMetronomeVolume(metroVolumeText)
-            : MetronomePlayer.DefaultVolume,
-    };
-
-    private static bool HasKnownKeys(Dictionary<string, string> values) =>
-        values.ContainsKey("AlwaysOnTop")
-        || values.ContainsKey("UiLanguage")
-        || values.ContainsKey("SkippedUpdateVersion")
-        || values.ContainsKey("ShowTips")
-        || values.ContainsKey("AudioApi")
-        || values.ContainsKey("AudioDeviceId")
-        || values.ContainsKey("WaveformHeightScale")
-        || values.ContainsKey("DefaultWaveformFadeInCurve")
-        || values.ContainsKey("DefaultWaveformFadeOutCurve")
-        || values.ContainsKey("DefaultPlaylistFadeInCurve")
-        || values.ContainsKey("DefaultPlaylistFadeOutCurve")
-        || values.ContainsKey("ExpectedSampleRateHz")
-        || values.ContainsKey("ExpectedBitsPerSample")
-        || values.ContainsKey("ExpectedChannels")
-        || values.ContainsKey("MetronomeVolume");
-
-    private static uint ParseExpectedUInt(
-        Dictionary<string, string> values,
-        string key,
-        uint fallback)
-    {
-        if (!values.TryGetValue(key, out var text)
-            || !uint.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value))
+        var settings = new AppSettings
         {
-            return fallback;
-        }
-
-        return key switch
-        {
-            "ExpectedSampleRateHz" => ExpectedWaveformFormat.Normalize((int)value, 24, 2).SampleRateHz,
-            "ExpectedBitsPerSample" => ExpectedWaveformFormat.Normalize(48_000, (int)value, 2).BitsPerSample,
-            "ExpectedChannels" => ExpectedWaveformFormat.Normalize(48_000, 24, (int)value).Channels,
-            _ => value,
+            AlwaysOnTop = data.AlwaysOnTop,
+            UiLanguage = UiStrings.ParseLanguage(data.UiLanguage),
+            SkippedUpdateVersion = AppVersion.NormalizeTag(data.SkippedUpdateVersion),
+            ShowTips = data.ShowTips,
+            AudioApi = AudioOutputSettings.ParseApi(data.AudioApi),
+            AudioDeviceId = data.AudioDeviceId ?? string.Empty,
+            WaveformHeightScale = NormalizeWaveformHeightScale(data.WaveformHeightScale),
+            DefaultWaveformFadeInCurve = ParseFadeCurve(
+                data.DefaultWaveformFadeInCurve,
+                RegionEdgeFade.BuiltinWaveformFadeInCurve),
+            DefaultWaveformFadeOutCurve = ParseFadeCurve(
+                data.DefaultWaveformFadeOutCurve,
+                RegionEdgeFade.BuiltinWaveformFadeOutCurve),
+            DefaultPlaylistFadeInCurve = ParseFadeCurve(
+                data.DefaultPlaylistFadeInCurve,
+                RegionEdgeFade.BuiltinPlaylistFadeInCurve),
+            DefaultPlaylistFadeOutCurve = ParseFadeCurve(
+                data.DefaultPlaylistFadeOutCurve,
+                RegionEdgeFade.BuiltinPlaylistFadeOutCurve),
+            MetronomeVolume = NormalizeMetronomeVolume(data.MetronomeVolume),
         };
+
+        var format = ExpectedWaveformFormat.Normalize(
+            (int)data.ExpectedSampleRateHz,
+            data.ExpectedBitsPerSample,
+            data.ExpectedChannels);
+        settings.ExpectedSampleRateHz = format.SampleRateHz;
+        settings.ExpectedBitsPerSample = format.BitsPerSample;
+        settings.ExpectedChannels = format.Channels;
+        return settings;
     }
 
-    private static RegionFadeCurveKind ParseFadeCurve(
-        Dictionary<string, string> values,
-        string key,
-        RegionFadeCurveKind fallback) =>
-        values.TryGetValue(key, out var text)
+    private static RegionFadeCurveKind ParseFadeCurve(string? text, RegionFadeCurveKind fallback) =>
+        !string.IsNullOrWhiteSpace(text)
         && Enum.TryParse<RegionFadeCurveKind>(text, ignoreCase: true, out var kind)
             ? kind
             : fallback;
@@ -278,25 +213,5 @@ internal sealed class AppSettings
         var clamped = Math.Clamp(volume, MetronomePlayer.MinVolume, MetronomePlayer.MaxVolume);
         var stepped = MathF.Round(clamped / MetronomePlayer.VolumeStep) * MetronomePlayer.VolumeStep;
         return Math.Clamp(stepped, MetronomePlayer.MinVolume, MetronomePlayer.MaxVolume);
-    }
-
-    private static float NormalizeMetronomeVolume(string? text)
-    {
-        if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var volume))
-        {
-            return NormalizeMetronomeVolume(volume);
-        }
-
-        return MetronomePlayer.DefaultVolume;
-    }
-
-    private static int NormalizeWaveformHeightScale(string? text)
-    {
-        if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var scale))
-        {
-            return NormalizeWaveformHeightScale(scale);
-        }
-
-        return 1;
     }
 }

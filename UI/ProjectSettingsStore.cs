@@ -1,10 +1,7 @@
-﻿using System.Globalization;
-using System.Text;
-
-namespace MgaWwiseIMImporter.UI;
+﻿namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// プロジェクト単位の作業設定（変更時オートセーブ）。exe 横 INI の [Projects] / [Project.*]。
+/// プロジェクト単位の作業設定（変更時オートセーブ）。AppData の settings.json / projects。
 /// </summary>
 internal sealed class ProjectProfile
 {
@@ -163,7 +160,6 @@ internal sealed class ProjectProfile
 internal sealed class ProjectSettingsStore
 {
     public const string DefaultName = "Default";
-    public const string IndexSection = "Projects";
 
     public static string NewProjectMenuItem => UiStrings.ProjectNewProjectMenuItem;
 
@@ -213,18 +209,25 @@ internal sealed class ProjectSettingsStore
     public static ProjectSettingsStore Load()
     {
         var store = new ProjectSettingsStore();
-        var index = IniFile.ReadSection(IndexSection);
-        if (index.Count == 0 || !index.ContainsKey("Names"))
+        var projects = JsonSettingsStore.Document.Projects ?? new ProjectsSettingsData();
+        if (projects.Items.Count == 0)
         {
             store.EnsureDefaultExists();
             store.WriteAll();
             return store;
         }
 
-        foreach (var name in ParseNames(index.TryGetValue("Names", out var namesText) ? namesText : string.Empty))
+        foreach (var item in projects.Items)
         {
+            var profile = item.ToProfile();
+            var name = profile.Name;
+            if (store._profiles.ContainsKey(name))
+            {
+                continue;
+            }
+
             store._names.Add(name);
-            store._profiles[name] = ReadProfile(name);
+            store._profiles[name] = profile;
         }
 
         if (store._names.Count == 0)
@@ -234,9 +237,9 @@ internal sealed class ProjectSettingsStore
             return store;
         }
 
-        var active = index.TryGetValue("Active", out var activeText)
-            ? activeText.Trim()
-            : DefaultName;
+        var active = string.IsNullOrWhiteSpace(projects.Active)
+            ? DefaultName
+            : projects.Active.Trim();
         store.ActiveName = store._profiles.ContainsKey(active)
             ? store._names.First(n => string.Equals(n, active, StringComparison.OrdinalIgnoreCase))
             : store._names[0];
@@ -304,8 +307,9 @@ internal sealed class ProjectSettingsStore
 
         try
         {
-            var path = LastWaveSessionState.SidecarPath(trimmed);
-            TextFileUtf8.WriteAllText(path, state.ToJson(), emitBom: true);
+            Directory.CreateDirectory(AppStorage.SessionsDirectory);
+            var path = LastWaveSessionState.SessionPath(trimmed);
+            TextFileUtf8.WriteAllText(path, state.ToJson(), emitBom: false);
         }
         catch
         {
@@ -322,7 +326,7 @@ internal sealed class ProjectSettingsStore
             return false;
         }
 
-        var path = LastWaveSessionState.SidecarPath(trimmed);
+        var path = LastWaveSessionState.SessionPath(trimmed);
         if (!File.Exists(path))
         {
             return false;
@@ -343,7 +347,7 @@ internal sealed class ProjectSettingsStore
     {
         try
         {
-            var path = LastWaveSessionState.SidecarPath(projectName);
+            var path = LastWaveSessionState.SessionPath(projectName);
             if (File.Exists(path))
             {
                 File.Delete(path);
@@ -359,8 +363,8 @@ internal sealed class ProjectSettingsStore
     {
         try
         {
-            var oldPath = LastWaveSessionState.SidecarPath(oldName);
-            var newPath = LastWaveSessionState.SidecarPath(newName);
+            var oldPath = LastWaveSessionState.SessionPath(oldName);
+            var newPath = LastWaveSessionState.SessionPath(newName);
             if (!File.Exists(oldPath))
             {
                 return;
@@ -444,7 +448,6 @@ internal sealed class ProjectSettingsStore
             }
 
             _profiles.Remove(trimmedCurrent);
-            IniFile.RemoveSection(ToSectionName(trimmedCurrent));
             RenameLastWaveSessionFile(trimmedCurrent, trimmedNew);
         }
 
@@ -465,7 +468,6 @@ internal sealed class ProjectSettingsStore
 
         _names.RemoveAll(n => string.Equals(n, trimmed, StringComparison.OrdinalIgnoreCase));
         _profiles.Remove(trimmed);
-        IniFile.RemoveSection(ToSectionName(trimmed));
         DeleteLastWaveSessionFile(trimmed);
 
         if (_names.Count == 0)
@@ -514,248 +516,38 @@ internal sealed class ProjectSettingsStore
         ActiveName = DefaultName;
     }
 
-    private void WriteAll()
+    private void WriteAll() => PersistProjects();
+
+    private void WriteIndex() => PersistProjects();
+
+    private void WriteProfile(string name, ProjectProfile profile)
     {
+        _profiles[name] = profile.Clone();
+        PersistProjects();
+    }
+
+    private void PersistProjects()
+    {
+        var items = new List<ProjectProfileData>(_names.Count);
         foreach (var name in _names)
         {
-            WriteProfile(name, _profiles[name]);
-        }
-
-        WriteIndex();
-    }
-
-    private void WriteIndex()
-    {
-        IniFile.WriteSection(IndexSection, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Active"] = ActiveName,
-            ["Names"] = string.Join("|", _names),
-        });
-    }
-
-    private static void WriteProfile(string name, ProjectProfile profile)
-    {
-        IniFile.WriteSection(ToSectionName(name), new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["Name"] = profile.Name,
-            ["FadeInSeconds"] = profile.FadeInSeconds.ToString(CultureInfo.InvariantCulture),
-            ["FadeOutSeconds"] = profile.FadeOutSeconds.ToString(CultureInfo.InvariantCulture),
-            ["FadeInCurve"] = profile.FadeInCurve,
-            ["FadeOutCurve"] = profile.FadeOutCurve,
-            ["ExitSourceAt"] = profile.ExitSourceAt.ToString(),
-            ["PlayPostExit"] = profile.PlayPostExit ? "1" : "0",
-            ["GridOverride"] = profile.GridOverride.ToString(),
-            ["CommentDigits"] = Math.Clamp(
-                    profile.CommentDigits,
-                    MarkerSettings.CommentDigitsMin,
-                    MarkerSettings.CommentDigitsMax)
-                .ToString(CultureInfo.InvariantCulture),
-            ["CommentZeroPad"] = profile.CommentZeroPad ? "1" : "0",
-            ["CommentPrefix"] = profile.CommentPrefix,
-            ["CommentSuffix"] = profile.CommentSuffix,
-            ["CommentJoiner"] = profile.CommentJoiner,
-            ["CommentResetPerPart"] = profile.CommentResetPerPart ? "1" : "0",
-            ["CompactFileNumbers"] = profile.CompactFileNumbers ? "1" : "0",
-            ["OutputDirectory"] = profile.OutputDirectory,
-            ["StreamEnabled"] = profile.StreamEnabled ? "1" : "0",
-            ["AutoActive"] = profile.AutoActive ? "1" : "0",
-            ["LookAheadMs"] = Math.Clamp(profile.LookAheadMs, 0, 9999)
-                .ToString(CultureInfo.InvariantCulture),
-            ["PrefetchLengthMs"] = Math.Clamp(profile.PrefetchLengthMs, 0, 9999)
-                .ToString(CultureInfo.InvariantCulture),
-            ["LoudnessPreserveGroupBalance"] = profile.LoudnessPreserveGroupBalance ? "1" : "0",
-            ["MoreOptionsExpanded"] = profile.MoreOptionsExpanded ? "1" : "0",
-            ["KeepLastSession"] = profile.KeepLastSession ? "1" : "0",
-            ["LastWavePath"] = profile.LastWavePath,
-            ["LastWavePaths"] = profile.LastWavePaths,
-            ["KeepTarget"] = profile.KeepTarget ? "1" : "0",
-            ["KeptTargetPath"] = profile.KeptTargetPath,
-            ["KeptTargetProjectFilePath"] = profile.KeptTargetProjectFilePath,
-        });
-    }
-
-    private static ProjectProfile ReadProfile(string name)
-    {
-        var values = IniFile.ReadSection(ToSectionName(name));
-        var profile = CreateAppDefaults(name);
-        if (values.TryGetValue("Name", out var storedName) && storedName.Trim().Length > 0)
-        {
-            profile.Name = storedName.Trim();
-        }
-
-        if (values.TryGetValue("FadeInSeconds", out var fadeInText)
-            && double.TryParse(fadeInText, NumberStyles.Float, CultureInfo.InvariantCulture, out var fadeIn))
-        {
-            profile.FadeInSeconds = fadeIn;
-        }
-
-        if (values.TryGetValue("FadeOutSeconds", out var fadeOutText)
-            && double.TryParse(fadeOutText, NumberStyles.Float, CultureInfo.InvariantCulture, out var fadeOut))
-        {
-            profile.FadeOutSeconds = fadeOut;
-        }
-
-        if (values.TryGetValue("FadeInCurve", out var fadeInCurve)
-            && !string.IsNullOrWhiteSpace(fadeInCurve))
-        {
-            profile.FadeInCurve = fadeInCurve.Trim();
-        }
-
-        if (values.TryGetValue("FadeOutCurve", out var fadeOutCurve)
-            && !string.IsNullOrWhiteSpace(fadeOutCurve))
-        {
-            profile.FadeOutCurve = fadeOutCurve.Trim();
-        }
-
-        if (values.TryGetValue("ExitSourceAt", out var exitText)
-            && Enum.TryParse<PlaylistExitSourceMode>(exitText, ignoreCase: true, out var exitMode))
-        {
-            profile.ExitSourceAt = exitMode;
-        }
-
-        profile.PlayPostExit = IniFile.ReadBool(values, "PlayPostExit", profile.PlayPostExit);
-
-        if (values.TryGetValue("GridOverride", out var gridText)
-            && Enum.TryParse<MarkerGridOverrideMode>(gridText, ignoreCase: true, out var gridMode))
-        {
-            profile.GridOverride = gridMode;
-        }
-
-        if (values.TryGetValue("CommentDigits", out var digitsText)
-            && int.TryParse(digitsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var digits))
-        {
-            profile.CommentDigits = Math.Clamp(
-                digits,
-                MarkerSettings.CommentDigitsMin,
-                MarkerSettings.CommentDigitsMax);
-        }
-
-        profile.CommentZeroPad = IniFile.ReadBool(values, "CommentZeroPad", profile.CommentZeroPad);
-        profile.CommentResetPerPart = IniFile.ReadBool(values, "CommentResetPerPart", profile.CommentResetPerPart);
-        profile.CompactFileNumbers = IniFile.ReadBool(values, "CompactFileNumbers", profile.CompactFileNumbers);
-
-        if (values.TryGetValue("CommentPrefix", out var prefix))
-        {
-            profile.CommentPrefix = prefix;
-        }
-
-        if (values.TryGetValue("CommentSuffix", out var suffix))
-        {
-            profile.CommentSuffix = suffix;
-        }
-
-        if (values.TryGetValue("CommentJoiner", out var joiner))
-        {
-            profile.CommentJoiner = joiner;
-        }
-
-        profile.CommentPrefixEnabled = profile.CommentPrefix.Length > 0;
-        profile.CommentSuffixEnabled = profile.CommentSuffix.Length > 0;
-        profile.CommentJoinerEnabled = profile.CommentJoiner.Length > 0;
-
-        if (values.TryGetValue("OutputDirectory", out var output))
-        {
-            profile.OutputDirectory = output;
-        }
-
-        profile.StreamEnabled = IniFile.ReadBool(values, "StreamEnabled", defaultValue: true);
-        profile.AutoActive = IniFile.ReadBool(values, "AutoActive", defaultValue: true);
-
-        if (values.TryGetValue("LookAheadMs", out var lookAheadText)
-            && int.TryParse(lookAheadText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var lookAheadMs))
-        {
-            profile.LookAheadMs = Math.Clamp(lookAheadMs, 0, 9999);
-        }
-
-        if (values.TryGetValue("PrefetchLengthMs", out var prefetchText)
-            && int.TryParse(prefetchText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var prefetchMs))
-        {
-            profile.PrefetchLengthMs = Math.Clamp(prefetchMs, 0, 9999);
-        }
-
-        profile.LoudnessPreserveGroupBalance = IniFile.ReadBool(
-            values,
-            "LoudnessPreserveGroupBalance",
-            defaultValue: false);
-
-        profile.MoreOptionsExpanded = IniFile.ReadBool(
-            values,
-            "MoreOptionsExpanded",
-            defaultValue: true);
-
-        profile.KeepLastSession = IniFile.ReadBool(
-            values,
-            "KeepLastSession",
-            defaultValue: true);
-        if (values.TryGetValue("LastWavePath", out var lastWave))
-        {
-            profile.LastWavePath = lastWave.Trim().Trim('"');
-        }
-
-        if (values.TryGetValue("LastWavePaths", out var lastWaves))
-        {
-            profile.LastWavePaths = lastWaves.Trim().Trim('"');
-        }
-
-        profile.KeepTarget = IniFile.ReadBool(
-            values,
-            "KeepTarget",
-            defaultValue: false);
-        if (values.TryGetValue("KeptTargetPath", out var keptTargetPath))
-        {
-            profile.KeptTargetPath = keptTargetPath.Trim().Trim('"');
-        }
-
-        if (values.TryGetValue("KeptTargetProjectFilePath", out var keptTargetProject))
-        {
-            profile.KeptTargetProjectFilePath = keptTargetProject.Trim().Trim('"');
-        }
-
-        return profile;
-    }
-
-    private static IEnumerable<string> ParseNames(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            yield break;
-        }
-
-        foreach (var part in text.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (part.Length > 0
-                && !string.Equals(part, NewProjectMenuItem, StringComparison.OrdinalIgnoreCase))
+            if (_profiles.TryGetValue(name, out var profile))
             {
-                yield return part;
+                items.Add(ProjectProfileData.FromProfile(profile));
             }
         }
+
+        var active = ActiveName;
+        JsonSettingsStore.Update(doc =>
+        {
+            doc.Projects = new ProjectsSettingsData
+            {
+                Active = active,
+                Items = items,
+            };
+        });
     }
 
     private static string NormalizeName(string name) => name.Trim();
-
-    internal static string ToSectionName(string projectName)
-    {
-        // セクション名に使えない文字を避けつつ、表示名は Name キーに保持する。
-        var sb = new StringBuilder(projectName.Length);
-        foreach (var ch in projectName)
-        {
-            if (ch is '[' or ']' or '\r' or '\n' or '=')
-            {
-                sb.Append('_');
-            }
-            else
-            {
-                sb.Append(ch);
-            }
-        }
-
-        var safe = sb.ToString().Trim();
-        if (safe.Length == 0)
-        {
-            safe = "Unnamed";
-        }
-
-        return "Project." + safe;
-    }
 
 }

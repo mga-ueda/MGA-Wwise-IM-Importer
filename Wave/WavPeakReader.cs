@@ -31,10 +31,7 @@ internal static class WavPeakReader
         long endFrame,
         int peakCount)
     {
-        if (peakCount <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(peakCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(peakCount);
 
         if (info.FrameCount <= 0 || info.BlockAlign == 0 || info.Channels == 0)
         {

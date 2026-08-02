@@ -45,6 +45,31 @@ internal static class WaapiMusicImporter
 
     /// <summary>MusicFade.FadeType: Fade-out。</summary>
     private const int MusicFadeTypeOut = 1;
+
+    private static readonly string[] ReturnFieldsIdNameTypePath =
+        ["id", "name", "type", "path"];
+
+    private static readonly string[] MusicTransitionReturnFields =
+    [
+        "id",
+        "name",
+        "@DestinationContextType",
+        "@DestinationContextObject",
+        "@DestinationContextObject.name",
+        "@DestinationContextObject.path",
+        "@DestinationContextObject.id",
+    ];
+
+    private static readonly string[] ReturnFieldsIdPath = ["id", "path"];
+
+    private static readonly string[] StatePropertiesVolume = ["Volume"];
+
+    private static readonly string[] ReturnFieldsIdNameType = ["id", "name", "type"];
+
+    private static readonly string[] ReturnFieldsId = ["id"];
+
+    private static readonly string[] ReturnFieldsFilePath = ["filePath"];
+
     public static async Task<string> ImportAsync(
         WaapiSettings waapiSettings,
         WwiseImportSettings importSettings,
@@ -141,7 +166,7 @@ internal static class WaapiMusicImporter
         using var client = new WaapiHttpClient(waapiSettings.Url, timeout);
         var returnOptions = new Dictionary<string, object>
         {
-            ["return"] = new[] { "id", "name", "type", "path" },
+            ["return"] = ReturnFieldsIdNameTypePath,
         };
 
         // 一括 object.set だと長時間 UI が止まったように見えるため、段階的に投げて進捗を出す。
@@ -609,16 +634,7 @@ internal static class WaapiMusicImporter
                 },
                 new Dictionary<string, object?>
                 {
-                    ["return"] = new[]
-                    {
-                        "id",
-                        "name",
-                        "@DestinationContextType",
-                        "@DestinationContextObject",
-                        "@DestinationContextObject.name",
-                        "@DestinationContextObject.path",
-                        "@DestinationContextObject.id",
-                    },
+                    ["return"] = MusicTransitionReturnFields,
                 },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -761,7 +777,7 @@ internal static class WaapiMusicImporter
                     },
                     new Dictionary<string, object?>
                     {
-                        ["return"] = new[] { "id", "path" },
+                        ["return"] = ReturnFieldsIdPath,
                     },
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -1216,7 +1232,7 @@ internal static class WaapiMusicImporter
                             new Dictionary<string, object?>
                             {
                                 ["object"] = trackPath,
-                                ["stateProperties"] = new[] { "Volume" },
+                                ["stateProperties"] = StatePropertiesVolume,
                             },
                             cancellationToken: cancellationToken)
                         .ConfigureAwait(false);
@@ -1459,7 +1475,7 @@ internal static class WaapiMusicImporter
                 },
                 new Dictionary<string, object?>
                 {
-                    ["return"] = new[] { "id", "name", "type" },
+                    ["return"] = ReturnFieldsIdNameType,
                 },
                 cancellationToken)
             .ConfigureAwait(false);
@@ -3626,7 +3642,7 @@ internal static class WaapiMusicImporter
                 var result = await client.CallAsync(
                         "ak.wwise.core.object.get",
                         new Dictionary<string, object?> { ["waql"] = "$ from type Project" },
-                        new Dictionary<string, object?> { ["return"] = new[] { "id" } },
+                        new Dictionary<string, object?> { ["return"] = ReturnFieldsId },
                         CancellationToken.None)
                     .ConfigureAwait(false);
                 if (!result.TryGetProperty("return", out var arr)
@@ -3669,7 +3685,7 @@ internal static class WaapiMusicImporter
                 var result = await client.CallAsync(
                         "ak.wwise.core.object.get",
                         new Dictionary<string, object?> { ["waql"] = "$ from type Project" },
-                        new Dictionary<string, object?> { ["return"] = new[] { "filePath" } },
+                        new Dictionary<string, object?> { ["return"] = ReturnFieldsFilePath },
                         CancellationToken.None)
                     .ConfigureAwait(false);
                 if (result.TryGetProperty("return", out var arr)
@@ -3892,7 +3908,7 @@ internal static class WaapiMusicImporter
                 },
                 new Dictionary<string, object?>
                 {
-                    ["return"] = new[] { "id", "name", "type", "path" },
+                    ["return"] = ReturnFieldsIdNameTypePath,
                 },
                 cancellationToken)
             .ConfigureAwait(false);

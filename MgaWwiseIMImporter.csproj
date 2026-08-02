@@ -7,7 +7,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MgaWwiseIMImporter</RootNamespace>
-    <AssemblyName>MgaWwiseIMImporter</AssemblyName>
+    <AssemblyName>MGA Wwise IM Importer</AssemblyName>
     <Product>MGA Wwise IM Importer</Product>
     <ApplicationTitle>MGA Wwise IM Importer</ApplicationTitle>
     <ApplicationIcon>Assets\Branding\MgaWwiseIMImporter.ico</ApplicationIcon>
@@ -26,6 +26,8 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <!-- 配布 zip に pdb（デバッグ記号）は含めない。開発用 bin 出力には残る。 -->
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <!-- Win32 P/Invoke は DllImport 維持（LibraryImport は ByValArray 等で壊れやすい）。 -->
+    <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,7 +45,7 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
-    <!-- INI 等が ANSI(CP932) で保存されていても読めるようにする。 -->
+    <!-- テキスト読み取りで ANSI(CP932) フォールバックできるようにする。 -->
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 

@@ -960,7 +960,7 @@ internal sealed class WaveAudioPlayer : IDisposable
         if (_provider is null)
         {
             Trace(
-                $"audio.output-settings api={AudioOutputSettings.ToIniValue(settings.Api)}"
+                $"audio.output-settings api={AudioOutputSettings.ToStoredValue(settings.Api)}"
                 + $" device='{settings.DeviceId}' (deferred)");
             return;
         }
@@ -1010,7 +1010,7 @@ internal sealed class WaveAudioPlayer : IDisposable
         {
             DisposeOutputOnly();
             var message =
-                $"Output init failed ({AudioOutputSettings.ToIniValue(_outputSettings.Api)}"
+                $"Output init failed ({AudioOutputSettings.ToStoredValue(_outputSettings.Api)}"
                 + $" '{_outputSettings.DeviceId}'): {ex.Message}; falling back to WaveOut default.";
             Trace($"audio.output-fallback {message}");
             Diagnostic?.Invoke(this, message);
@@ -1029,7 +1029,7 @@ internal sealed class WaveAudioPlayer : IDisposable
 
         _output.PlaybackStopped += OnPlaybackStopped;
         Trace(
-            $"audio.output-ready api={AudioOutputSettings.ToIniValue(_outputSettings.Api)}"
+            $"audio.output-ready api={AudioOutputSettings.ToStoredValue(_outputSettings.Api)}"
             + $" device='{_outputSettings.DeviceId}'"
             + $" type={_output.GetType().Name}");
     }

@@ -38,7 +38,7 @@ internal readonly record struct AudioOutputSettings(AudioOutputApi Api, string D
         return AudioOutputApi.WaveOut;
     }
 
-    public static string ToIniValue(AudioOutputApi api) => api switch
+    public static string ToStoredValue(AudioOutputApi api) => api switch
     {
         AudioOutputApi.Wasapi => "Wasapi",
         AudioOutputApi.Asio => "Asio",

@@ -7,7 +7,7 @@ namespace MgaWwiseIMImporter.UI;
 /// <summary>
 /// アプリ版の単一ソース。csproj の <c>Version</c>（SemVer）を表示・比較・GitHub タグ照合に共通利用する。
 /// </summary>
-internal static class AppVersion
+internal static partial class AppVersion
 {
     public const string GitHubOwner = "mga-ueda";
     public const string GitHubRepo = "MGA-Wwise-IM-Importer";
@@ -125,10 +125,7 @@ internal static class AppVersion
         }
 
         // 1.0.2 / 1.0.2-beta / 1.0.2-beta.2
-        var match = Regex.Match(
-            normalized,
-            @"^(?<maj>\d+)\.(?<min>\d+)\.(?<pat>\d+)(?:-(?<pre>[0-9A-Za-z\.-]+))?$",
-            RegexOptions.CultureInvariant);
+        var match = SemVerRegex().Match(normalized);
         if (!match.Success)
         {
             return false;
@@ -141,6 +138,11 @@ internal static class AppVersion
             match.Groups["pre"].Success ? match.Groups["pre"].Value : null);
         return true;
     }
+
+    [GeneratedRegex(
+        @"^(?<maj>\d+)\.(?<min>\d+)\.(?<pat>\d+)(?:-(?<pre>[0-9A-Za-z\.-]+))?$",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex SemVerRegex();
 
     /// <summary>SemVer 風: 同じ数値なら、プレリリース無しが新しい。</summary>
     private static int Compare(ParsedVersion left, ParsedVersion right)

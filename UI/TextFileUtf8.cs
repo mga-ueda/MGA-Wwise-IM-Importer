@@ -19,35 +19,9 @@ internal static class TextFileUtf8
         return DecodeBytes(bytes);
     }
 
-    public static string[] ReadAllLines(string path)
-    {
-        var text = ReadAllText(path);
-        if (text.Length == 0)
-        {
-            return [];
-        }
-
-        // File.ReadAllLines と同様、末尾の改行による空要素は付けない。
-        var normalized = text.Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n');
-        if (normalized.EndsWith('\n'))
-        {
-            normalized = normalized[..^1];
-        }
-
-        return normalized.Length == 0 ? [] : normalized.Split('\n');
-    }
-
-    public static IEnumerable<string> ReadLines(string path) => ReadAllLines(path);
-
     public static void WriteAllText(string path, string contents, bool emitBom = true)
     {
         File.WriteAllText(path, contents, emitBom ? Utf8WithBom : Utf8NoBom);
-    }
-
-    public static void WriteAllLines(string path, IEnumerable<string> lines, bool emitBom = true)
-    {
-        File.WriteAllLines(path, lines, emitBom ? Utf8WithBom : Utf8NoBom);
     }
 
     private static string DecodeBytes(byte[] bytes)
