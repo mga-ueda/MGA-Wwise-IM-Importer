@@ -41,6 +41,18 @@ internal static class FlatOptionGlyph
     public static int GlyphGap(Control? c = null) => DesignMetrics.Px(GlyphGapDesign, c);
 
     public static int TextGap(Control? c = null) => DesignMetrics.Px(TextGapDesign, c);
+
+    /// <summary>
+    /// グリフ＋ラベル相当のヒット領域か。列幅まで伸ばしたコントロールの余白クリックを除外する。
+    /// </summary>
+    public static bool IsInContentHitArea(Control control, Point clientPoint, Size preferredSize)
+    {
+        var width = Math.Clamp(preferredSize.Width, 1, Math.Max(1, control.Width));
+        return clientPoint.X >= 0
+            && clientPoint.Y >= 0
+            && clientPoint.X < width
+            && clientPoint.Y < control.Height;
+    }
 }
 
 internal sealed class FlatOptionRadioButton : RadioButton
@@ -102,16 +114,40 @@ internal sealed class FlatOptionRadioButton : RadioButton
 
     protected override void OnMouseEnter(EventArgs e)
     {
-        _hovered = true;
-        Invalidate();
+        UpdateHover(PointToClient(Control.MousePosition));
         base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        UpdateHover(e.Location);
+        base.OnMouseMove(e);
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
-        _hovered = false;
-        Invalidate();
+        SetHovered(false);
         base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (!IsInContentHitArea(e.Location))
+        {
+            return;
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (!IsInContentHitArea(e.Location))
+        {
+            return;
+        }
+
+        base.OnMouseUp(e);
     }
 
     protected override void OnCheckedChanged(EventArgs e)
@@ -154,6 +190,22 @@ internal sealed class FlatOptionRadioButton : RadioButton
         }
 
         DrawText(g, glyphSize);
+    }
+
+    private bool IsInContentHitArea(Point clientPoint) =>
+        FlatOptionGlyph.IsInContentHitArea(this, clientPoint, GetPreferredSize(Size.Empty));
+
+    private void UpdateHover(Point clientPoint) => SetHovered(IsInContentHitArea(clientPoint));
+
+    private void SetHovered(bool hovered)
+    {
+        if (_hovered == hovered)
+        {
+            return;
+        }
+
+        _hovered = hovered;
+        Invalidate();
     }
 
     private Color ResolveBorderColor() =>
@@ -231,16 +283,40 @@ internal sealed class FlatOptionCheckBox : CheckBox
 
     protected override void OnMouseEnter(EventArgs e)
     {
-        _hovered = true;
-        Invalidate();
+        UpdateHover(PointToClient(Control.MousePosition));
         base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        UpdateHover(e.Location);
+        base.OnMouseMove(e);
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
-        _hovered = false;
-        Invalidate();
+        SetHovered(false);
         base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        if (!IsInContentHitArea(e.Location))
+        {
+            return;
+        }
+
+        base.OnMouseDown(e);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        if (!IsInContentHitArea(e.Location))
+        {
+            return;
+        }
+
+        base.OnMouseUp(e);
     }
 
     protected override void OnCheckedChanged(EventArgs e)
@@ -309,6 +385,22 @@ internal sealed class FlatOptionCheckBox : CheckBox
             new Rectangle(textLeft, 0, Math.Max(0, Width - textLeft), Height),
             Enabled ? ForeColor : UiColors.OptionGlyphDisabled,
             GetTextFormatFlags());
+    }
+
+    private bool IsInContentHitArea(Point clientPoint) =>
+        FlatOptionGlyph.IsInContentHitArea(this, clientPoint, GetPreferredSize(Size.Empty));
+
+    private void UpdateHover(Point clientPoint) => SetHovered(IsInContentHitArea(clientPoint));
+
+    private void SetHovered(bool hovered)
+    {
+        if (_hovered == hovered)
+        {
+            return;
+        }
+
+        _hovered = hovered;
+        Invalidate();
     }
 
     private TextFormatFlags GetTextFormatFlags()

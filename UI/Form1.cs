@@ -457,6 +457,7 @@ public partial class Form1 : Form, IMessageFilter
         actionControlsPanel.Controls.Remove(detailedLogCheckBox);
 #endif
         RestoreWindowBounds();
+        ApplyCopyrightTextAndLinks();
         LayoutActionBarCopyright();
         ApplyFixedUiMetrics();
 
@@ -602,13 +603,20 @@ public partial class Form1 : Form, IMessageFilter
     bool IMessageFilter.PreFilterMessage(ref Message m)
     {
         const int wmLButtonDown = 0x0201;
+        const int wmLButtonDblClk = 0x0203;
         const int wmRButtonDown = 0x0204;
+        const int wmRButtonDblClk = 0x0206;
         const int wmMButtonDown = 0x0207;
-        if (m.Msg is wmLButtonDown or wmRButtonDown or wmMButtonDown)
+        const int wmMButtonDblClk = 0x0209;
+        // ダブルクリックは 2 回目が *_DBLCLK になり DOWN が来ないため、両方拾う。
+        if (m.Msg is wmLButtonDown or wmLButtonDblClk
+            or wmRButtonDown or wmRButtonDblClk
+            or wmMButtonDown or wmMButtonDblClk)
         {
-            // 操作系 UI は Selectable=false が多く、クリックしてもログからフォーカスが移らない。
-            // ログ外をクリックしたら波形へ戻し、ジャンプ系などのショートカットを復帰させる。
+            // 操作系 UI は Selectable=false が多く、クリックしてもログ／TextBox からフォーカスが移らない。
+            // 外側をクリックしたら波形へ戻し、ジャンプ系などのショートカットを復帰させる。
             TryReleaseLogFocusOnOutsideMouseDown();
+            TryReleaseMarkerOptionsFocusOnOutsideMouseDown();
             return false;
         }
 
@@ -658,6 +666,36 @@ public partial class Form1 : Form, IMessageFilter
         }
 
         ReleaseFocusToWaveform();
+    }
+
+    /// <summary>
+    /// More Options の TextBox 以外をクリックしたとき、残ったキャレットを消して波形へ戻す。
+    /// （チェックやラベルは Selectable=false のため、クリックだけではフォーカスが移らない）
+    /// 余白クリック後に Prefetch 等へ吸われた場合も、ここでの遅延チェックで波形へ戻す。
+    /// </summary>
+    private void TryReleaseMarkerOptionsFocusOnOutsideMouseDown()
+    {
+        if (IsDisposed || !Visible || !ContainsFocus)
+        {
+            return;
+        }
+
+        if (markerOptionsPanel.IsPointerOverEditableTextBox())
+        {
+            return;
+        }
+
+        // クリック処理後に次の TabStop（Prefetch Length）へ吸われることがあるため遅延で戻す。
+        // PreFilter 時点ではまだ TextBox にいない場合もあるので、ここでの早期 return はしない。
+        BeginInvoke(() =>
+        {
+            if (IsDisposed || !Visible || !markerOptionsPanel.HasEditableTextBoxFocus)
+            {
+                return;
+            }
+
+            ReleaseFocusToWaveform(forceTextBoxRelease: true);
+        });
     }
 
     protected override void OnShown(EventArgs e)
@@ -2035,9 +2073,12 @@ public partial class Form1 : Form, IMessageFilter
     /// <summary>
     /// 操作系コントロールへフォーカスが残ると ↑↓ がフォーカス移動になるため、波形へ戻す。
     /// </summary>
-    private void ReleaseFocusToWaveform()
+    /// <param name="forceTextBoxRelease">
+    /// true のとき、More Options 等の通常 TextBox からもフォーカスを奪う（外側クリック用）。
+    /// </param>
+    private void ReleaseFocusToWaveform(bool forceTextBoxRelease = false)
     {
-        if (waveformView is not { IsHandleCreated: true, CanFocus: true })
+        if (waveformView is not { IsHandleCreated: true, Visible: true, Enabled: true })
         {
             return;
         }
@@ -2051,7 +2092,8 @@ public partial class Form1 : Form, IMessageFilter
         // プロジェクト書き出し先（ReadOnly）とプロジェクト名コンボは例外で波形へ戻す。
         // （コンボの子 EDIT を通常 TextBox と誤判定すると、全選択ハイライトが残る）
         // Form.ActiveControl は UserControl 止まりのため、入れ子の ActiveControl を辿る。
-        if (GetDeepActiveControl() is TextBox textBox
+        if (!forceTextBoxRelease
+            && GetDeepActiveControl() is TextBox textBox
             && !ReferenceEquals(textBox, projectOutputPathTextBox)
             && !projectNameComboBox.ContainsFocus)
         {
@@ -2063,7 +2105,18 @@ public partial class Form1 : Form, IMessageFilter
             projectNameComboBox.DismissTransientSelection();
         }
 
-        waveformView.Focus();
+        // TabStop=false だと Focus に失敗しやすく、成功直後に false へ戻すと
+        // 次の TabStop（More Options の Prefetch Length）へ弾かれて交互フォーカスになる。
+        // フォーカスを波形に置くあいだは TabStop を true のままにする（SetPreview で再設定される）。
+        if (!waveformView.TabStop)
+        {
+            waveformView.TabStop = true;
+        }
+
+        if (!waveformView.Focus())
+        {
+            ActiveControl = waveformView;
+        }
     }
 
     /// <summary>入れ子の ContainerControl を辿った、実際にフォーカスを持つコントロール。</summary>
@@ -2327,6 +2380,8 @@ public partial class Form1 : Form, IMessageFilter
 
     private void ApplyActionBarTextColors()
     {
+        // Transparent だと自前描画の下地が親とずれることがあるため、帯色を明示する。
+        copyrightLinkLabel.BackColor = actionBar.BackColor;
         copyrightLinkLabel.ForeColor = UiColors.ActionCopyrightFore;
         copyrightLinkLabel.LinkColor = UiColors.ActionLinkFore;
         copyrightLinkLabel.ActiveLinkColor = UiColors.ActionLinkHoverFore;
@@ -2334,7 +2389,7 @@ public partial class Form1 : Form, IMessageFilter
     }
 
     /// <summary>
-    /// 権利表記をロゴ下端に揃え、右側の操作群（Debug Log 等）と重ならない幅に抑える。
+    /// 権利表記をアクションバー内で高さ中央に置き、右側の操作群と重ならない幅に抑える。
     /// </summary>
     private void LayoutActionBarCopyright()
     {
@@ -2347,8 +2402,15 @@ public partial class Form1 : Form, IMessageFilter
         actionControlsPanel.BringToFront();
         brandLogoPictureBox.BringToFront();
 
-        // 折り返しで 3 行になると BottomLeft 固定高で © 行が上に消えるため、高さを 2 行分に確定する。
-        copyrightLinkLabel.Height = MeasureCopyrightPreferredHeight();
+        // Bottom アンカーが残っていると縦中央が効かない。
+        copyrightLinkLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+
+        // 明示 3 行の高さを確定（折り返しで上の行が見切れないようにする）。
+        var preferredHeight = MeasureCopyrightPreferredHeight();
+        var minTop = Math.Max(0, actionBar.Padding.Top);
+        var maxBottom = actionBar.ClientSize.Height - Math.Max(0, actionBar.Padding.Bottom);
+        var maxHeight = Math.Max(1, maxBottom - minTop);
+        copyrightLinkLabel.Height = Math.Min(preferredHeight, maxHeight);
 
         var gap = DesignMetrics.Px(18, this);
         var left = copyrightLinkLabel.Left;
@@ -2373,12 +2435,13 @@ public partial class Form1 : Form, IMessageFilter
             copyrightLinkLabel.Width = Math.Max(DesignMetrics.Px(120, this), available);
         }
 
-        var top = brandLogoPictureBox.Bottom - copyrightLinkLabel.Height;
-        copyrightLinkLabel.Top = Math.Max(DesignMetrics.Px(3, this), top);
+        // アクションバー内容領域の高さ中央へ（ロゴ下端揃えだと塊が上寄りに見える）。
+        var top = minTop + Math.Max(0, (maxHeight - copyrightLinkLabel.Height) / 2);
+        copyrightLinkLabel.Top = Math.Clamp(top, minTop, Math.Max(minTop, maxBottom - copyrightLinkLabel.Height));
     }
 
     /// <summary>
-    /// 権利表記 2 行が折り返しなしで収まる幅。
+    /// 権利表記が折り返しなしで収まる幅。
     /// SmoothLinkLabel は GDI+ 描画のため MeasureString で測る（TextRenderer だと ® 等で狭く見積もる）。
     /// </summary>
     private int MeasureCopyrightPreferredWidth()
@@ -2403,26 +2466,49 @@ public partial class Form1 : Form, IMessageFilter
         return (int)Math.Ceiling(width) + DesignMetrics.Px(12, this);
     }
 
-    /// <summary>権利表記の明示 2 行を実測し、150% 設計の余白を足した高さ。</summary>
+    /// <summary>
+    /// 権利表記 3 行の高さ。<see cref="SmoothLinkLabel.LineHeightScale"/> 込みで帯内に収める。
+    /// </summary>
     private int MeasureCopyrightPreferredHeight()
     {
         if (copyrightLinkLabel is null)
         {
-            return DesignMetrics.Px(45, this);
+            return DesignMetrics.Px(30, this);
         }
 
+        var scale = copyrightLinkLabel.LineHeightScale;
         var textHeight = 0f;
         using (var g = copyrightLinkLabel.CreateGraphics())
         {
-            foreach (var line in copyrightLinkLabel.Text.Split('\n'))
-            {
-                textHeight += g.MeasureString(
-                    string.IsNullOrEmpty(line) ? " " : line,
-                    copyrightLinkLabel.Font).Height;
-            }
+            var lineH = copyrightLinkLabel.Font.GetHeight(g) * scale;
+            var lines = copyrightLinkLabel.Text.Split('\n').Length;
+            textHeight = lineH * Math.Max(1, lines);
         }
 
-        return (int)Math.Ceiling(textHeight) + DesignMetrics.Px(9, this);
+        // コンパクト描画時の nudge は半量。見切れ防止の最小余白のみ。
+        var nudge = DesignMetrics.VisualTextNudgeY(copyrightLinkLabel) * (scale < 0.999f ? 0.5f : 1f);
+        return (int)Math.Ceiling(textHeight + nudge) + DesignMetrics.Px(2, this);
+    }
+
+    /// <summary>フッタ権利表記の本文と GitHub／ライセンスリンクを設定する。</summary>
+    private void ApplyCopyrightTextAndLinks()
+    {
+        copyrightLinkLabel.Text = UiStrings.CopyrightText;
+        copyrightLinkLabel.Links.Clear();
+        var text = copyrightLinkLabel.Text;
+        const string github = "GitHub";
+        var license = UiStrings.CopyrightLicenseLinkText;
+        var githubAt = text.IndexOf(github, StringComparison.Ordinal);
+        if (githubAt >= 0)
+        {
+            copyrightLinkLabel.Links.Add(githubAt, github.Length, "github");
+        }
+
+        var licenseAt = text.IndexOf(license, StringComparison.Ordinal);
+        if (licenseAt >= 0)
+        {
+            copyrightLinkLabel.Links.Add(licenseAt, license.Length, "license");
+        }
     }
 
     /// <summary>アクションバー（ロゴ＋権利表記＋操作群）が重ならずに並ぶ最小クライアント幅。</summary>
@@ -7687,7 +7773,7 @@ public partial class Form1 : Form, IMessageFilter
         clearButton.Text = UiStrings.LabelClear;
         reloadButton.Text = UiStrings.LabelReload;
         exportButton.Text = UiStrings.LabelExport;
-        copyrightLinkLabel.Text = UiStrings.CopyrightText;
+        ApplyCopyrightTextAndLinks();
 
         projectFolderButton.AccessibleName = UiStrings.AccessibleProjectFolderButton;
         projectDeleteButton.AccessibleName = UiStrings.AccessibleProjectDeleteButton;
@@ -7898,6 +7984,7 @@ public partial class Form1 : Form, IMessageFilter
         TipService.Set(reloadButton, UiStrings.TipReload);
         TipService.Set(exportButton, UiStrings.TipExport);
         TipService.Set(copyrightLinkLabel, UiStrings.TipCopyright);
+        TipService.Set(brandLogoPictureBox, UiStrings.TipBrandLogo);
     }
 
     private void ApplyProjectBarTips()
@@ -8407,10 +8494,32 @@ public partial class Form1 : Form, IMessageFilter
 
     private void CopyrightLinkLabel_LinkClicked(object? sender, LinkLabelLinkClickedEventArgs e)
     {
-        const string repositoryUrl = AppVersion.RepositoryUrl;
+        var linkId = e.Link?.LinkData as string;
+        if (string.IsNullOrEmpty(linkId) && e.Link is not null)
+        {
+            var slice = copyrightLinkLabel.Text.Substring(e.Link.Start, e.Link.Length);
+            linkId = string.Equals(slice, UiStrings.CopyrightLicenseLinkText, StringComparison.Ordinal)
+                ? "license"
+                : "github";
+        }
+
+        if (string.Equals(linkId, "license", StringComparison.Ordinal))
+        {
+            ShowEmbeddedLicenseInLog();
+            return;
+        }
+
+        OpenExternalUrl(AppVersion.RepositoryUrl, UiStrings.DialogOpenGithubFailed);
+    }
+
+    private void BrandLogoPictureBox_Click(object? sender, EventArgs e) =>
+        OpenExternalUrl(AppVersion.CompanyUrl, UiStrings.DialogOpenCompanySiteFailed);
+
+    private void OpenExternalUrl(string url, string failureTitle)
+    {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(repositoryUrl)
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url)
             {
                 UseShellExecute = true,
             });
@@ -8420,10 +8529,29 @@ public partial class Form1 : Form, IMessageFilter
             OwnerCenteredMessageBox.Show(
                 this,
                 ex.Message,
-                UiStrings.DialogOpenGithubFailed,
+                failureTitle,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>フッタのライセンスリンク: ログを消してから埋め込み全文を表示する。</summary>
+    private void ShowEmbeddedLicenseInLog()
+    {
+        var body = AppEmbeddedResources.ReadUdevGothicLicenseText();
+        ClearLogText();
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            AppendReport(UiStrings.DialogLicenseMissing + Environment.NewLine, colorize: false);
+            return;
+        }
+
+        // ライセンス原文の # / - などをログ用ハイライトに掛けない。
+        AppendReport(UiStrings.DialogLicenseTitle + Environment.NewLine + Environment.NewLine, colorize: false);
+        AppendReport(body.TrimEnd() + Environment.NewLine, colorize: false);
+        editorTextBox.SelectionStart = 0;
+        editorTextBox.SelectionLength = 0;
+        editorTextBox.ScrollToCaret();
     }
 
     private void DetailedLogCheckBox_CheckedChanged(object? sender, EventArgs e)
@@ -11901,7 +12029,7 @@ public partial class Form1 : Form, IMessageFilter
 #endif
     }
 
-    private void AppendReport(string text)
+    private void AppendReport(string text, bool colorize = true)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -11918,7 +12046,7 @@ public partial class Form1 : Form, IMessageFilter
         {
             for (var i = 0; i < count; i++)
             {
-                AppendColoredLine(lines[i]);
+                AppendColoredLine(lines[i], colorize);
             }
         }
         finally
@@ -11940,13 +12068,21 @@ public partial class Form1 : Form, IMessageFilter
         }
     }
 
-    private void AppendColoredLine(string line)
+    private void AppendColoredLine(string line, bool colorize = true)
     {
         editorTextBox.SelectionStart = editorTextBox.TextLength;
         editorTextBox.SelectionLength = 0;
         ApplyFixedLogLineSpacing();
-        _logColorSection = AdvanceLogColorSection(line, _logColorSection);
-        editorTextBox.SelectionColor = ColorForLogLine(line, _logColorSection);
+        if (colorize)
+        {
+            _logColorSection = AdvanceLogColorSection(line, _logColorSection);
+            editorTextBox.SelectionColor = ColorForLogLine(line, _logColorSection);
+        }
+        else
+        {
+            editorTextBox.SelectionColor = UiColors.LogDefault;
+        }
+
         editorTextBox.AppendText(line + "\n");
     }
 

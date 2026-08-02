@@ -1066,6 +1066,29 @@ internal sealed class MarkerOptionsPanel : UserControl
         return false;
     }
 
+    /// <summary>More Options の 6 TextBox のいずれかがフォーカスを持っているか。</summary>
+    public bool HasEditableTextBoxFocus => HasFocusedTextBox();
+
+    /// <summary>マウス位置がいずれかの編集 TextBox 上にあるか（外側クリックでフォーカス解除する判定用）。</summary>
+    public bool IsPointerOverEditableTextBox()
+    {
+        foreach (var textBox in EnumerateEditableTextBoxes())
+        {
+            if (!textBox.IsHandleCreated || !textBox.Visible)
+            {
+                continue;
+            }
+
+            var pt = textBox.PointToClient(Control.MousePosition);
+            if (pt.X >= 0 && pt.Y >= 0 && pt.X < textBox.Width && pt.Y < textBox.Height)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private IEnumerable<TextBox> EnumerateEditableTextBoxes()
     {
         yield return _lookAheadTextBox;

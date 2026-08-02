@@ -1245,32 +1245,35 @@ partial class Form1
         //
         brandLogoPictureBox.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         brandLogoPictureBox.BackColor = Color.Transparent;
+        brandLogoPictureBox.Cursor = Cursors.Hand;
         brandLogoPictureBox.Location = new Point(10, 6);
         brandLogoPictureBox.Name = "brandLogoPictureBox";
         brandLogoPictureBox.Size = new Size(214, 32);
         brandLogoPictureBox.SizeMode = PictureBoxSizeMode.Zoom;
         brandLogoPictureBox.TabStop = false;
+        brandLogoPictureBox.Click += BrandLogoPictureBox_Click;
         //
         // copyrightLinkLabel
         //
-        // ロゴ（bottom=38）と権利表記2行のボトムラインを揃える。
-        // 幅は LayoutActionBarCopyright で右側コントロールと重ならないよう調整する。
-        copyrightLinkLabel.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+        // 幅・高さ・縦中央は LayoutActionBarCopyright / ApplyCopyrightTextAndLinks で調整する。
+        // Bottom アンカーだと下端固定になり高さ中央にできない。
+        copyrightLinkLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
         copyrightLinkLabel.AutoEllipsis = true;
         copyrightLinkLabel.BackColor = Color.Transparent;
+        // 行間は LineHeightScale で詰め、アクションバー高さ 44 のまま 3 行を収める。
         copyrightLinkLabel.Font = new Font("Yu Gothic UI", 7.5F);
+        copyrightLinkLabel.LineHeightScale = 0.78f;
         copyrightLinkLabel.LinkBehavior = LinkBehavior.HoverUnderline;
         copyrightLinkLabel.Location = new Point(232, 8);
         copyrightLinkLabel.Name = "copyrightLinkLabel";
-        copyrightLinkLabel.Size = new Size(240, 30);
+        copyrightLinkLabel.Size = new Size(280, 30);
         copyrightLinkLabel.TabIndex = 0;
         copyrightLinkLabel.TabStop = false;
         copyrightLinkLabel.Text =
-            "c 2026 MIYABI GAME AUDIO INC.  GitHub"
-            + "\nWwiseR and AudiokineticR are trademarks of Audiokinetic Inc.";
-        copyrightLinkLabel.TextAlign = ContentAlignment.BottomLeft;
-        // "GitHub" は1行目の31文字目から（商標行の追加で変わらない）。
-        copyrightLinkLabel.LinkArea = new LinkArea(31, 6);
+            "© 2026 MIYABI GAME AUDIO INC.  GitHub"
+            + "\nWwise® and Audiokinetic® are trademarks of Audiokinetic Inc."
+            + "\nSIL Open Font License";
+        copyrightLinkLabel.TextAlign = ContentAlignment.MiddleLeft;
         copyrightLinkLabel.LinkClicked += CopyrightLinkLabel_LinkClicked;
         //
         // actionControlsPanel

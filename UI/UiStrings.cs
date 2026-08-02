@@ -265,8 +265,12 @@ internal static class UiStrings
         "Save the log to a file.");
 
     public static string TipCopyright => Get(
-        "著作権・ライセンス情報（GitHub）を開きます。",
-        "Open copyright / license information on GitHub.");
+        "GitHub を開くか、SIL Open Font License 全文をログに表示します。",
+        "Open GitHub, or show the SIL Open Font License text in the log.");
+
+    public static string TipBrandLogo => Get(
+        "MIYABI GAME AUDIO のウェブサイトを開きます。",
+        "Open the MIYABI GAME AUDIO website.");
 
     public static string TipPlaylistHeader => Get(
         "遷移先として選ぶ Music Playlist の一覧です。クリックで Fade／Exit Source At を反映し、再生中は遷移を予約します。",
@@ -964,6 +968,10 @@ internal static class UiStrings
     public static string DialogOpenGithubFailed => Get(
         "GitHub を開けませんでした。",
         "Unable to open GitHub.");
+
+    public static string DialogOpenCompanySiteFailed => Get(
+        "ウェブサイトを開けませんでした。",
+        "Unable to open the website.");
 
     // --- Logs (user-facing) ---
     public static string LogKeepTargetNeedSelection => Get(
@@ -2160,11 +2168,25 @@ internal static class UiStrings
             localVersion,
             remoteVersion);
 
+    /// <summary>フッタ権利表記。リンク文言（GitHub / SIL Open Font License）は常に英語。</summary>
     public static string CopyrightText => Get(
         "© 2026 MIYABI GAME AUDIO INC.  GitHub"
-        + "\nWwise® and Audiokinetic® are trademarks of Audiokinetic Inc.",
+        + "\nWwise® and Audiokinetic® are trademarks of Audiokinetic Inc."
+        + "\nSIL Open Font License",
         "© 2026 MIYABI GAME AUDIO INC.  GitHub"
-        + "\nWwise® and Audiokinetic® are trademarks of Audiokinetic Inc.");
+        + "\nWwise® and Audiokinetic® are trademarks of Audiokinetic Inc."
+        + "\nSIL Open Font License");
+
+    /// <summary>フッタ 3 行目のライセンスリンク文言（常に英語）。</summary>
+    public const string CopyrightLicenseLinkText = "SIL Open Font License";
+
+    public static string DialogLicenseTitle => Get(
+        CopyrightLicenseLinkText,
+        CopyrightLicenseLinkText);
+
+    public static string DialogLicenseMissing => Get(
+        "License text is not embedded in this build.",
+        "License text is not embedded in this build.");
 
     // Form1: アクセシビリティ名（元から英語固定）
     public static string AccessibleProjectFolderButton => Get(

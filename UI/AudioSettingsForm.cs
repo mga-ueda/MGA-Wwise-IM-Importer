@@ -6,7 +6,7 @@ namespace MgaWwiseIMImporter.UI;
 /// <summary>
 /// 再生出力・フェードカーブ既定・波形フォーマット規定の設定ダイアログ。
 /// </summary>
-internal sealed class AudioSettingsForm : Form
+internal sealed class AudioSettingsForm : Form, IMessageFilter
 {
     private readonly DarkDropDownComboBox _apiCombo;
     private readonly DarkDropDownComboBox _deviceCombo;
@@ -78,6 +78,8 @@ internal sealed class AudioSettingsForm : Form
         MinimizeBox = false;
         ShowInTaskbar = false;
         KeyPreview = true;
+        // 初回レイアウト／描画が終わるまで透明にしておく（チラつき防止）。
+        Opacity = 0d;
         // 寸法は 150% 設計＋ DesignMetrics。AutoScale は使わない（二重スケール防止）。
         AutoScaleMode = AutoScaleMode.None;
         Font = new Font("Yu Gothic UI", 9F);
@@ -582,6 +584,99 @@ internal sealed class AudioSettingsForm : Form
         button.BorderSize = 1;
     }
 
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        Application.AddMessageFilter(this);
+    }
+
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        Application.RemoveMessageFilter(this);
+        base.OnHandleDestroyed(e);
+    }
+
+    bool IMessageFilter.PreFilterMessage(ref Message m)
+    {
+        const int wmLButtonDown = 0x0201;
+        const int wmLButtonDblClk = 0x0203;
+        const int wmRButtonDown = 0x0204;
+        const int wmRButtonDblClk = 0x0206;
+        const int wmMButtonDown = 0x0207;
+        const int wmMButtonDblClk = 0x0209;
+        // ダブルクリックは 2 回目が *_DBLCLK になり DOWN が来ないため、両方拾う。
+        if (m.Msg is wmLButtonDown or wmLButtonDblClk
+            or wmRButtonDown or wmRButtonDblClk
+            or wmMButtonDown or wmMButtonDblClk)
+        {
+            TryReleaseEditorFocusOnOutsideMouseDown();
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 数値エディタ以外をクリックしたとき、キャレットを消してダイアログ自体をアクティブにする。
+    /// （ラベルやラジオは Selectable=false のため、クリックだけではフォーカスが移らない）
+    /// </summary>
+    private void TryReleaseEditorFocusOnOutsideMouseDown()
+    {
+        if (IsDisposed || !Visible || !ContainsFocus || !HasExpectedFormatTextBoxFocus())
+        {
+            return;
+        }
+
+        if (IsPointerOverExpectedFormatTextBox())
+        {
+            return;
+        }
+
+        ActiveControl = null;
+        if (!Focused)
+        {
+            Focus();
+        }
+    }
+
+    private bool HasExpectedFormatTextBoxFocus()
+    {
+        foreach (var textBox in EnumerateExpectedFormatTextBoxes())
+        {
+            if (textBox.Focused)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsPointerOverExpectedFormatTextBox()
+    {
+        foreach (var textBox in EnumerateExpectedFormatTextBoxes())
+        {
+            if (!textBox.IsHandleCreated || !textBox.Visible)
+            {
+                continue;
+            }
+
+            var pt = textBox.PointToClient(Control.MousePosition);
+            if (pt.X >= 0 && pt.Y >= 0 && pt.X < textBox.Width && pt.Y < textBox.Height)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IEnumerable<TextBox> EnumerateExpectedFormatTextBoxes()
+    {
+        yield return _expectedSampleRateTextBox;
+        yield return _expectedBitDepthTextBox;
+        yield return _expectedChannelsTextBox;
+    }
+
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
@@ -590,14 +685,31 @@ internal sealed class AudioSettingsForm : Form
             TopMost = true;
         }
 
+        // Shown 後にレイアウトと初回描画を完了させてから不透明化する。
+        BeginInvoke(CompleteInitialRender);
+    }
+
+    private void CompleteInitialRender()
+    {
+        if (IsDisposed)
+        {
+            return;
+        }
+
         // ハンドル生成・初期 Text 反映後に縦中央を確定する。
         TextBoxVerticalAlign.Apply(_expectedSampleRateTextBox);
         TextBoxVerticalAlign.Apply(_expectedBitDepthTextBox);
         TextBoxVerticalAlign.Apply(_expectedChannelsTextBox);
+
+        PerformLayout();
+        Refresh();
+        Update();
+        Opacity = 1d;
     }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        Application.RemoveMessageFilter(this);
         _fadeCurveMenu?.Dispose();
         _fadeCurveMenu = null;
         foreach (var row in new[]

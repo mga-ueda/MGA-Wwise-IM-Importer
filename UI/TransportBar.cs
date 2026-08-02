@@ -883,6 +883,9 @@ internal sealed class TransportMetronomeButton : Button
     private const int BpmTextWidthDesign = 32;
     /// <summary>音符グリフの設計座標空間（スケール前）。ボタン高さ 45 とは別。</summary>
     private const int NoteGlyphDesign = 30;
+
+    /// <summary>音符グリフをヒット領域高さに対して描く比率。</summary>
+    private const float NoteGlyphScale = 0.75f;
     private const int DesignHeight = 45;
     private readonly System.Windows.Forms.Timer _shortcutFadeTimer = new() { Interval = 16 };
     private bool _hovered;
@@ -1069,11 +1072,16 @@ internal sealed class TransportMetronomeButton : Button
             : _isActive
                 ? ActiveForeColor
                 : ForeColor;
-        // 音符は 30 設計座標を高さへ均一スケール（150% で従来どおり約 1.5 倍）。
-        var noteScale = Height > 0 ? Height / (float)NoteGlyphDesign : 0f;
+        // 音符は 30 設計座標を高さへ均一スケールし、さらに 75% で描く（縦は中央寄せ）。
+        var noteScale = Height > 0
+            ? Height / (float)NoteGlyphDesign * NoteGlyphScale
+            : 0f;
         if (noteScale > 0f)
         {
-            using var iconPen = new Pen(fore, Math.Max(1f, DesignMetrics.PxF(1.6f, this)))
+            // ScaleTransform 後も線幅が従来相当になるよう、縮小率を打ち消す。
+            using var iconPen = new Pen(
+                fore,
+                Math.Max(1f, DesignMetrics.PxF(1.6f, this) / NoteGlyphScale))
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round,
@@ -1081,6 +1089,8 @@ internal sealed class TransportMetronomeButton : Button
             };
             using var iconBrush = new SolidBrush(fore);
             var noteState = g.Save();
+            var offsetY = (Height - NoteGlyphDesign * noteScale) / 2f;
+            g.TranslateTransform(0f, offsetY);
             g.ScaleTransform(noteScale, noteScale);
             DrawQuarterNote(g, iconPen, iconBrush, 5f, 7f);
             g.Restore(noteState);

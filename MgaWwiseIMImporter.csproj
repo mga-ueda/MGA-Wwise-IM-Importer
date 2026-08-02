@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -64,11 +64,10 @@
     <EmbeddedResource Include="Assets\Wave\Low.wav">
       <LogicalName>MgaWwiseIMImporter.Wave.Low.wav</LogicalName>
     </EmbeddedResource>
-    <!-- SIL OFL 1.1: 埋め込み可。著作権表示とライセンスはユーザーが容易に読める形で同梱する。 -->
-    <None Update="Assets\Fonts\LICENSE-UDEV-GOTHIC.txt">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <TargetPath>Licenses\LICENSE-UDEV-GOTHIC.txt</TargetPath>
-    </None>
+    <!-- SIL OFL 1.1: 埋め込み。アプリ内ウィンドウで容易に表示する。 -->
+    <EmbeddedResource Include="Assets\Fonts\LICENSE-UDEV-GOTHIC.txt">
+      <LogicalName>MgaWwiseIMImporter.Fonts.LICENSE-UDEV-GOTHIC.txt</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>

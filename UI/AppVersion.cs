@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -12,6 +12,7 @@ internal static class AppVersion
     public const string GitHubOwner = "mga-ueda";
     public const string GitHubRepo = "MGA-Wwise-IM-Importer";
     public const string RepositoryUrl = "https://github.com/" + GitHubOwner + "/" + GitHubRepo;
+    public const string CompanyUrl = "https://www.miyabi-ga.co.jp/";
     public const string ReleasesApiUrl =
         "https://api.github.com/repos/" + GitHubOwner + "/" + GitHubRepo + "/releases";
 
