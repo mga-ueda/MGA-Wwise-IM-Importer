@@ -13,10 +13,10 @@
     <ApplicationIcon>Assets\Branding\MgaWwiseIMImporter.ico</ApplicationIcon>
     <!-- レイアウトは 150%（144 DPI）設計＋ DesignMetrics 換算 -->
     <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
-    <!-- 表示・比較・GitHub タグ共通の SemVer（例: 1.1.3-beta ↔ tag v1.1.3-beta） -->
-    <Version>1.1.3-beta</Version>
-    <AssemblyVersion>1.1.3.0</AssemblyVersion>
-    <FileVersion>1.1.3.0</FileVersion>
+    <!-- 表示・比較・GitHub タグ共通の SemVer（例: 1.1.4-beta ↔ tag v1.1.4-beta） -->
+    <Version>1.1.4-beta</Version>
+    <AssemblyVersion>1.1.4.0</AssemblyVersion>
+    <FileVersion>1.1.4.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <!-- コンパイラ診断メッセージを UTF-8 で出力し、日本語環境での文字化けを防ぐ。 -->
     <Utf8Output>true</Utf8Output>
