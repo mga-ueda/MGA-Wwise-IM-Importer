@@ -1,75 +1,78 @@
-﻿namespace MgaWwiseIMImporter.UI;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// Playlist 行の左外側に置くグループ塗り分け用の四角枠。
-/// Shift＋クリック／ドラッグでグループ塗り、Ctrl で解除塗りの起点になる。
+/// Form1 同様、色はフィールド保持＋即時ビジュアル更新（OnRender / DP に頼らない）。
 /// </summary>
-internal sealed class PlaylistGroupSwatch : Control
+internal sealed class PlaylistGroupSwatch : Border
 {
+    // WinForms OnPaint の BoxSize=12 / Width=16 はデバイス px 固定。
+    public static double BoxSize => DesignMetrics.Dip(12);
+    public static double ControlWidth => DesignMetrics.Dip(16);
+
+    private readonly Border _box;
     private Color? _groupColor;
 
-    public const int BoxSize = 12;
-    public const int ControlWidth = 16;
+    public PlaylistGroupSwatch()
+    {
+        Width = ControlWidth;
+        Background = Brushes.Transparent;
+        BorderThickness = new Thickness(0);
+        Cursor = Cursors.Hand;
+        Focusable = false;
+        SnapsToDevicePixels = true;
+        UseLayoutRounding = true;
 
-    /// <summary>
-    /// グループ枠の塗り色。null のときは空枠のみ表示する。
-    /// </summary>
-    public Color? GroupColor
+        _box = new Border
+        {
+            Width = BoxSize,
+            Height = BoxSize,
+            BorderThickness = new Thickness(1),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+            SnapsToDevicePixels = true,
+            UseLayoutRounding = true,
+        };
+        Child = _box;
+        ApplyGroupColorVisual();
+    }
+
+    /// <summary>グループ枠の塗り色。null のときは空枠のみ表示する。</summary>
+    public Color? Fill
     {
         get => _groupColor;
         set
         {
-            if (_groupColor == value)
-            {
-                return;
-            }
-
+            // 値が同じでもブラシを載せ直す（ドラッグ開始直後の1つ目が描画されない対策）。
             _groupColor = value;
-            Invalidate();
+            ApplyGroupColorVisual();
         }
     }
 
-    public PlaylistGroupSwatch()
+    /// <summary>互換用。Fill の別名（Form1 GroupColor）。</summary>
+    public Color? GroupColor
     {
-        SetStyle(
-            ControlStyles.UserPaint
-            | ControlStyles.AllPaintingInWmPaint
-            | ControlStyles.OptimizedDoubleBuffer,
-            true);
-        // クリックでフォーカスを奪わず、上下キーの波形拡縮を阻害しない。
-        SetStyle(ControlStyles.Selectable, false);
-        TabStop = false;
-        Width = ControlWidth;
-        Cursor = Cursors.Hand;
+        get => Fill;
+        set => Fill = value;
     }
 
-    protected override void OnPaint(PaintEventArgs e)
+    private void ApplyGroupColorVisual()
     {
-        e.Graphics.Clear(BackColor);
-
-        var top = Math.Max(0, (ClientSize.Height - BoxSize) / 2);
-        var bounds = new Rectangle(0, top, BoxSize, Math.Min(BoxSize, ClientSize.Height));
-        if (_groupColor is Color groupColor)
+        if (_groupColor is Color fillColor)
         {
-            using var fill = new SolidBrush(groupColor);
-            e.Graphics.FillRectangle(fill, bounds);
-            using var border = new Pen(ControlPaint.Dark(groupColor), 1f);
-            e.Graphics.DrawRectangle(
-                border,
-                bounds.X,
-                bounds.Y,
-                bounds.Width - 1,
-                bounds.Height - 1);
+            _box.Background = WpfControlHelpers.FrozenBrush(fillColor);
+            _box.BorderBrush = WpfControlHelpers.FrozenBrush(WpfControlHelpers.DarkenBorder(fillColor));
         }
         else
         {
-            using var border = new Pen(UiColors.PlaylistButtonBorder, 1f);
-            e.Graphics.DrawRectangle(
-                border,
-                bounds.X,
-                bounds.Y,
-                bounds.Width - 1,
-                bounds.Height - 1);
+            _box.Background = Brushes.Transparent;
+            _box.BorderBrush = UiColors.Brush(UiColors.PlaylistButtonBorder);
         }
     }
 }

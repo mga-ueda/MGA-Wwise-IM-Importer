@@ -12,7 +12,7 @@ internal static class AppStorage
 
     /// <summary>
     /// ディレクトリ作成と settings.json 読み込み。
-    /// <see cref="Form1"/> 生成より前に呼ぶこと。
+    /// <see cref="MainWindow"/> 生成より前に呼ぶこと。
     /// </summary>
     public static void Initialize()
     {

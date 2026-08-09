@@ -1,4 +1,7 @@
-using System.Drawing.Drawing2D;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -10,193 +13,276 @@ internal sealed class RoundedButton : Button
     private bool _hover;
     private bool _pressed;
 
-    public int CornerRadius { get; set; } = 8;
+    public static readonly DependencyProperty CornerRadiusProperty =
+        DependencyProperty.Register(nameof(CornerRadius), typeof(double), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(8d, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color HoverBackColor { get; set; }
+    public static readonly DependencyProperty HoverBackColorProperty =
+        DependencyProperty.Register(nameof(HoverBackColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color PressedBackColor { get; set; }
+    public static readonly DependencyProperty PressedBackColorProperty =
+        DependencyProperty.Register(nameof(PressedBackColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color DisabledBackColor { get; set; } = UiColors.ForControlBack(UiColors.ActionButtonInnerBack);
+    public static readonly DependencyProperty DisabledBackColorProperty =
+        DependencyProperty.Register(nameof(DisabledBackColor), typeof(Color), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(
+                UiColors.ForControlBack(UiColors.ActionButtonInnerBack),
+                FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color DisabledForeColor { get; set; } = UiColors.ActionButtonDisabledFore;
+    public static readonly DependencyProperty DisabledForeColorProperty =
+        DependencyProperty.Register(nameof(DisabledForeColor), typeof(Color), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(
+                UiColors.ActionButtonDisabledFore,
+                FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color BorderColor { get; set; }
+    public static readonly DependencyProperty BorderColorProperty =
+        DependencyProperty.Register(nameof(BorderColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color HoverBorderColor { get; set; }
+    public static readonly DependencyProperty HoverBorderColorProperty =
+        DependencyProperty.Register(nameof(HoverBorderColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color PressedBorderColor { get; set; }
+    public static readonly DependencyProperty PressedBorderColorProperty =
+        DependencyProperty.Register(nameof(PressedBorderColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public Color DisabledBorderColor { get; set; }
+    public static readonly DependencyProperty DisabledBorderColorProperty =
+        DependencyProperty.Register(nameof(DisabledBorderColor), typeof(Color?), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
-    public int BorderSize { get; set; }
+    public static readonly DependencyProperty BorderSizeProperty =
+        DependencyProperty.Register(nameof(BorderSize), typeof(double), typeof(RoundedButton),
+            new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    static RoundedButton()
+    {
+        DefaultStyleKeyProperty.OverrideMetadata(typeof(RoundedButton),
+            new FrameworkPropertyMetadata(typeof(RoundedButton)));
+        FocusableProperty.OverrideMetadata(typeof(RoundedButton), new FrameworkPropertyMetadata(false));
+        FocusVisualStyleProperty.OverrideMetadata(typeof(RoundedButton), new FrameworkPropertyMetadata(null));
+    }
 
     public RoundedButton()
     {
-        FlatStyle = FlatStyle.Flat;
-        FlatAppearance.BorderSize = 0;
-        TabStop = false;
-        UseVisualStyleBackColor = false;
-        SetStyle(
-            ControlStyles.UserPaint
-            | ControlStyles.AllPaintingInWmPaint
-            | ControlStyles.OptimizedDoubleBuffer
-            | ControlStyles.ResizeRedraw,
-            true);
-        // クリックでフォーカスを奪わず、↑↓ 等の波形ショートカットを阻害しない。
-        SetStyle(ControlStyles.Selectable, false);
+        Background = Brushes.Transparent;
+        BorderThickness = new Thickness(0);
+        Padding = new Thickness(8, 2, 8, 2);
+        Cursor = Cursors.Hand;
+        IsEnabledChanged += (_, _) => InvalidateVisual();
     }
 
-    protected override bool ShowFocusCues => false;
+    public double CornerRadius
+    {
+        get => (double)GetValue(CornerRadiusProperty);
+        set => SetValue(CornerRadiusProperty, value);
+    }
 
-    protected override void OnMouseEnter(EventArgs e)
+    public Color? HoverBackColor
+    {
+        get => (Color?)GetValue(HoverBackColorProperty);
+        set => SetValue(HoverBackColorProperty, value);
+    }
+
+    public Color? PressedBackColor
+    {
+        get => (Color?)GetValue(PressedBackColorProperty);
+        set => SetValue(PressedBackColorProperty, value);
+    }
+
+    public Color DisabledBackColor
+    {
+        get => (Color)GetValue(DisabledBackColorProperty);
+        set => SetValue(DisabledBackColorProperty, value);
+    }
+
+    public Color DisabledForeColor
+    {
+        get => (Color)GetValue(DisabledForeColorProperty);
+        set => SetValue(DisabledForeColorProperty, value);
+    }
+
+    public Color? BorderColor
+    {
+        get => (Color?)GetValue(BorderColorProperty);
+        set => SetValue(BorderColorProperty, value);
+    }
+
+    public Color? HoverBorderColor
+    {
+        get => (Color?)GetValue(HoverBorderColorProperty);
+        set => SetValue(HoverBorderColorProperty, value);
+    }
+
+    public Color? PressedBorderColor
+    {
+        get => (Color?)GetValue(PressedBorderColorProperty);
+        set => SetValue(PressedBorderColorProperty, value);
+    }
+
+    public Color? DisabledBorderColor
+    {
+        get => (Color?)GetValue(DisabledBorderColorProperty);
+        set => SetValue(DisabledBorderColorProperty, value);
+    }
+
+    public double BorderSize
+    {
+        get => (double)GetValue(BorderSizeProperty);
+        set => SetValue(BorderSizeProperty, value);
+    }
+
+    protected override void OnMouseEnter(MouseEventArgs e)
     {
         _hover = true;
-        Invalidate();
+        InvalidateVisual();
         base.OnMouseEnter(e);
     }
 
-    protected override void OnMouseLeave(EventArgs e)
+    protected override void OnMouseLeave(MouseEventArgs e)
     {
         _hover = false;
         _pressed = false;
-        Invalidate();
+        InvalidateVisual();
         base.OnMouseLeave(e);
     }
 
-    protected override void OnMouseDown(MouseEventArgs e)
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
-        if (e.Button == MouseButtons.Left)
-        {
-            _pressed = true;
-            Invalidate();
-        }
-
-        base.OnMouseDown(e);
+        _pressed = true;
+        InvalidateVisual();
+        base.OnMouseLeftButtonDown(e);
     }
 
-    protected override void OnMouseUp(MouseEventArgs e)
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         _pressed = false;
-        Invalidate();
-        base.OnMouseUp(e);
+        InvalidateVisual();
+        base.OnMouseLeftButtonUp(e);
     }
 
-    protected override void OnEnabledChanged(EventArgs e)
+    protected override void OnRender(DrawingContext dc)
     {
-        Invalidate();
-        base.OnEnabledChanged(e);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-        // 角の外側は親色で塗り、非アクティブ時の白い矩形枠残りを防ぐ
-        g.Clear(Parent?.BackColor ?? SystemColors.Control);
+        var parentBack = ResolveParentBackColor();
+        dc.DrawRectangle(WpfControlHelpers.FrozenBrush(parentBack), null, new Rect(RenderSize));
 
         var fill = ResolveFillColor();
-        var textColor = Enabled ? ForeColor : DisabledForeColor;
-        var bounds = new Rectangle(0, 0, Width - 1, Height - 1);
-        using var path = CreateRoundedRectanglePath(bounds, CornerRadius);
-        using var brush = new SolidBrush(fill);
-        g.FillPath(brush, path);
+        var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
+        var fillGeometry = WpfControlHelpers.RoundedRectGeometry(bounds, CornerRadius);
+        dc.DrawGeometry(WpfControlHelpers.FrozenBrush(fill), null, fillGeometry);
 
         var borderColor = ResolveBorderColor();
-        if (BorderSize > 0 && !borderColor.IsEmpty)
+        if (BorderSize > 0 && borderColor is Color border)
         {
-            var inset = BorderSize / 2f;
-            var borderBounds = new RectangleF(
+            var inset = BorderSize / 2d;
+            var borderBounds = new Rect(
                 inset,
                 inset,
-                Math.Max(0f, Width - 1f - BorderSize),
-                Math.Max(0f, Height - 1f - BorderSize));
-            using var borderPath = CreateRoundedRectanglePath(
-                Rectangle.Round(borderBounds),
-                Math.Max(0, CornerRadius - (int)Math.Ceiling(inset)));
-            using var pen = new Pen(borderColor, BorderSize);
-            g.DrawPath(pen, borderPath);
+                Math.Max(0d, ActualWidth - BorderSize),
+                Math.Max(0d, ActualHeight - BorderSize));
+            var borderGeometry = WpfControlHelpers.RoundedRectGeometry(
+                borderBounds,
+                Math.Max(0d, CornerRadius - inset));
+            var pen = new Pen(WpfControlHelpers.FrozenBrush(border), BorderSize)
+            {
+                LineJoin = PenLineJoin.Round,
+            };
+            if (pen.CanFreeze)
+            {
+                pen.Freeze();
+            }
+
+            dc.DrawGeometry(null, pen, borderGeometry);
         }
 
-        // ボタン高さに対し Font.Height 帯を中央配置する（nudge なし）。
-        var textHeight = Math.Min(Height, Math.Max(1, Font.Height));
-        var top = Math.Max(0, (Height - textHeight) / 2);
-        TextRenderer.DrawText(
-            g,
-            Text,
-            Font,
-            new Rectangle(
-                Padding.Left,
-                top,
-                Math.Max(0, Width - Padding.Horizontal),
-                textHeight),
-            textColor,
-            TextFormatFlags.HorizontalCenter
-            | TextFormatFlags.VerticalCenter
-            | TextFormatFlags.EndEllipsis
-            | TextFormatFlags.NoPrefix
-            | TextFormatFlags.NoPadding
-            | TextFormatFlags.SingleLine);
+        var text = Content as string ?? Content?.ToString() ?? string.Empty;
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        var textColor = IsEnabled
+            ? Foreground is SolidColorBrush solid ? solid.Color : UiColors.PrimaryFore
+            : DisabledForeColor;
+        var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+        var formatted = new FormattedText(
+            text,
+            System.Globalization.CultureInfo.CurrentUICulture,
+            FlowDirection,
+            typeface,
+            FontSize,
+            WpfControlHelpers.FrozenBrush(textColor),
+            VisualTreeHelper.GetDpi(this).PixelsPerDip)
+        {
+            MaxTextWidth = Math.Max(1d, ActualWidth - Padding.Left - Padding.Right),
+            Trimming = TextTrimming.CharacterEllipsis,
+        };
+        var textX = Padding.Left + Math.Max(0d, (ActualWidth - Padding.Left - Padding.Right - formatted.Width) / 2d);
+        var textY = (ActualHeight - formatted.Height) / 2d;
+        dc.DrawText(formatted, new Point(textX, textY));
+    }
+
+    private Color ResolveParentBackColor()
+    {
+        var background = Parent switch
+        {
+            System.Windows.Controls.Panel panel => panel.Background,
+            System.Windows.Controls.Control control => control.Background,
+            _ => null,
+        };
+
+        if (background is SolidColorBrush brush)
+        {
+            return brush.Color;
+        }
+
+        return UiColors.WindowBack;
     }
 
     private Color ResolveFillColor()
     {
-        if (!Enabled)
+        if (!IsEnabled)
         {
             return DisabledBackColor;
         }
 
-        if (_pressed && !PressedBackColor.IsEmpty)
+        if (_pressed && PressedBackColor is Color pressed)
         {
-            return PressedBackColor;
+            return pressed;
         }
 
-        if (_hover && !HoverBackColor.IsEmpty)
+        if (_hover && HoverBackColor is Color hover)
         {
-            return HoverBackColor;
+            return hover;
         }
 
-        return BackColor;
+        if (Background is SolidColorBrush back)
+        {
+            return back.Color;
+        }
+
+        return UiColors.ActionButtonInnerBack;
     }
 
-    private Color ResolveBorderColor()
+    private Color? ResolveBorderColor()
     {
-        if (!Enabled && !DisabledBorderColor.IsEmpty)
+        if (!IsEnabled)
         {
-            return DisabledBorderColor;
+            return DisabledBorderColor ?? BorderColor;
         }
 
-        if (_pressed && !PressedBorderColor.IsEmpty)
+        if (_pressed)
         {
-            return PressedBorderColor;
+            return PressedBorderColor ?? BorderColor;
         }
 
-        if (_hover && !HoverBorderColor.IsEmpty)
+        if (_hover)
         {
-            return HoverBorderColor;
+            return HoverBorderColor ?? BorderColor;
         }
 
         return BorderColor;
-    }
-
-    private static GraphicsPath CreateRoundedRectanglePath(Rectangle bounds, int radius)
-    {
-        var diameter = radius * 2;
-        var path = new GraphicsPath();
-        if (diameter <= 0 || diameter > bounds.Width || diameter > bounds.Height)
-        {
-            path.AddRectangle(bounds);
-            return path;
-        }
-
-        var arc = new Rectangle(bounds.Location, new Size(diameter, diameter));
-        path.AddArc(arc, 180, 90);
-        arc.X = bounds.Right - diameter;
-        path.AddArc(arc, 270, 90);
-        arc.Y = bounds.Bottom - diameter;
-        path.AddArc(arc, 0, 90);
-        arc.X = bounds.Left;
-        path.AddArc(arc, 90, 90);
-        path.CloseFigure();
-        return path;
     }
 }

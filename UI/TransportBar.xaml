@@ -1,0 +1,15 @@
+﻿<UserControl x:Class="MgaWwiseIMImporter.UI.TransportBar"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:MgaWwiseIMImporter.UI"
+             Height="{x:Static ui:DesignMetrics.TransportBarHeight}"
+             Focusable="False"
+             Background="{StaticResource TransportBackBrush}">
+  <Border x:Name="RootBorder"
+          Background="{StaticResource TransportBackBrush}">
+    <StackPanel x:Name="GroupsHost"
+                Orientation="Horizontal"
+                VerticalAlignment="Center" />
+  </Border>
+</UserControl>

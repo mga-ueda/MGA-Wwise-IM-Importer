@@ -1,67 +1,132 @@
-﻿using System.Drawing.Text;
-using System.Runtime.InteropServices;
+﻿using WpfApplication = System.Windows.Application;
+using WpfFontFamily = System.Windows.Media.FontFamily;
+using WpfTypeface = System.Windows.Media.Typeface;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// 埋め込みフォントをプロセス内で利用可能にする。
-/// ログは RichTextBox（RichEdit）のため AddMemoryFont だけでは実描画に使われず、
-/// プロポーショナルへ落ちることがある。一時ファイルへ展開して AddFontResourceEx する。
+/// UI は Yu Gothic UI（Bold あり）。ログのみ埋め込み UDEV Gothic Regular。
 /// </summary>
 internal static class AppFonts
 {
-    private const uint FrPrivate = 0x10;
-    private static string? _registeredPath;
+    private const string LogFontFamilyName = "UDEV Gothic";
+    private const string PackLogFontUri =
+        "pack://application:,,,/Assets/Fonts/UDEVGothic-Regular.ttf#" + LogFontFamilyName;
 
-    // AddFontResourceEx(FR_PRIVATE) だけでは GDI+ の new Font(名前, ...) から
-    // フォントが見つからず既定フォントへ化けるため、GDI+ 用に別途保持する。
-    private static PrivateFontCollection? _privateFonts;
+    /// <summary>WinForms 時代と同じ UI フォント。システム同梱で Bold が使える。</summary>
+    public static WpfFontFamily UiFamily { get; } = new("Yu Gothic UI");
 
-    public static void EnsureRegistered()
+    private static WpfFontFamily? _logFamily;
+    private static WpfTypeface? _logTypeface;
+
+    /// <summary>UI 用 Yu Gothic UI。</summary>
+    public static WpfFontFamily AppFamily => UiFamily;
+
+    public static WpfTypeface LogTypeface =>
+        _logTypeface ??= new WpfTypeface(
+            EnsureLogFamily(),
+            System.Windows.FontStyles.Normal,
+            System.Windows.FontWeights.Normal,
+            System.Windows.FontStretches.Normal);
+
+    /// <summary>ログ用 UDEV Gothic を登録する。UI フォントはシステム依存のため登録不要。</summary>
+    public static void EnsureRegistered() => _ = EnsureLogFamily();
+
+    /// <summary>ログ表示用フォントファミリー。同梱フォントが使えない場合は Consolas。</summary>
+    public static WpfFontFamily CreateLogFont() => EnsureLogFamily();
+
+    /// <summary>
+    /// WinForms pt → WPF DIP（96 DPI 換算）。例: 9pt → 12、8.5pt → 11.333、7pt → 9.333。
+    /// </summary>
+    public static double DipFromPoints(double points) => points * 96d / 72d;
+
+    private static WpfFontFamily EnsureLogFamily()
     {
-        if (_registeredPath is not null)
+        if (_logFamily is not null)
         {
-            return;
+            return _logFamily;
         }
 
+        if (TryRegisterFromPackUri(out var family))
+        {
+            _logFamily = family;
+            RegisterExitCleanup();
+            return _logFamily;
+        }
+
+        if (TryRegisterFromEmbeddedFile(out family))
+        {
+            _logFamily = family;
+            RegisterExitCleanup();
+            return _logFamily;
+        }
+
+        _logFamily = new WpfFontFamily("Consolas");
+        return _logFamily;
+    }
+
+    private static bool TryRegisterFromPackUri(out WpfFontFamily family)
+    {
+        family = new WpfFontFamily("Consolas");
+        try
+        {
+            var candidate = new WpfFontFamily(PackLogFontUri);
+            if (!TryValidateGlyphTypeface(candidate))
+            {
+                return false;
+            }
+
+            family = candidate;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryRegisterFromEmbeddedFile(out WpfFontFamily family)
+    {
+        family = new WpfFontFamily("Consolas");
         try
         {
             using var stream = AppEmbeddedResources.OpenLogFont();
             if (stream is null)
             {
-                return;
+                return false;
             }
 
             var fontData = new byte[stream.Length];
             stream.ReadExactly(fontData);
 
             var path = EnsureExtractedFontFile(fontData);
-            if (AddFontResourceEx(path, FrPrivate, IntPtr.Zero) <= 0)
+            var uri = new Uri(path, UriKind.Absolute);
+            var candidate = new WpfFontFamily(uri, LogFontFamilyName);
+            if (!TryValidateGlyphTypeface(candidate))
             {
-                return;
+                return false;
             }
 
-            _registeredPath = path;
-            var collection = new PrivateFontCollection();
-            collection.AddFontFile(path);
-            _privateFonts = collection;
+            family = candidate;
+            return true;
         }
-        catch (Exception)
+        catch
         {
-            _privateFonts = null;
-            _registeredPath = null;
+            return false;
         }
-
-        Application.ApplicationExit += (_, _) => Unregister();
     }
 
-    /// <summary>ログ表示用の等幅フォントを生成する。同梱フォントが使えない場合は Consolas。</summary>
-    public static Font CreateLogFont(float sizePt)
+    private static bool TryValidateGlyphTypeface(WpfFontFamily family)
     {
-        var family = _privateFonts?.Families is { Length: > 0 } families ? families[0] : null;
-        return family is not null
-            ? new Font(family, sizePt, FontStyle.Regular, GraphicsUnit.Point)
-            : new Font("Consolas", sizePt, FontStyle.Regular, GraphicsUnit.Point);
+        foreach (var typeface in family.GetTypefaces())
+        {
+            if (typeface.TryGetGlyphTypeface(out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string EnsureExtractedFontFile(byte[] fontData)
@@ -83,23 +148,17 @@ internal static class AppFonts
         return path;
     }
 
-    private static void Unregister()
+    private static void RegisterExitCleanup()
     {
-        if (_registeredPath is not { } path)
+        if (WpfApplication.Current is null)
         {
             return;
         }
 
-        _privateFonts?.Dispose();
-        _privateFonts = null;
-        RemoveFontResourceEx(path, FrPrivate, IntPtr.Zero);
-        _registeredPath = null;
+        WpfApplication.Current.Exit += (_, _) =>
+        {
+            _logFamily = null;
+            _logTypeface = null;
+        };
     }
-
-    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern int AddFontResourceEx(string fileName, uint flags, IntPtr reserved);
-
-    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool RemoveFontResourceEx(string fileName, uint flags, IntPtr reserved);
 }

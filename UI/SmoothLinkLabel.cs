@@ -1,260 +1,244 @@
-﻿using System.Drawing.Text;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// 小サイズでも滲まないよう、GDI+ のアンチエイリアス（グリッドフィット付き）で
-/// 描画する LinkLabel。フッタの権利表記など、7〜8pt の英字表示に使う。
+/// フッタ権利表記向け。本文はミュート色、指定リンクだけ青。行間を詰めて 3 行を収める。
 /// </summary>
-internal sealed class SmoothLinkLabel : LinkLabel
+internal sealed class SmoothLinkLabel : TextBlock
 {
-    private float _lineHeightScale = 1f;
+    public static readonly DependencyProperty LinkTextProperty =
+        DependencyProperty.Register(
+            nameof(LinkText),
+            typeof(string),
+            typeof(SmoothLinkLabel),
+            new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.AffectsMeasure, OnContentChanged));
 
-    /// <summary>
-    /// 複数行の行送り倍率（1 未満で詰める）。1 のときは標準 LinkLabel 描画。
-    /// ヒット判定もこの倍率に合わせる。
-    /// </summary>
-    public float LineHeightScale
+    public static readonly DependencyProperty LineHeightScaleProperty =
+        DependencyProperty.Register(
+            nameof(LineHeightScale),
+            typeof(double),
+            typeof(SmoothLinkLabel),
+            new FrameworkPropertyMetadata(0.78d, FrameworkPropertyMetadataOptions.AffectsMeasure, OnContentChanged));
+
+    public static readonly RoutedEvent LinkClickEvent =
+        EventManager.RegisterRoutedEvent(
+            nameof(LinkClick),
+            RoutingStrategy.Bubble,
+            typeof(EventHandler<SmoothLinkClickEventArgs>),
+            typeof(SmoothLinkLabel));
+
+    private readonly List<Hyperlink> _links = [];
+    private Hyperlink? _hoveredLink;
+
+    static SmoothLinkLabel()
     {
-        get => _lineHeightScale;
-        set
-        {
-            var next = Math.Clamp(value, 0.5f, 1.5f);
-            if (Math.Abs(_lineHeightScale - next) < 0.001f)
-            {
-                return;
-            }
-
-            _lineHeightScale = next;
-            Invalidate();
-        }
+        FontSizeProperty.OverrideMetadata(
+            typeof(SmoothLinkLabel),
+            new FrameworkPropertyMetadata(10d, FrameworkPropertyMetadataOptions.AffectsMeasure, OnFontSizeChanged));
     }
 
     public SmoothLinkLabel()
     {
-        // TextRenderingHint を効かせるため GDI+ 描画にする。
-        UseCompatibleTextRendering = true;
+        // 著作権は NoWrap + LineBreak で 3 行固定。汎用時は呼び出し側で Wrap を指定可。
+        TextWrapping = TextWrapping.NoWrap;
+        Foreground = UiColors.Brush(UiColors.ActionCopyrightFore);
+        Cursor = Cursors.Arrow;
+        Focusable = false;
+        FontFamily = AppFonts.UiFamily;
+        RebuildContent();
     }
 
-    private bool UseCompactLines =>
-        _lineHeightScale < 0.999f
-        && Text.Contains('\n', StringComparison.Ordinal);
-
-    protected override void OnPaint(PaintEventArgs e)
+    public event EventHandler<SmoothLinkClickEventArgs> LinkClick
     {
-        e.Graphics.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-        if (!UseCompactLines)
+        add => AddHandler(LinkClickEvent, value);
+        remove => RemoveHandler(LinkClickEvent, value);
+    }
+
+    public string LinkText
+    {
+        get => (string)GetValue(LinkTextProperty);
+        set => SetValue(LinkTextProperty, value);
+    }
+
+    /// <summary>1 未満で行間を詰める（Form1 LineHeightScale=0.78）。</summary>
+    public double LineHeightScale
+    {
+        get => (double)GetValue(LineHeightScaleProperty);
+        set => SetValue(LineHeightScaleProperty, Math.Clamp(value, 0.5d, 1.5d));
+    }
+
+    public void ApplyColors()
+    {
+        Foreground = UiColors.Brush(UiColors.ActionCopyrightFore);
+        UpdateLinkBrushes();
+        UpdatePlainRunBrushes();
+    }
+
+    private static void OnContentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is SmoothLinkLabel label)
         {
-            var state = e.Graphics.Save();
-            // 小サイズ英字の視覚上寄りを 150% 設計 nudge で下げる（生 px 固定にしない）。
-            e.Graphics.TranslateTransform(0f, DesignMetrics.VisualTextNudgeY(this));
-            base.OnPaint(e);
-            e.Graphics.Restore(state);
+            label.RebuildContent();
+        }
+    }
+
+    private static void OnFontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is SmoothLinkLabel label)
+        {
+            label.ApplyLineMetrics();
+        }
+    }
+
+    private void ApplyLineMetrics()
+    {
+        var scale = LineHeightScale;
+        if (scale < 0.999d)
+        {
+            // WinForms SmoothLinkLabel: Font.GetHeight(g) * LineHeightScale。
+            // GDI GetHeight は FontFamily.LineSpacing * em と一致（1.25 近似だと低すぎる）。
+            var lineSpacing = FontFamily?.LineSpacing > 0d ? FontFamily.LineSpacing : 1.33d;
+            LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+            LineHeight = Math.Max(1d, FontSize * lineSpacing * scale);
+        }
+        else
+        {
+            ClearValue(LineHeightProperty);
+            LineStackingStrategy = LineStackingStrategy.MaxHeight;
+        }
+    }
+
+    private void RebuildContent()
+    {
+        Inlines.Clear();
+        _links.Clear();
+        ApplyLineMetrics();
+
+        var text = LinkText;
+        if (string.IsNullOrEmpty(text))
+        {
             return;
         }
 
-        // 行間詰め時は自前描画（標準 LinkLabel は行送りを変えられない）。
-        // Transparent を Clear すると黒塗りになるため、親の実背景色で塗る。
-        using (var back = new SolidBrush(ResolvePaintBackColor()))
-        {
-            e.Graphics.FillRectangle(back, ClientRectangle);
-        }
-
-        DrawCompactLines(e.Graphics);
-    }
-
-    private Color ResolvePaintBackColor()
-    {
-        if (BackColor.A == 255)
-        {
-            return BackColor;
-        }
-
-        for (var p = Parent; p is not null; p = p.Parent)
-        {
-            if (p.BackColor.A == 255)
-            {
-                return p.BackColor;
-            }
-        }
-
-        return UiColors.ForControlBack(UiColors.WindowBack);
-    }
-
-    protected override void OnMouseMove(MouseEventArgs e)
-    {
-        if (UseCompactLines)
-        {
-            Cursor = HitTestCompact(e.Location) is not null ? Cursors.Hand : Cursors.Default;
-            return;
-        }
-
-        base.OnMouseMove(e);
-    }
-
-    protected override void OnMouseUp(MouseEventArgs e)
-    {
-        if (UseCompactLines && e.Button == MouseButtons.Left)
-        {
-            var link = HitTestCompact(e.Location);
-            if (link is not null)
-            {
-                OnLinkClicked(new LinkLabelLinkClickedEventArgs(link));
-                return;
-            }
-        }
-
-        base.OnMouseUp(e);
-    }
-
-    private float CompactLinePitch(Graphics g) => Font.GetHeight(g) * _lineHeightScale;
-
-    private static readonly StringFormat CompactFormat = new(StringFormat.GenericTypographic)
-    {
-        FormatFlags = StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoClip,
-        Alignment = StringAlignment.Near,
-        LineAlignment = StringAlignment.Near,
-    };
-
-    private float CompactBlockTop(Graphics g)
-    {
-        var lines = Math.Max(1, Text.Split('\n').Length);
-        var blockH = CompactLinePitch(g) * lines;
-        // コントロール内でも塊を高さ中央へ（nudge で下寄せしない）。
-        return Math.Max(0f, (ClientSize.Height - blockH) / 2f);
-    }
-
-    private void DrawCompactLines(Graphics g)
-    {
-        var lines = Text.Split('\n');
-        var pitch = CompactLinePitch(g);
-        var y = CompactBlockTop(g);
-        var charOffset = 0;
-        using var normal = new SolidBrush(ForeColor);
-        using var linkBrush = new SolidBrush(LinkColor);
-
+        var bodyBrush = UiColors.Brush(UiColors.ActionCopyrightFore);
+        var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
-            var line = lines[i];
-            DrawLineWithLinks(g, line, charOffset, 0f, y, normal, linkBrush);
-            charOffset += line.Length + (i < lines.Length - 1 ? 1 : 0);
-            y += pitch;
+            if (i > 0)
+            {
+                Inlines.Add(new LineBreak());
+            }
+
+            AppendLineWithLinks(lines[i], bodyBrush);
         }
     }
 
-    private void DrawLineWithLinks(
-        Graphics g,
-        string line,
-        int lineStart,
-        float x,
-        float y,
-        Brush normal,
-        Brush linkBrush)
+    private void AppendLineWithLinks(string line, Brush bodyBrush)
     {
-        if (line.Length == 0)
+        if (string.IsNullOrEmpty(line))
         {
+            Inlines.Add(new Run(" ") { Foreground = bodyBrush });
             return;
         }
 
-        var pos = 0;
-        while (pos < line.Length)
+        var remaining = line;
+        while (remaining.Length > 0)
         {
-            var abs = lineStart + pos;
-            var link = FindLinkCovering(abs);
-            if (link is null)
+            var githubAt = remaining.IndexOf("GitHub", StringComparison.Ordinal);
+            var licenseAt = remaining.IndexOf(UiStrings.CopyrightLicenseLinkText, StringComparison.Ordinal);
+            var nextAt = -1;
+            string? nextId = null;
+            var nextLen = 0;
+            if (githubAt >= 0 && (licenseAt < 0 || githubAt <= licenseAt))
             {
-                var nextLinkStart = NextLinkStart(abs, lineStart + line.Length);
-                var end = nextLinkStart < 0
-                    ? line.Length
-                    : Math.Min(line.Length, nextLinkStart - lineStart);
-                if (end <= pos)
+                nextAt = githubAt;
+                nextId = "github";
+                nextLen = "GitHub".Length;
+            }
+            else if (licenseAt >= 0)
+            {
+                nextAt = licenseAt;
+                nextId = "license";
+                nextLen = UiStrings.CopyrightLicenseLinkText.Length;
+            }
+
+            if (nextAt < 0 || nextId is null)
+            {
+                Inlines.Add(new Run(remaining) { Foreground = bodyBrush });
+                break;
+            }
+
+            if (nextAt > 0)
+            {
+                Inlines.Add(new Run(remaining[..nextAt]) { Foreground = bodyBrush });
+            }
+
+            var segment = remaining.Substring(nextAt, nextLen);
+            var link = new Hyperlink(new Run(segment))
+            {
+                TextDecorations = null,
+                Foreground = UiColors.Brush(UiColors.ActionLinkFore),
+                Cursor = Cursors.Hand,
+                Tag = nextId,
+            };
+            var capturedId = nextId;
+            link.Click += (_, _) =>
+                RaiseEvent(new SmoothLinkClickEventArgs(LinkClickEvent, this, capturedId));
+            link.MouseEnter += (_, _) =>
+            {
+                _hoveredLink = link;
+                UpdateLinkBrushes();
+            };
+            link.MouseLeave += (_, _) =>
+            {
+                if (ReferenceEquals(_hoveredLink, link))
                 {
-                    end = line.Length;
+                    _hoveredLink = null;
                 }
 
-                var chunk = line[pos..end];
-                g.DrawString(chunk, Font, normal, x, y, CompactFormat);
-                x += MeasureWidth(g, chunk);
-                pos = end;
-                continue;
-            }
-
-            var linkEndAbs = link.Start + link.Length;
-            var linkEndInLine = Math.Min(line.Length, linkEndAbs - lineStart);
-            var linkChunk = line[pos..linkEndInLine];
-            g.DrawString(linkChunk, Font, linkBrush, x, y, CompactFormat);
-            x += MeasureWidth(g, linkChunk);
-            pos = linkEndInLine;
+                UpdateLinkBrushes();
+            };
+            _links.Add(link);
+            Inlines.Add(link);
+            remaining = remaining[(nextAt + nextLen)..];
         }
     }
 
-    private float MeasureWidth(Graphics g, string text) =>
-        string.IsNullOrEmpty(text) ? 0f : g.MeasureString(text, Font, int.MaxValue, CompactFormat).Width;
-
-    private Link? FindLinkCovering(int absoluteIndex)
+    private void UpdatePlainRunBrushes()
     {
-        foreach (Link link in Links)
+        var body = Foreground;
+        foreach (var inline in Inlines)
         {
-            if (absoluteIndex >= link.Start && absoluteIndex < link.Start + link.Length)
+            if (inline is Run run)
             {
-                return link;
+                run.Foreground = body;
             }
         }
-
-        return null;
     }
 
-    private int NextLinkStart(int fromExclusive, int limit)
+    private void UpdateLinkBrushes()
     {
-        var best = -1;
-        foreach (Link link in Links)
+        var normal = UiColors.Brush(UiColors.ActionLinkFore);
+        var hover = UiColors.Brush(UiColors.ActionLinkHoverFore);
+        foreach (var link in _links)
         {
-            if (link.Start >= fromExclusive && link.Start < limit
-                && (best < 0 || link.Start < best))
-            {
-                best = link.Start;
-            }
+            link.Foreground = ReferenceEquals(link, _hoveredLink) ? hover : normal;
         }
-
-        return best;
     }
+}
 
-    private Link? HitTestCompact(Point client)
+internal sealed class SmoothLinkClickEventArgs : RoutedEventArgs
+{
+    public SmoothLinkClickEventArgs(RoutedEvent routedEvent, object source, string linkId)
+        : base(routedEvent, source)
     {
-        using var g = CreateGraphics();
-        var pitch = CompactLinePitch(g);
-        var y0 = CompactBlockTop(g);
-        if (client.Y < y0)
-        {
-            return null;
-        }
-
-        var lines = Text.Split('\n');
-        var lineIndex = (int)((client.Y - y0) / pitch);
-        if (lineIndex < 0 || lineIndex >= lines.Length)
-        {
-            return null;
-        }
-
-        var line = lines[lineIndex];
-        var charOffset = 0;
-        for (var i = 0; i < lineIndex; i++)
-        {
-            charOffset += lines[i].Length + 1;
-        }
-
-        float x = 0;
-        for (var i = 0; i < line.Length; i++)
-        {
-            var w = MeasureWidth(g, line[i].ToString());
-            if (client.X >= x && client.X < x + Math.Max(w, 1f))
-            {
-                return FindLinkCovering(charOffset + i);
-            }
-
-            x += w;
-        }
-
-        return null;
+        LinkId = linkId;
     }
+
+    public string LinkId { get; }
 }

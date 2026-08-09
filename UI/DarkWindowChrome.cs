@@ -1,12 +1,15 @@
 ﻿using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Interop;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// FixedDialog などの標準枠付きウィンドウをアプリのダークテーマに寄せる。
+/// 標準枠付き WPF ウィンドウをアプリのダークテーマに寄せる。
 /// </summary>
 internal static class DarkWindowChrome
 {
+    private const int DwmwaUseImmersiveDarkModeBefore20 = 19;
     private const int DwmwaUseImmersiveDarkMode = 20;
     private const int DwmwaBorderColor = 34;
     private const int DwmwaCaptionColor = 35;
@@ -14,45 +17,52 @@ internal static class DarkWindowChrome
 
     /// <summary>
     /// タイトルバー／枠をダーク化する（Win10 1809+ / Win11）。
-    /// ハンドル作成前なら <see cref="Control.HandleCreated"/> で適用する。
+    /// <see cref="Window.SourceInitialized"/> 以降、または HWND 取得後に適用する。
     /// </summary>
-    public static void ApplyImmersiveDarkTitleBar(Form form)
+    public static void ApplyImmersiveDarkTitleBar(Window window)
     {
         void Apply()
         {
-            if (form.IsDisposed || !form.IsHandleCreated)
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero)
             {
                 return;
             }
 
             var useDarkMode = 1;
-            _ = DwmSetWindowAttribute(
-                form.Handle,
-                DwmwaUseImmersiveDarkMode,
-                ref useDarkMode,
-                sizeof(int));
+            // 20 が失敗する古い Win10 では 19 を試す。
+            if (DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref useDarkMode, sizeof(int)) != 0)
+            {
+                _ = DwmSetWindowAttribute(
+                    hwnd,
+                    DwmwaUseImmersiveDarkModeBefore20,
+                    ref useDarkMode,
+                    sizeof(int));
+            }
 
-            // Win11: キャプション／枠／文字色をダイアログ本体に寄せる（未対応 OS では失敗して無視）。
-            var caption = ToColorRef(UiColors.DialogBodyBack);
+            // Win11: キャプション色は従来の #1E2026。枠／文字はテーマ色（未対応 OS では失敗して無視）。
+            var caption = ToColorRef(UiColors.TitleBarBack);
             var border = ToColorRef(UiColors.ChromeBorder);
             var text = ToColorRef(UiColors.DialogFore);
-            _ = DwmSetWindowAttribute(form.Handle, DwmwaCaptionColor, ref caption, sizeof(int));
-            _ = DwmSetWindowAttribute(form.Handle, DwmwaBorderColor, ref border, sizeof(int));
-            _ = DwmSetWindowAttribute(form.Handle, DwmwaTextColor, ref text, sizeof(int));
+            _ = DwmSetWindowAttribute(hwnd, DwmwaCaptionColor, ref caption, sizeof(int));
+            _ = DwmSetWindowAttribute(hwnd, DwmwaBorderColor, ref border, sizeof(int));
+            _ = DwmSetWindowAttribute(hwnd, DwmwaTextColor, ref text, sizeof(int));
         }
 
-        if (form.IsHandleCreated)
+        // SourceInitialized ハンドラ内から呼ばれた場合、IsLoaded はまだ false だが HWND は既にある。
+        // IsLoaded で遅延するとイベントを取り逃して白タイトルバーのままになる。
+        if (new WindowInteropHelper(window).Handle != IntPtr.Zero)
         {
             Apply();
         }
         else
         {
-            form.HandleCreated += (_, _) => Apply();
+            window.SourceInitialized += (_, _) => Apply();
         }
     }
 
     /// <summary>COLORREF（0x00BBGGRR）。</summary>
-    private static int ToColorRef(Color color) =>
+    private static int ToColorRef(System.Windows.Media.Color color) =>
         color.R | (color.G << 8) | (color.B << 16);
 
     [DllImport("dwmapi.dll", ExactSpelling = true)]

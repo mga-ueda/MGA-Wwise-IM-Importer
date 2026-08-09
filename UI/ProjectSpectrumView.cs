@@ -1,17 +1,19 @@
-﻿using MgaWwiseIMImporter.Wave;
+﻿using System.Windows;
+using System.Windows.Media;
+using System.Windows.Threading;
+using MgaWwiseIMImporter.Wave;
 
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// プロジェクトバー右端の小型スペクトラムアナライザ。
-/// 再生中の出力（モノラルミックス）を FFT し、RME 風の 1/3 オクターブ帯域で表示する。
-/// 停止・一時停止中はバーが減衰してゼロへ戻る。
+/// バー幅・間隔は WinForms 同様デバイス px 固定（2px）、ホスト幅もそれに合わせる。
 /// </summary>
-internal sealed class ProjectSpectrumView : Control
+internal sealed class ProjectSpectrumView : FrameworkElement
 {
     private const int FftSize = 2048;
-    private const int BarWidth = 2;
-    private const int BarGap = 2;
+    private const int BarWidthDevicePx = 2;
+    private const int BarGapDevicePx = 2;
     private const float FloorDb = -60f;
     private const float CeilingDb = 0f;
     private const double RiseSeconds = 0.001d;
@@ -20,7 +22,6 @@ internal sealed class ProjectSpectrumView : Control
     private const float PeakSoftKneeDb = -6f;
     private const double PeakSoftGamma = 1.24d;
 
-    // MGA-Layer-Music-Checker と同じ RME 風 1/3 オクターブ中心周波数。
     private static readonly double[] BandCenters =
     [
         20d, 25d, 31.5d, 40d, 50d, 63d, 80d, 100d,
@@ -29,7 +30,7 @@ internal sealed class ProjectSpectrumView : Control
         4000d, 5000d, 6300d, 8000d, 10000d, 12500d, 16000d, 20000d,
     ];
 
-    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 33 };
+    private readonly DispatcherTimer _timer;
     private readonly float[] _samples = new float[FftSize];
     private readonly float[] _window = new float[FftSize];
     private readonly double[] _re = new double[FftSize];
@@ -41,18 +42,32 @@ internal sealed class ProjectSpectrumView : Control
     private readonly float _windowSum;
     private bool _idle = true;
 
-    public WaveAudioPlayer? Player { get; set; }
+    public static readonly DependencyProperty BackgroundProperty =
+        System.Windows.Controls.Control.BackgroundProperty.AddOwner(
+            typeof(ProjectSpectrumView),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public Brush? Background
+    {
+        get => (Brush?)GetValue(BackgroundProperty);
+        set => SetValue(BackgroundProperty, value);
+    }
 
     public ProjectSpectrumView()
     {
-        SetStyle(
-            ControlStyles.UserPaint
-            | ControlStyles.AllPaintingInWmPaint
-            | ControlStyles.OptimizedDoubleBuffer
-            | ControlStyles.ResizeRedraw,
-            true);
-        SetStyle(ControlStyles.Selectable, false);
-        TabStop = false;
+        Focusable = false;
+        SnapsToDevicePixels = true;
+        UseLayoutRounding = true;
+        ApplyDevicePixelLayout();
+        Loaded += (_, _) => ApplyDevicePixelLayout();
+        LayoutUpdated += (_, _) =>
+        {
+            var next = RequiredWidthDevicePx / PixelsPerDip;
+            if (Math.Abs(Width - next) > 0.01)
+            {
+                Width = next;
+            }
+        };
 
         var windowSum = 0f;
         for (var i = 0; i < FftSize; i++)
@@ -63,43 +78,70 @@ internal sealed class ProjectSpectrumView : Control
 
         _windowSum = windowSum;
         Array.Fill(_envelopeDb, FloorDb);
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(33) };
         _timer.Tick += (_, _) => UpdateLevels();
         _timer.Start();
     }
 
-    /// <summary>枠なしのため余白なし。</summary>
-    private const int EdgeInset = 0;
+    public WaveAudioPlayer? Player { get; set; }
 
-    private Rectangle InnerBounds =>
-        Rectangle.Inflate(ClientRectangle, -EdgeInset, -EdgeInset);
+    /// <summary>デバイス px 換算の必要幅（バー 2px + 隙間 2px × バンド数）。</summary>
+    public static int RequiredWidthDevicePx =>
+        BandCenters.Length * BarWidthDevicePx
+        + (BandCenters.Length - 1) * BarGapDevicePx;
 
-    /// <summary>全バンドが丁度収まる幅（バー＋間隔）。</summary>
-    public static int RequiredWidth =>
-        BandCenters.Length * BarWidth
-        + (BandCenters.Length - 1) * BarGap
-        + EdgeInset * 2;
-
-    protected override void OnHandleCreated(EventArgs e)
+    private double PixelsPerDip
     {
-        base.OnHandleCreated(e);
-        // DPI スケーリングで拡大されてもバー描画は固定 px のため、
-        // グラフが丁度収まる幅へ自分でサイズを固定する。
-        Width = RequiredWidth;
+        get
+        {
+            var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            return dpi > 0 ? dpi : 1d;
+        }
     }
 
-    protected override void Dispose(bool disposing)
+    private void ApplyDevicePixelLayout()
     {
-        if (disposing)
+        Width = RequiredWidthDevicePx / PixelsPerDip;
+        InvalidateVisual();
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        var back = Background ?? UiColors.Brush(UiColors.ForControlBack(UiColors.ProjectBarBack));
+        dc.DrawRectangle(back, null, new Rect(0, 0, ActualWidth, ActualHeight));
+
+        var inner = new Rect(0, 0, ActualWidth, ActualHeight);
+        if (inner.Width <= 0 || inner.Height <= 0)
         {
-            _timer.Dispose();
+            return;
         }
 
-        base.Dispose(disposing);
+        var px = 1d / PixelsPerDip;
+        var barWidth = BarWidthDevicePx * px;
+        var barGap = BarGapDevicePx * px;
+        var barBrush = UiColors.Brush(UiColors.SpectrumBar);
+        var bandCount = Math.Min(
+            _levels.Length,
+            (int)((inner.Width + barGap) / (barWidth + barGap)));
+        var graphWidth = bandCount * barWidth + Math.Max(0, bandCount - 1) * barGap;
+        var graphLeft = inner.Left + Math.Max(0, (inner.Width - graphWidth) / 2);
+        for (var band = 0; band < bandCount; band++)
+        {
+            var x = graphLeft + band * (barWidth + barGap);
+            var barHeight = Math.Round(_levels[band] * inner.Height);
+            if (barHeight > 0)
+            {
+                dc.DrawRectangle(
+                    barBrush,
+                    null,
+                    new Rect(x, inner.Bottom - barHeight, barWidth, barHeight));
+            }
+        }
     }
 
     private void UpdateLevels()
     {
-        if (!Visible || !IsHandleCreated || IsDisposed)
+        if (!IsVisible)
         {
             return;
         }
@@ -114,9 +156,8 @@ internal sealed class ProjectSpectrumView : Control
         }
         else
         {
-            // 参照実装と同じ約 0.7 秒の指数下降でフロアへ戻す。
             var anyVisible = false;
-            var fall = 1d - Math.Exp(-_timer.Interval / 1000d / FallSeconds);
+            var fall = 1d - Math.Exp(-_timer.Interval.TotalMilliseconds / 1000d / FallSeconds);
             for (var i = 0; i < _levels.Length; i++)
             {
                 _envelopeDb[i] += (FloorDb - _envelopeDb[i]) * (float)fall;
@@ -142,7 +183,7 @@ internal sealed class ProjectSpectrumView : Control
             }
         }
 
-        Invalidate();
+        InvalidateVisual();
     }
 
     private void ComputeBandTargets(int sampleRate)
@@ -159,13 +200,10 @@ internal sealed class ProjectSpectrumView : Control
         }
 
         Fft(_re, _im);
-
         Array.Clear(_bandPower);
         var binHz = sampleRate / (double)FftSize;
         var nyquist = sampleRate / 2d;
 
-        // 各 FFT ビンの線形パワーを、帯域との周波数重なり率に応じて積算する。
-        // 単純な「帯域内の最大ビン」ではないため、狭い低域だけが過大に見えにくい。
         for (var bin = 1; bin < FftSize / 2; bin++)
         {
             var binLow = bin * binHz;
@@ -187,7 +225,7 @@ internal sealed class ProjectSpectrumView : Control
 
         BlurBandPower();
 
-        var dt = _timer.Interval / 1000d;
+        var dt = _timer.Interval.TotalMilliseconds / 1000d;
         var rise = 1d - Math.Exp(-dt / RiseSeconds);
         var fall = 1d - Math.Exp(-dt / FallSeconds);
         for (var band = 0; band < BandCenters.Length; band++)
@@ -197,17 +235,12 @@ internal sealed class ProjectSpectrumView : Control
                 : FloorDb;
             var targetDb = SoftenDisplayPeak(Math.Clamp(rawDb, FloorDb, CeilingDb));
             var coefficient = targetDb >= _envelopeDb[band] ? rise : fall;
-            _envelopeDb[band] +=
-                (targetDb - _envelopeDb[band]) * (float)coefficient;
+            _envelopeDb[band] += (targetDb - _envelopeDb[band]) * (float)coefficient;
             _levels[band] = DbToLevel(_envelopeDb[band]);
         }
     }
 
-    private static void GetBandEdges(
-        int band,
-        double nyquist,
-        out double low,
-        out double high)
+    private static void GetBandEdges(int band, double nyquist, out double low, out double high)
     {
         low = band == 0
             ? BandCenters[0]
@@ -218,7 +251,6 @@ internal sealed class ProjectSpectrumView : Control
         high = Math.Min(high, nyquist * 0.995d);
     }
 
-    /// <summary>参照実装と同じ、線形パワー領域での狭いガウス平滑化。</summary>
     private void BlurBandPower()
     {
         var radius = (int)Math.Ceiling(BlurSigma * 4d);
@@ -234,8 +266,7 @@ internal sealed class ProjectSpectrumView : Control
                     continue;
                 }
 
-                var weight = Math.Exp(
-                    -(offset * offset) / (2d * BlurSigma * BlurSigma));
+                var weight = Math.Exp(-(offset * offset) / (2d * BlurSigma * BlurSigma));
                 weighted += _bandPower[source] * weight;
                 weightSum += weight;
             }
@@ -253,14 +284,12 @@ internal sealed class ProjectSpectrumView : Control
 
         var span = CeilingDb - PeakSoftKneeDb;
         var normalized = (db - PeakSoftKneeDb) / span;
-        return PeakSoftKneeDb
-            + span * (float)Math.Pow(normalized, PeakSoftGamma);
+        return PeakSoftKneeDb + span * (float)Math.Pow(normalized, PeakSoftGamma);
     }
 
     private static float DbToLevel(float db) =>
         Math.Clamp((db - FloorDb) / (CeilingDb - FloorDb), 0f, 1f);
 
-    /// <summary>基数2の反復 FFT（実部・虚部を上書き）。</summary>
     private static void Fft(double[] re, double[] im)
     {
         var n = re.Length;
@@ -302,43 +331,6 @@ internal sealed class ProjectSpectrumView : Control
                     var nextRe = curRe * wRe - curIm * wIm;
                     curIm = curRe * wIm + curIm * wRe;
                     curRe = nextRe;
-                }
-            }
-        }
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        // 背景は親（プロジェクトバー）と同色。枠は描かない。
-        using (var backBrush = new SolidBrush(BackColor))
-        {
-            g.FillRectangle(backBrush, ClientRectangle);
-        }
-
-        var inner = InnerBounds;
-        if (inner.Width > 0 && inner.Height > 0)
-        {
-            using var barBrush = new SolidBrush(UiColors.SpectrumBar);
-            var bandCount = Math.Min(
-                _levels.Length,
-                (inner.Width + BarGap) / (BarWidth + BarGap));
-            var graphWidth = bandCount * BarWidth
-                + Math.Max(0, bandCount - 1) * BarGap;
-            var graphLeft = inner.Left + Math.Max(0, (inner.Width - graphWidth) / 2);
-            for (var band = 0; band < bandCount; band++)
-            {
-                // 2px バー＋1px 間隔で固定し、全バンドを中央配置する。
-                var x = graphLeft + band * (BarWidth + BarGap);
-                var barHeight = (int)Math.Round(_levels[band] * inner.Height);
-                if (barHeight > 0)
-                {
-                    g.FillRectangle(
-                        barBrush,
-                        x,
-                        inner.Bottom - barHeight,
-                        BarWidth,
-                        barHeight);
                 }
             }
         }

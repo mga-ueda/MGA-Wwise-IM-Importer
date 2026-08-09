@@ -1,4 +1,70 @@
-﻿namespace MgaWwiseIMImporter.UI;
+﻿using System.Drawing;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using TextAlignment = System.Windows.TextAlignment;
+using WpfColor = System.Windows.Media.Color;
+
+namespace MgaWwiseIMImporter.UI;
+
+/// <summary>
+/// UiColors の色を GDI+ (<see cref="System.Drawing.Color"/>) として直接使うための薄いラッパー。
+/// WaveformView の描画コードは GDI+ を使い続けるため、このファイル内では
+/// <c>WaveformGdiColors.XXX</c> と書くだけで自動的に System.Drawing.Color へ変換される。
+/// </summary>
+internal static class WaveformGdiColors
+{
+    private static Color D(WpfColor c) => MgaWwiseIMImporter.UI.UiColors.ToDrawing(c);
+
+    public static Color ForControlBack(Color c) => Color.FromArgb(255, c.R, c.G, c.B);
+
+    public static Color ToDrawing(WpfColor c) => D(c);
+
+    public static Color WaveformBack => D(MgaWwiseIMImporter.UI.UiColors.WaveformBack);
+    public static Color EmptyHint => D(MgaWwiseIMImporter.UI.UiColors.EmptyHint);
+    public static Color BarNumberBg => D(MgaWwiseIMImporter.UI.UiColors.BarNumberBg);
+    public static Color TempoBg => D(MgaWwiseIMImporter.UI.UiColors.TempoBg);
+    public static Color SignatureBg => D(MgaWwiseIMImporter.UI.UiColors.SignatureBg);
+    public static Color MarkerRowBg => D(MgaWwiseIMImporter.UI.UiColors.MarkerRowBg);
+    public static Color WaveformInfoFg => D(MgaWwiseIMImporter.UI.UiColors.WaveformInfoFg);
+    public static Color MarkerTriangle => D(MgaWwiseIMImporter.UI.UiColors.MarkerTriangle);
+    public static Color MarkerTriangleSelected => D(MgaWwiseIMImporter.UI.UiColors.MarkerTriangleSelected);
+    public static Color MarkerCommentSelected => D(MgaWwiseIMImporter.UI.UiColors.MarkerCommentSelected);
+    public static Color BarLine => D(MgaWwiseIMImporter.UI.UiColors.BarLine);
+    public static Color BeatLine => D(MgaWwiseIMImporter.UI.UiColors.BeatLine);
+    public static Color TempoChangeLine => D(MgaWwiseIMImporter.UI.UiColors.TempoChangeLine);
+    public static Color WaveFill => D(MgaWwiseIMImporter.UI.UiColors.WaveFill);
+    public static Color WaveZeroDbLine => D(MgaWwiseIMImporter.UI.UiColors.WaveZeroDbLine);
+    public static Color WaveformSourceMeterTrack => D(MgaWwiseIMImporter.UI.UiColors.WaveformSourceMeterTrack);
+    public static Color WaveformSourceMeterMinimum => D(MgaWwiseIMImporter.UI.UiColors.WaveformSourceMeterMinimum);
+    public static Color WaveformSourceMeterMaximum => D(MgaWwiseIMImporter.UI.UiColors.WaveformSourceMeterMaximum);
+    public static Color RegionWaveFillGray => D(MgaWwiseIMImporter.UI.UiColors.RegionWaveFillGray);
+    public static Color RegionWaveFillExcluded => D(MgaWwiseIMImporter.UI.UiColors.RegionWaveFillExcluded);
+    public static Color RegionWaveFillLoop => D(MgaWwiseIMImporter.UI.UiColors.RegionWaveFillLoop);
+    public static Color RegionWaveFillAnacrusis => D(MgaWwiseIMImporter.UI.UiColors.RegionWaveFillAnacrusis);
+    public static Color RegionWaveFillExit => D(MgaWwiseIMImporter.UI.UiColors.RegionWaveFillExit);
+    public static Color RegionBoundaryMarker => D(MgaWwiseIMImporter.UI.UiColors.RegionBoundaryMarker);
+    public static Color EntryCueMarker => D(MgaWwiseIMImporter.UI.UiColors.EntryCueMarker);
+    public static Color ExitCueMarker => D(MgaWwiseIMImporter.UI.UiColors.ExitCueMarker);
+    public static Color OutputPartFg => D(MgaWwiseIMImporter.UI.UiColors.OutputPartFg);
+    public static Color MusicSegmentLaneBg => D(MgaWwiseIMImporter.UI.UiColors.MusicSegmentLaneBg);
+    public static Color MusicPlaylistLaneBg => D(MgaWwiseIMImporter.UI.UiColors.MusicPlaylistLaneBg);
+    public static Color ExportPartGlow => D(MgaWwiseIMImporter.UI.UiColors.ExportPartGlow);
+    public static Color SeekCyan => D(MgaWwiseIMImporter.UI.UiColors.SeekCyan);
+    public static Color RegionFadeCurve => D(MgaWwiseIMImporter.UI.UiColors.RegionFadeCurve);
+    public static Color SeekExit => D(MgaWwiseIMImporter.UI.UiColors.SeekExit);
+    public static Color SeekAnacrusis => D(MgaWwiseIMImporter.UI.UiColors.SeekAnacrusis);
+    public static Color SeekFadeOut => D(MgaWwiseIMImporter.UI.UiColors.SeekFadeOut);
+    public static Color MouseGuide => D(MgaWwiseIMImporter.UI.UiColors.MouseGuide);
+    public static Color ChromeMid => D(MgaWwiseIMImporter.UI.UiColors.ChromeMid);
+    public static Color ChromeBorder => D(MgaWwiseIMImporter.UI.UiColors.ChromeBorder);
+    public static Color TransportDisabledFore => D(MgaWwiseIMImporter.UI.UiColors.TransportDisabledFore);
+    public static Color DialogFore => D(MgaWwiseIMImporter.UI.UiColors.DialogFore);
+    public static Color DialogInputBack => D(MgaWwiseIMImporter.UI.UiColors.DialogInputBack);
+    public static Color LogWarning => D(MgaWwiseIMImporter.UI.UiColors.LogWarning);
+    public static Color PlaylistHoverBorder => D(MgaWwiseIMImporter.UI.UiColors.PlaylistHoverBorder);
+}
 
 internal enum MarkerEditMode
 {
@@ -60,14 +126,17 @@ internal sealed class RegionFadeChangedEventArgs(RegionEdgeFade fade) : EventArg
 /// <summary>
 /// 読み込んだ Wave のピーク波形と再生位置（シークバー）を描画する。
 /// </summary>
-internal sealed class WaveformView : Control
+internal sealed class WaveformView : System.Windows.FrameworkElement
 {
+    // WinForms WaveformView と同じデバイス px 定数（描画ビットマップもデバイス px）。
     private const int LabelWaveGapPx = 3;
     private const int LabelRowCount = 4;
     private const int InfoLanePadX = 8;
     private const int InfoLaneSeparatorPx = 3;
     private const int SourceMeterWidthPx = 12;
     private const int SourceMeterGapPx = 8;
+    private const int ContentPadPx = 4;
+    private const float RegionEdgeGlyphHalfW = 18f;
     private const float NameLaneFontMinPx = 8f;
     private const float NameLaneFontScale = 0.16f;
     private static IReadOnlyList<string> InfoRowLabels => UiStrings.WaveformInfoRowLabels;
@@ -96,6 +165,8 @@ internal sealed class WaveformView : Control
     private bool _endingSourceNameEdit;
     private TextBox? _markerCommentEditor;
     private bool _endingMarkerCommentEdit;
+    private readonly List<System.Windows.UIElement> _visualChildren = [];
+    private readonly Dictionary<System.Windows.UIElement, System.Windows.Rect> _childArrangeRects = [];
     private long? _markerCommentEditSampleOffset;
     private long? _selectedMarkerSampleOffset;
     private bool _allowsSessionMarkerEdit;
@@ -108,7 +179,7 @@ internal sealed class WaveformView : Control
     private IReadOnlyList<RegionEdgeFade> _regionEdgeFades = [];
     private readonly List<FadeHandleHitRegion> _fadeHandleHitRegions = [];
     private readonly List<FadeAreaHitRegion> _fadeAreaHitRegions = [];
-    private ContextMenuStrip? _fadeCurveMenu;
+    private ContextMenu? _fadeCurveMenu;
 
     /// <summary>新規リージョン端フェードの既定 Fade In カーブ（歯車メニューのアプリ設定）。</summary>
     public RegionFadeCurveKind DefaultFadeInCurve { get; set; } =
@@ -145,20 +216,20 @@ internal sealed class WaveformView : Control
         new Dictionary<int, string>();
     private IReadOnlyDictionary<int, int> _playlistPartGroupIds =
         new Dictionary<int, int>();
-    private IReadOnlyDictionary<int, Color> _playlistGroupColors =
-        new Dictionary<int, Color>();
+    private IReadOnlyDictionary<int, WpfColor> _playlistGroupColors =
+        new Dictionary<int, WpfColor>();
     private HashSet<int> _disabledPlaylistPartNumbers = [];
     private IReadOnlyList<WaveformSegmentNameMark> _segmentNames = [];
     private int? _hoveredPlaylistPartNumber;
     private int? _playlistHoverHighlightPartNumber;
     private int? _exportHighlightPartNumber;
-    private readonly System.Windows.Forms.Timer _exportGlowTimer;
+    private readonly DispatcherTimer _exportGlowTimer;
     private string? _timelineTipText;
 
     // 時間軸ズーム（1=全体表示。既定より縮小しない）
     private const double TimeZoomMin = 1.0;
-    private const double TimeZoomMax = 8192.0;
-    // キーボード: ≈ 2^(1/8)。ホイールは少し大きめ ≈ 2^(1/4)
+    private const double TimeZoomMax = 81920.0;
+    // キーボード: ? 2^(1/8)。ホイールは少し大きめ ? 2^(1/4)
     private const double TimeZoomStep = 1.09050773267;
     private const double TimeZoomWheelStep = 1.189207115;
     private double _timeZoom = TimeZoomMin;
@@ -205,24 +276,50 @@ internal sealed class WaveformView : Control
     private int _presentationSuspendCount;
     private bool _holdScaffold;
     private bool _staticRebuildQueued;
+    /// <summary>時間軸ズーム／パンの静的レイヤ再構築を 1 フレームにまとめる。</summary>
+    private bool _timeViewRebuildQueued;
 
-    private const int WmEraseBkgnd = 0x0014;
+    private Bitmap? _frameBitmap;
+    private Bitmap? _measureBitmap;
+    private WriteableBitmap? _presentationBitmap;
+    private bool _disposed;
+
+    public static readonly System.Windows.DependencyProperty BackgroundProperty =
+        Control.BackgroundProperty.AddOwner(
+            typeof(WaveformView),
+            new System.Windows.FrameworkPropertyMetadata(
+                MgaWwiseIMImporter.UI.UiColors.Brush(
+                    MgaWwiseIMImporter.UI.UiColors.ForControlBack(MgaWwiseIMImporter.UI.UiColors.WaveformBack)),
+                System.Windows.FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public System.Windows.Media.Brush? Background
+    {
+        get => (System.Windows.Media.Brush?)GetValue(BackgroundProperty);
+        set => SetValue(BackgroundProperty, value);
+    }
+
+    /// <summary>
+    /// GDI+ 描画フォント。WinForms Control.Font（"Yu Gothic UI" 8.5pt）と同じ。
+    /// デバイス DPI ビットマップ上では GetHeight もデバイス px になるため、
+    /// ホスト高は <see cref="DesignMetrics.WaveformHostHeight"/> で Form1 AutoScale に合わせる。
+    /// </summary>
+    private Font Font { get; set; } = new("Yu Gothic UI", 8.5F);
 
     public WaveformView()
     {
-        SetStyle(
-            ControlStyles.AllPaintingInWmPaint
-            | ControlStyles.OptimizedDoubleBuffer
-            | ControlStyles.ResizeRedraw
-            | ControlStyles.UserPaint
-            | ControlStyles.Opaque,
-            true);
-        BackColor = UiColors.ForControlBack(UiColors.WaveformBack);
-        Font = new Font("Yu Gothic UI", 8.5F);
-        Height = 210;
+        // ホスト（waveformHostPanel）の * 行に追従させる。固定 Height だと Z 倍率時に下側が黒抜けする。
+        HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch;
+        VerticalAlignment = System.Windows.VerticalAlignment.Stretch;
+        // デバイス px ビットマップを 1:1 で貼る（既定の Fant 拡大だと文字が滲む）
+        SnapsToDevicePixels = true;
+        UseLayoutRounding = true;
+        System.Windows.Media.RenderOptions.SetBitmapScalingMode(
+            this, System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+        System.Windows.Media.RenderOptions.SetEdgeMode(this, System.Windows.Media.EdgeMode.Aliased);
         TabStop = false;
-        Cursor = Cursors.Default;
-        _exportGlowTimer = new System.Windows.Forms.Timer { Interval = 16 };
+        Cursor = null;
+        Focusable = true;
+        _exportGlowTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _exportGlowTimer.Tick += (_, _) => Invalidate();
         UiStrings.LanguageChanged += (_, _) =>
         {
@@ -231,6 +328,205 @@ internal sealed class WaveformView : Control
                 Invalidate();
             }
         };
+        Unloaded += OnUnloaded;
+    }
+
+    protected override void OnDpiChanged(
+        System.Windows.DpiScale oldDpi,
+        System.Windows.DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        DisposeStaticLayer();
+        _measureBitmap?.Dispose();
+        _measureBitmap = null;
+        _frameBitmap?.Dispose();
+        _frameBitmap = null;
+        _presentationBitmap = null;
+        Invalidate();
+    }
+
+    private void OnUnloaded(object? sender, System.Windows.RoutedEventArgs e)
+    {
+        _exportGlowTimer.Stop();
+        _fadeCurveMenu = null;
+        DisposeStaticLayer();
+        _frameBitmap?.Dispose();
+        _frameBitmap = null;
+        _measureBitmap?.Dispose();
+        _measureBitmap = null;
+        _presentationBitmap = null;
+        _disposed = true;
+    }
+
+    // --- WinForms 由来 API の薄いシム（挙動はそのまま、名前だけ揃える） ---
+
+    private void Invalidate() => InvalidateVisual();
+
+    private void Update()
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+        }
+    }
+
+    private bool Capture
+    {
+        get => IsMouseCaptured;
+        set
+        {
+            if (value)
+            {
+                CaptureMouse();
+            }
+            else
+            {
+                ReleaseMouseCapture();
+            }
+        }
+    }
+
+    private bool TabStop
+    {
+        get => Focusable;
+        set => Focusable = value;
+    }
+
+    private bool CanFocus => Focusable;
+
+    private bool IsDisposed => _disposed;
+
+    private bool IsHandleCreated => IsLoaded;
+
+    /// <summary>DIP → デバイス px。WinForms ClientSize と同じ単位でレイアウトする。</summary>
+    private double DpiScale
+    {
+        get
+        {
+            var scale = System.Windows.Media.VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            return scale > 0.01 ? scale : 1d;
+        }
+    }
+
+    private float DeviceDpi => (float)(96d * DpiScale);
+
+    /// <summary>デバイス px のクライアント矩形（WinForms ClientRectangle 相当）。</summary>
+    private Rectangle ClientRectangle
+    {
+        get
+        {
+            var scale = DpiScale;
+            return new(
+                0,
+                0,
+                Math.Max(0, (int)Math.Round(ActualWidth * scale)),
+                Math.Max(0, (int)Math.Round(ActualHeight * scale)));
+        }
+    }
+
+    private Rectangle ContentBounds =>
+        Rectangle.Inflate(ClientRectangle, -ContentPadPx, -ContentPadPx);
+
+    private static Rectangle ContentBoundsOf(Rectangle bounds, int pad) =>
+        Rectangle.Inflate(bounds, -pad, -pad);
+
+    private Size ClientSize => ClientRectangle.Size;
+
+    private void BeginInvoke(Action action) => Dispatcher.BeginInvoke(action);
+
+    private static System.Windows.Input.ModifierKeys ModifierKeys => Keyboard.Modifiers;
+
+    private Graphics CreateMeasureGraphics()
+    {
+        var dpi = DeviceDpi;
+        if (_measureBitmap is null
+            || Math.Abs(_measureBitmap.HorizontalResolution - dpi) > 0.1f)
+        {
+            _measureBitmap?.Dispose();
+            _measureBitmap = new Bitmap(1, 1, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            _measureBitmap.SetResolution(dpi, dpi);
+        }
+
+        return Graphics.FromImage(_measureBitmap);
+    }
+
+    private Point ToGdiPoint(System.Windows.Point p)
+    {
+        var scale = DpiScale;
+        return new((int)Math.Round(p.X * scale), (int)Math.Round(p.Y * scale));
+    }
+
+    private System.Windows.Point ToWpfPoint(Point p)
+    {
+        var scale = DpiScale;
+        return new(p.X / scale, p.Y / scale);
+    }
+
+    private static double GdiPointsToWpfFontSize(float gdiPoints) => gdiPoints * (96.0 / 72.0);
+
+    /// <summary>Digits などの他のダーク系インライン入力欄と揃えた見た目の TextBox を作る。</summary>
+    private TextBox CreateDarkInlineEditor(bool bold, TextAlignment alignment)
+    {
+        return new TextBox
+        {
+            Background = MgaWwiseIMImporter.UI.UiColors.Brush(
+                MgaWwiseIMImporter.UI.UiColors.ForControlBack(MgaWwiseIMImporter.UI.UiColors.DialogInputBack)),
+            Foreground = MgaWwiseIMImporter.UI.UiColors.Brush(MgaWwiseIMImporter.UI.UiColors.DialogFore),
+            BorderBrush = MgaWwiseIMImporter.UI.UiColors.Brush(MgaWwiseIMImporter.UI.UiColors.ChromeMid),
+            BorderThickness = new System.Windows.Thickness(1),
+            FontFamily = new System.Windows.Media.FontFamily(Font.FontFamily.Name),
+            FontWeight = bold ? System.Windows.FontWeights.Bold : System.Windows.FontWeights.Normal,
+            FontSize = GdiPointsToWpfFontSize(Font.SizeInPoints),
+            TextAlignment = alignment,
+            Padding = new System.Windows.Thickness(2),
+            Visibility = System.Windows.Visibility.Collapsed,
+        };
+    }
+
+    private void RegisterVisualChild(System.Windows.UIElement child)
+    {
+        _visualChildren.Add(child);
+        AddVisualChild(child);
+        AddLogicalChild(child);
+    }
+
+    private void SetEditorBounds(System.Windows.UIElement editor, Rectangle bounds)
+    {
+        // bounds はデバイス px。WPF 子要素の Arrange は DIP。
+        var scale = DpiScale;
+        _childArrangeRects[editor] = new System.Windows.Rect(
+            bounds.Left / scale,
+            bounds.Top / scale,
+            Math.Max(0, bounds.Width / scale),
+            Math.Max(0, bounds.Height / scale));
+        InvalidateArrange();
+    }
+
+    protected override int VisualChildrenCount => _visualChildren.Count;
+
+    protected override System.Windows.Media.Visual GetVisualChild(int index) => _visualChildren[index];
+
+    protected override System.Windows.Size MeasureOverride(System.Windows.Size availableSize)
+    {
+        foreach (var child in _visualChildren)
+        {
+            child.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+        }
+
+        return availableSize;
+    }
+
+    protected override System.Windows.Size ArrangeOverride(System.Windows.Size finalSize)
+    {
+        foreach (var child in _visualChildren)
+        {
+            var rect = _childArrangeRects.TryGetValue(child, out var r)
+                ? r
+                : new System.Windows.Rect(0, 0, 0, 0);
+            child.Arrange(rect);
+        }
+
+        return finalSize;
     }
 
     public void SetPreview(
@@ -257,7 +553,7 @@ internal sealed class WaveformView : Control
         ClearDetailPeaks();
         if (_sourceSpans.Count > 1)
         {
-            // 仮想タイムライン用のピーク階層を背景構築（ズーム時の概要↔精密ちらつきを防ぐ）
+            // 仮想タイムライン用のピーク階層を背景構築（ズーム時の概要?精密ちらつきを防ぐ）
             StartPeakPyramidBuildFromSpans(_sourceSpans);
         }
         else
@@ -276,7 +572,7 @@ internal sealed class WaveformView : Control
         TabStop = allowsSessionMarkerEdit;
         _playlistDisplayNames = new Dictionary<int, string>();
         _playlistPartGroupIds = new Dictionary<int, int>();
-        _playlistGroupColors = new Dictionary<int, Color>();
+        _playlistGroupColors = new Dictionary<int, WpfColor>();
         SetHoveredPlaylistPart(null);
         SetPlaylistHoverHighlight(null);
         SetSourceNameHovered(false);
@@ -294,7 +590,7 @@ internal sealed class WaveformView : Control
         Capture = false;
         UpdateTimelineTip(null);
         _mouseGuideX = null;
-        Cursor = Cursors.Default;
+        Cursor = null;
 
         // 重いレイヤ生成の前にダークな足場だけ先に出す（白フラッシュ防止）
         DisposeStaticLayer();
@@ -390,15 +686,15 @@ internal sealed class WaveformView : Control
     public void SetPlaylistDisplayNames(
         IReadOnlyDictionary<int, string> names,
         IReadOnlyDictionary<int, int>? partGroupIds = null,
-        IReadOnlyDictionary<int, Color>? partGroupColors = null)
+        IReadOnlyDictionary<int, WpfColor>? partGroupColors = null)
     {
         _playlistDisplayNames = new Dictionary<int, string>(names);
         _playlistPartGroupIds = partGroupIds is null
             ? new Dictionary<int, int>()
             : new Dictionary<int, int>(partGroupIds);
         _playlistGroupColors = partGroupColors is null
-            ? new Dictionary<int, Color>()
-            : new Dictionary<int, Color>(partGroupColors);
+            ? new Dictionary<int, WpfColor>()
+            : new Dictionary<int, WpfColor>(partGroupColors);
         RebuildSegmentNameMarks();
         RebuildPresentationLayers(clearDetailPeaks: false);
     }
@@ -406,10 +702,10 @@ internal sealed class WaveformView : Control
     /// <summary>
     /// グループ帯の色だけを更新する（ドラッグ塗り中の軽量更新用。レイヤ再生成はしない）。
     /// </summary>
-    public void SetPlaylistGroupColors(IReadOnlyDictionary<int, Color> partGroupColors)
+    public void SetPlaylistGroupColors(IReadOnlyDictionary<int, WpfColor> partGroupColors)
     {
-        _playlistGroupColors = new Dictionary<int, Color>(partGroupColors);
-        Invalidate();
+        _playlistGroupColors = new Dictionary<int, WpfColor>(partGroupColors);
+        InvalidateVisual();
     }
 
     /// <summary>
@@ -457,7 +753,6 @@ internal sealed class WaveformView : Control
     /// </summary>
     public void RefreshAppearance()
     {
-        BackColor = UiColors.ForControlBack(UiColors.WaveformBack);
         DisposeStaticLayer();
 
         if (!IsHandleCreated || IsDisposed)
@@ -505,7 +800,7 @@ internal sealed class WaveformView : Control
         TabStop = false;
         _playlistDisplayNames = new Dictionary<int, string>();
         _playlistPartGroupIds = new Dictionary<int, int>();
-        _playlistGroupColors = new Dictionary<int, Color>();
+        _playlistGroupColors = new Dictionary<int, WpfColor>();
         _disabledPlaylistPartNumbers = [];
         UpdateTimelineTip(null);
         SetHoveredPlaylistPart(null);
@@ -523,7 +818,7 @@ internal sealed class WaveformView : Control
         Capture = false;
         _mouseGuideX = null;
         ClearPlayhead();
-        Cursor = Cursors.Default;
+        Cursor = null;
         DisposeStaticLayer();
         Invalidate();
         Update();
@@ -531,7 +826,7 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// 再生位置を更新する。progress は 0〜1。null で非表示。
+    /// 再生位置を更新する。progress は 0?1。null で非表示。
     /// recordTrail が false のとき残光を消す（停止時など）。
     /// recordTrail が true（再生中）のときは、ズーム表示で画面外へ出たらページめくり追従する。
     /// ensureVisible が true のときは停止中でも表示窓を追従させる。
@@ -744,7 +1039,7 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// -E 二重再生ヘッド（赤）。progress は 0〜1。null で非表示。
+    /// -E 二重再生ヘッド（赤）。progress は 0?1。null で非表示。
     /// </summary>
     public void SetExitPlayhead(double? progress, bool recordTrail = false)
     {
@@ -771,7 +1066,7 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// -A 先行再生ヘッド（緑）。progress は 0〜1。null で非表示。
+    /// -A 先行再生ヘッド（緑）。progress は 0?1。null で非表示。
     /// </summary>
     public void SetAnacrusisPlayhead(double? progress, bool recordTrail = false)
     {
@@ -892,7 +1187,7 @@ internal sealed class WaveformView : Control
     {
         if (_exportHighlightPartNumber == partNumber)
         {
-            if (partNumber is not null && !_exportGlowTimer.Enabled)
+            if (partNumber is not null && !_exportGlowTimer.IsEnabled)
             {
                 _exportGlowTimer.Start();
             }
@@ -905,7 +1200,7 @@ internal sealed class WaveformView : Control
         {
             _exportGlowTimer.Stop();
         }
-        else if (!_exportGlowTimer.Enabled)
+        else if (!_exportGlowTimer.IsEnabled)
         {
             _exportGlowTimer.Start();
         }
@@ -1319,14 +1614,16 @@ internal sealed class WaveformView : Control
 
     /// <summary>
     /// マウスホイールによる時間軸ズーム。
-    /// <paramref name="mouseX"/> は本コントロール座標系。アンカーはその X の絶対進捗。
+    /// <paramref name="mouseXDip"/> は WPF DIP 座標。内部でデバイス px に変換する。
     /// </summary>
-    public void ZoomTimeByWheel(int wheelDelta, int mouseX)
+    public void ZoomTimeByWheel(int wheelDelta, int mouseXDip)
     {
         if (_peaks is null || _peaks.IsEmpty || wheelDelta == 0)
         {
             return;
         }
+
+        var mouseX = (int)Math.Round(mouseXDip * DpiScale);
 
         // ノッチに応じた連続倍率（ホイールは 1/4 oct 刻み）
         var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
@@ -1725,15 +2022,40 @@ internal sealed class WaveformView : Control
         _detailViewEnd = double.NaN;
         _detailPixelWidth = -1;
         _detailIsApproximate = false;
-        _rawDetailWanted = null;
+        // 進行中の raw 要求は消さない（ズーム連打で詳細読みが永久に完了しなくなるのを防ぐ）
     }
 
     private void NotifyAmpViewChanged() => RebuildPresentationLayers(clearDetailPeaks: false);
 
     private void NotifyTimeViewChanged()
     {
-        RebuildPresentationLayers(clearDetailPeaks: true);
+        // Form1 同等: ズームのたびに詳細キャッシュを捨て、新しい表示窓で取り直す。
+        // 再構築自体は Render 優先度でまとめて、WPF の GDI→WriteableBitmap 連打を避ける。
+        ClearDetailPeaks();
         TimeViewChanged?.Invoke(this, EventArgs.Empty);
+        QueueTimeViewRebuild();
+    }
+
+    private void QueueTimeViewRebuild()
+    {
+        if (_timeViewRebuildQueued)
+        {
+            return;
+        }
+
+        _timeViewRebuildQueued = true;
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                _timeViewRebuildQueued = false;
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                RebuildPresentationLayers(clearDetailPeaks: false);
+            },
+            DispatcherPriority.Render);
     }
 
     private void RebuildPresentationLayers(bool clearDetailPeaks)
@@ -1826,7 +2148,7 @@ internal sealed class WaveformView : Control
         return true;
     }
 
-    /// <summary>クリック／ドラッグでシーク（0〜1）。</summary>
+    /// <summary>クリック／ドラッグでシーク（0?1）。</summary>
     public event EventHandler<double>? SeekRequested;
 
     /// <summary>時間軸の表示位置または倍率が変更された。</summary>
@@ -1843,7 +2165,7 @@ internal sealed class WaveformView : Control
     {
         get
         {
-            var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+            var content = ContentBounds;
             return content.Left + _infoLaneWidth;
         }
     }
@@ -1934,13 +2256,14 @@ internal sealed class WaveformView : Control
 
     private MarkerHitRegion CreateSyntheticMarkerHit(WaveformMarkerMark marker)
     {
-        var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var content = ContentBounds;
         var labels = new Rectangle(
             content.Left + _infoLaneWidth + 6,
             content.Top,
             Math.Max(1, content.Width - _infoLaneWidth - 6),
             Math.Max(1, content.Height));
-        var rowHeight = Math.Max(14f, Font.Height + 2f);
+        using var measure = CreateMeasureGraphics();
+        var rowHeight = Font.GetHeight(measure) + 2f;
         var markerRowTop = labels.Top + rowHeight * 3f;
         var tipY = markerRowTop + rowHeight - 1f;
         var triHalfW = Math.Min(5f, rowHeight * 0.35f);
@@ -2026,14 +2349,14 @@ internal sealed class WaveformView : Control
         _staticLayer = null;
     }
 
-    protected override void OnResize(EventArgs e)
+    protected override void OnRenderSizeChanged(System.Windows.SizeChangedInfo sizeInfo)
     {
-        base.OnResize(e);
+        base.OnRenderSizeChanged(sizeInfo);
         DisposeStaticLayer();
-        if (_sourceNameEditor is { Visible: true } editor
+        if (_sourceNameEditor is { Visibility: System.Windows.Visibility.Visible } editor
             && TryGetSourceNameBounds(out var editorBounds))
         {
-            editor.Bounds = GetSourceNameEditorBounds(editorBounds, editor);
+            SetEditorBounds(editor, GetSourceNameEditorBounds(editorBounds, editor));
         }
 
         if (!IsHandleCreated)
@@ -2065,59 +2388,26 @@ internal sealed class WaveformView : Control
         Invalidate();
     }
 
-    protected override void OnPaintBackground(PaintEventArgs pevent)
-    {
-        pevent.Graphics.Clear(UiColors.WaveformBack);
-    }
-
-    protected override void WndProc(ref Message m)
-    {
-        // 既定のウィンドウブラシは白。消去をダークで上書きしてフラッシュを防ぐ。
-        if (m.Msg == WmEraseBkgnd)
-        {
-            if (m.WParam != IntPtr.Zero)
-            {
-                using var g = Graphics.FromHdc(m.WParam);
-                g.Clear(UiColors.WaveformBack);
-            }
-
-            m.Result = 1;
-            return;
-        }
-
-        base.WndProc(ref m);
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _exportGlowTimer.Stop();
-            _exportGlowTimer.Dispose();
-            _fadeCurveMenu?.Dispose();
-            DisposeStaticLayer();
-        }
-
-        base.Dispose(disposing);
-    }
-
-    protected override void OnMouseDown(MouseEventArgs e)
+    protected override void OnMouseDown(MouseButtonEventArgs e)
     {
         base.OnMouseDown(e);
 
-        UpdateMouseGuide(e.X);
-        if (e.Button == MouseButtons.Right)
+        var location = ToGdiPoint(e.GetPosition(this));
+        UpdateMouseGuide(location.X);
+        if (e.ChangedButton == MouseButton.Right)
         {
-            if (TryShowFadeCurveMenu(e.Location))
-            {
-                return;
-            }
-
+            TryShowFadeCurveMenu(location);
             return;
         }
 
-        if (e.Button != MouseButtons.Left)
+        if (e.ChangedButton != MouseButton.Left)
         {
+            return;
+        }
+
+        if (e.ClickCount >= 2)
+        {
+            HandleMouseDoubleClick(location);
             return;
         }
 
@@ -2127,20 +2417,20 @@ internal sealed class WaveformView : Control
             Focus();
         }
 
-        if (TryBeginMarkerStroke(e.Location))
+        if (TryBeginMarkerStroke(location))
         {
             return;
         }
 
         if (_allowsSessionMarkerEdit
-            && TryHitSessionMarker(e.Location, out var hit, out _))
+            && TryHitSessionMarker(location, out var hit, out _))
         {
             EndMarkerCommentEdit(commit: true);
             SetSelectedMarker(hit.SampleOffset);
             _isDraggingMarker = true;
             _markerDragFromSample = hit.SampleOffset;
             _markerDragPreviewSample = hit.SampleOffset;
-            _markerDragStartX = e.X;
+            _markerDragStartX = location.X;
             _markerDragMoved = false;
             Capture = true;
             Cursor = Cursors.SizeWE;
@@ -2152,18 +2442,18 @@ internal sealed class WaveformView : Control
             SetSelectedMarker(null);
         }
 
-        if (TryBeginFadeHandleDrag(e.Location))
+        if (TryBeginFadeHandleDrag(location))
         {
             return;
         }
 
-        if (!TryGetProgressFromX(e.X, out var progress))
+        if (!TryGetProgressFromX(location.X, out var progress))
         {
             return;
         }
 
         _isDraggingSeek = true;
-        _seekDragStartX = e.X;
+        _seekDragStartX = location.X;
         _seekMovedDuringDrag = false;
         Capture = true;
         // シングルクリックは MouseDown のみでシークする。
@@ -2172,14 +2462,8 @@ internal sealed class WaveformView : Control
         SeekRequested?.Invoke(this, progress);
     }
 
-    protected override void OnMouseDoubleClick(MouseEventArgs e)
+    private void HandleMouseDoubleClick(Point location)
     {
-        base.OnMouseDoubleClick(e);
-        if (e.Button != MouseButtons.Left)
-        {
-            return;
-        }
-
         if (_markerEditMode is not null)
         {
             return;
@@ -2192,16 +2476,16 @@ internal sealed class WaveformView : Control
         ClearMarkerDragState();
         ClearFadeDragState();
         Capture = false;
-        Cursor = Cursors.Default;
+        Cursor = null;
 
-        if (_sourceNameEditable && IsSourceNamePoint(e.Location))
+        if (_sourceNameEditable && IsSourceNamePoint(location))
         {
             BeginSourceNameEdit();
             return;
         }
 
         if (_allowsSessionMarkerEdit
-            && TryHitSessionMarker(e.Location, out var hit, out _))
+            && TryHitSessionMarker(location, out var hit, out _))
         {
             SetSelectedMarker(hit.SampleOffset);
             BeginMarkerCommentEdit(hit);
@@ -2209,7 +2493,7 @@ internal sealed class WaveformView : Control
         }
 
         var previousZoom = _timeZoom;
-        ZoomTimeToPlaylistUnderMouse(e.X);
+        ZoomTimeToPlaylistUnderMouse(location.X);
         if (_timeZoom > previousZoom + 1e-9)
         {
             TransportFeedbackRequested?.Invoke(this, TransportCommand.TimeZoomIn);
@@ -2218,63 +2502,46 @@ internal sealed class WaveformView : Control
         {
             TransportFeedbackRequested?.Invoke(this, TransportCommand.TimeZoomOut);
         }
-        UpdateTimelineTip(e.Location);
+        UpdateTimelineTip(location);
     }
 
-    protected override bool IsInputKey(Keys keyData)
+    private static bool IsAltKey(KeyEventArgs e) =>
+        e.Key is Key.LeftAlt or Key.RightAlt
+        || (e.Key == Key.System && e.SystemKey is Key.LeftAlt or Key.RightAlt);
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
-        var keyCode = keyData & Keys.KeyCode;
-        if (_peaks is not null
-            && !_peaks.IsEmpty
-            && (keyData & (Keys.Control | Keys.Alt)) == 0
-            && keyCode is Keys.Left or Keys.Right)
+        base.OnPreviewKeyDown(e);
+        if (_isDraggingMarker && IsAltKey(e))
         {
-            return true;
+            RebuildPresentationLayers(clearDetailPeaks: false);
         }
+    }
 
-        if (_allowsSessionMarkerEdit
-            && _selectedMarkerSampleOffset is not null
-            && keyCode == Keys.Delete)
+    protected override void OnPreviewKeyUp(KeyEventArgs e)
+    {
+        base.OnPreviewKeyUp(e);
+        if (_isDraggingMarker && IsAltKey(e))
         {
-            return true;
+            RebuildPresentationLayers(clearDetailPeaks: false);
         }
-
-        return base.IsInputKey(keyData);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (_isDraggingMarker
-            && e.KeyCode is Keys.Menu or Keys.LMenu or Keys.RMenu)
-        {
-            RebuildPresentationLayers(clearDetailPeaks: false);
-        }
-
         if (_allowsSessionMarkerEdit
-            && e.KeyCode == Keys.Delete
+            && e.Key == Key.Delete
             && _selectedMarkerSampleOffset is { } sampleOffset
-            && _markerCommentEditor is not { Visible: true })
+            && _markerCommentEditor is not { Visibility: System.Windows.Visibility.Visible })
         {
             MarkerSessionDeleteRequested?.Invoke(
                 this,
                 new MarkerSessionDeleteRequestedEventArgs(sampleOffset));
             e.Handled = true;
-            e.SuppressKeyPress = true;
             return;
         }
 
         base.OnKeyDown(e);
-    }
-
-    protected override void OnKeyUp(KeyEventArgs e)
-    {
-        if (_isDraggingMarker
-            && e.KeyCode is Keys.Menu or Keys.LMenu or Keys.RMenu)
-        {
-            RebuildPresentationLayers(clearDetailPeaks: false);
-        }
-
-        base.OnKeyUp(e);
     }
 
     private bool IsSourceNamePoint(Point location)
@@ -2291,7 +2558,7 @@ internal sealed class WaveformView : Control
         }
 
         _sourceNameHovered = hovered;
-        Cursor = hovered ? Cursors.IBeam : Cursors.Default;
+        Cursor = hovered ? Cursors.IBeam : null;
         Invalidate();
     }
 
@@ -2307,8 +2574,8 @@ internal sealed class WaveformView : Control
             return false;
         }
 
-        using var g = CreateGraphics();
-        var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+        using var g = CreateMeasureGraphics();
+        var content = ContentBounds;
         var (info, _, wave, _, _, _) = GetLayout(content, g);
         var nameWidth = Math.Max(
             0,
@@ -2332,10 +2599,9 @@ internal sealed class WaveformView : Control
         }
 
         _sourceNameEditor ??= CreateSourceNameEditor();
-        _sourceNameEditor.Bounds = GetSourceNameEditorBounds(bounds, _sourceNameEditor);
+        SetEditorBounds(_sourceNameEditor, GetSourceNameEditorBounds(bounds, _sourceNameEditor));
         _sourceNameEditor.Text = _sourceDisplayName;
-        _sourceNameEditor.Visible = true;
-        _sourceNameEditor.BringToFront();
+        _sourceNameEditor.Visibility = System.Windows.Visibility.Visible;
         _sourceNameEditor.Focus();
         _sourceNameEditor.SelectAll();
         SourceNameEditStateChanged?.Invoke(
@@ -2345,7 +2611,8 @@ internal sealed class WaveformView : Control
 
     private static Rectangle GetSourceNameEditorBounds(Rectangle available, TextBox editor)
     {
-        var height = Math.Min(available.Height, Math.Max(22, editor.PreferredHeight + 2));
+        var preferredHeight = (int)Math.Ceiling(editor.FontSize * 1.6) + 6;
+        var height = Math.Min(available.Height, Math.Max(22, preferredHeight));
         return new Rectangle(
             available.Left,
             available.Top + Math.Max(0, (available.Height - height) / 2),
@@ -2361,9 +2628,10 @@ internal sealed class WaveformView : Control
             return GetSourceNameEditorBounds(available, editor);
         }
 
+        using var g = CreateMeasureGraphics();
         using var font = new Font(Font, FontStyle.Bold);
-        var preferred = TextRenderer.MeasureText("Ag", font).Height + 2;
-        var height = Math.Min(available.Height, Math.Max(22, preferred));
+        var preferred = g.MeasureString("Ag", font).Height + 2;
+        var height = Math.Min(available.Height, Math.Max(22, (int)Math.Ceiling(preferred)));
         return new Rectangle(
             available.Left,
             available.Top + Math.Max(0, (available.Height - height) / 2),
@@ -2374,40 +2642,29 @@ internal sealed class WaveformView : Control
     private TextBox CreateSourceNameEditor()
     {
         // Digits などのオプション入力と同じ、システム描画の FixedSingle 枠。
-        var editor = new TextBox
-        {
-            AutoSize = false,
-            BackColor = UiColors.ForControlBack(UiColors.DialogInputBack),
-            BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font(Font, FontStyle.Bold),
-            ForeColor = UiColors.DialogFore,
-            TextAlign = HorizontalAlignment.Center,
-            Visible = false,
-        };
+        var editor = CreateDarkInlineEditor(bold: true, TextAlignment.Center);
         editor.KeyDown += (_, e) =>
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.Key == Key.Enter)
             {
                 e.Handled = true;
-                e.SuppressKeyPress = true;
                 EndSourceNameEdit(commit: true);
             }
-            else if (e.KeyCode == Keys.Escape)
+            else if (e.Key == Key.Escape)
             {
                 e.Handled = true;
-                e.SuppressKeyPress = true;
                 EndSourceNameEdit(commit: false);
             }
         };
         editor.LostFocus += (_, _) => EndSourceNameEdit(commit: true);
-        Controls.Add(editor);
+        RegisterVisualChild(editor);
         return editor;
     }
 
     private void EndSourceNameEdit(bool commit)
     {
         if (_endingSourceNameEdit
-            || _sourceNameEditor is not { Visible: true } editor)
+            || _sourceNameEditor is not { Visibility: System.Windows.Visibility.Visible } editor)
         {
             return;
         }
@@ -2416,7 +2673,7 @@ internal sealed class WaveformView : Control
         try
         {
             var name = editor.Text.Trim();
-            editor.Visible = false;
+            editor.Visibility = System.Windows.Visibility.Collapsed;
             // TextBox を隠すと次の TabStop（フッタの GitHub 等）へフォーカスが飛ぶため、
             // 波形ビューへ戻して点線枠の表示を避ける。
             if (IsHandleCreated && CanFocus)
@@ -2470,7 +2727,7 @@ internal sealed class WaveformView : Control
 
         // Alt+ドラッグ: 一つ前のマーカーも同じ差分だけプレビュー移動する。
         // プレビュー自体をペア移動可能範囲に制限済みなので、単純な差分でよい。
-        if ((ModifierKeys & Keys.Alt) != 0
+        if ((ModifierKeys & System.Windows.Input.ModifierKeys.Alt) != 0
             && TryGetPreviousMarkerSample(_markerDragFromSample, out var previousSample)
             && sampleOffset == previousSample)
         {
@@ -2504,7 +2761,7 @@ internal sealed class WaveformView : Control
 
         desiredSampleOffset = Math.Clamp(desiredSampleOffset, rangeMin, rangeMax);
 
-        if ((ModifierKeys & Keys.Alt) == 0
+        if ((ModifierKeys & System.Windows.Input.ModifierKeys.Alt) == 0
             || !TryGetPreviousMarkerSample(_markerDragFromSample, out var previousSample))
         {
             return desiredSampleOffset;
@@ -2664,11 +2921,10 @@ internal sealed class WaveformView : Control
         EndSourceNameEdit(commit: false);
         _markerCommentEditor ??= CreateMarkerCommentEditor();
         var editBounds = GetMarkerCommentEditorBounds(hit);
-        _markerCommentEditor.Bounds = editBounds;
+        SetEditorBounds(_markerCommentEditor, editBounds);
         _markerCommentEditSampleOffset = hit.SampleOffset;
         _markerCommentEditor.Text = hit.Comment;
-        _markerCommentEditor.Visible = true;
-        _markerCommentEditor.BringToFront();
+        _markerCommentEditor.Visibility = System.Windows.Visibility.Visible;
         _markerCommentEditor.Focus();
         _markerCommentEditor.SelectAll();
         MarkerCommentEditStateChanged?.Invoke(
@@ -2698,40 +2954,29 @@ internal sealed class WaveformView : Control
 
     private TextBox CreateMarkerCommentEditor()
     {
-        var editor = new TextBox
-        {
-            AutoSize = false,
-            BackColor = UiColors.ForControlBack(UiColors.DialogInputBack),
-            BorderStyle = BorderStyle.FixedSingle,
-            Font = Font,
-            ForeColor = UiColors.DialogFore,
-            TextAlign = HorizontalAlignment.Left,
-            Visible = false,
-        };
+        var editor = CreateDarkInlineEditor(bold: false, TextAlignment.Left);
         editor.KeyDown += (_, e) =>
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.Key == Key.Enter)
             {
                 e.Handled = true;
-                e.SuppressKeyPress = true;
                 EndMarkerCommentEdit(commit: true);
             }
-            else if (e.KeyCode == Keys.Escape)
+            else if (e.Key == Key.Escape)
             {
                 e.Handled = true;
-                e.SuppressKeyPress = true;
                 EndMarkerCommentEdit(commit: false);
             }
         };
         editor.LostFocus += (_, _) => EndMarkerCommentEdit(commit: true);
-        Controls.Add(editor);
+        RegisterVisualChild(editor);
         return editor;
     }
 
     private void EndMarkerCommentEdit(bool commit)
     {
         if (_endingMarkerCommentEdit
-            || _markerCommentEditor is not { Visible: true } editor
+            || _markerCommentEditor is not { Visibility: System.Windows.Visibility.Visible } editor
             || _markerCommentEditSampleOffset is not { } sampleOffset)
         {
             return;
@@ -2741,7 +2986,7 @@ internal sealed class WaveformView : Control
         try
         {
             var comment = editor.Text.Trim();
-            editor.Visible = false;
+            editor.Visibility = System.Windows.Visibility.Collapsed;
             _markerCommentEditSampleOffset = null;
             if (IsHandleCreated && CanFocus)
             {
@@ -2853,7 +3098,7 @@ internal sealed class WaveformView : Control
         var current = isFadeIn ? fade.FadeInCurve : fade.FadeOutCurve;
         FadeCurveIcons.ShowPicker(
             this,
-            location,
+            ToWpfPoint(location),
             current,
             isFadeIn,
             kind => ApplyFadeCurve(fade, isFadeIn, kind),
@@ -3042,27 +3287,28 @@ internal sealed class WaveformView : Control
     {
         base.OnMouseMove(e);
 
-        UpdateMouseGuide(e.X);
-        SetSourceNameHovered(_sourceNameEditable && IsSourceNamePoint(e.Location));
-        UpdateTimelineTip(e.Location);
+        var location = ToGdiPoint(e.GetPosition(this));
+        UpdateMouseGuide(location.X);
+        SetSourceNameHovered(_sourceNameEditable && IsSourceNamePoint(location));
+        UpdateTimelineTip(location);
 
         if (_markerEditMode is not null)
         {
-            ApplyMarkerStroke(_markerStrokeLastX, e.X, includeNearest: true);
-            _markerStrokeLastX = e.X;
+            ApplyMarkerStroke(_markerStrokeLastX, location.X, includeNearest: true);
+            _markerStrokeLastX = location.X;
             return;
         }
 
         if (_isDraggingMarker)
         {
             if (!_markerDragMoved
-                && Math.Abs(e.X - _markerDragStartX) < 3)
+                && Math.Abs(location.X - _markerDragStartX) < 3)
             {
                 return;
             }
 
             _markerDragMoved = true;
-            if (!TryGetSampleFromX(e.X, out var sampleOffset))
+            if (!TryGetSampleFromX(location.X, out var sampleOffset))
             {
                 return;
             }
@@ -3081,13 +3327,13 @@ internal sealed class WaveformView : Control
         if (_isDraggingFadeHandle)
         {
             if (!_fadeDragMoved
-                && Math.Abs(e.X - _fadeDragStartX) < 3)
+                && Math.Abs(location.X - _fadeDragStartX) < 3)
             {
                 return;
             }
 
             _fadeDragMoved = true;
-            if (!TryGetSampleFromX(e.X, out var sampleOffset))
+            if (!TryGetSampleFromX(location.X, out var sampleOffset))
             {
                 return;
             }
@@ -3099,23 +3345,23 @@ internal sealed class WaveformView : Control
         if (!_isDraggingSeek
             && !_isDraggingMarker
             && !_isDraggingFadeHandle
-            && TryHitFadeHandle(e.Location, out _))
+            && TryHitFadeHandle(location, out _))
         {
             Cursor = Cursors.SizeWE;
         }
         else if (!_isDraggingSeek && !_isDraggingMarker && !_isDraggingFadeHandle)
         {
-            Cursor = Cursors.Default;
+            Cursor = null;
         }
 
-        if (!_isDraggingSeek || !TryGetProgressFromX(e.X, out var progress))
+        if (!_isDraggingSeek || !TryGetProgressFromX(location.X, out var progress))
         {
             return;
         }
 
         // クリックとドラッグを分ける（微小なマウスブレは無視）
         if (!_seekMovedDuringDrag
-            && Math.Abs(e.X - _seekDragStartX) < 3)
+            && Math.Abs(location.X - _seekDragStartX) < 3)
         {
             return;
         }
@@ -3131,27 +3377,28 @@ internal sealed class WaveformView : Control
         SeekRequested?.Invoke(this, progress);
     }
 
-    protected override void OnMouseUp(MouseEventArgs e)
+    protected override void OnMouseUp(MouseButtonEventArgs e)
     {
         base.OnMouseUp(e);
 
-        UpdateMouseGuide(e.X);
-        if (e.Button == MouseButtons.Left && _markerEditMode is not null)
+        var location = ToGdiPoint(e.GetPosition(this));
+        UpdateMouseGuide(location.X);
+        if (e.ChangedButton == MouseButton.Left && _markerEditMode is not null)
         {
-            ApplyMarkerStroke(_markerStrokeLastX, e.X, includeNearest: true);
+            ApplyMarkerStroke(_markerStrokeLastX, location.X, includeNearest: true);
             _markerEditMode = null;
             Capture = false;
             return;
         }
 
-        if (e.Button == MouseButtons.Left && _isDraggingMarker)
+        if (e.ChangedButton == MouseButton.Left && _isDraggingMarker)
         {
             var markerMoved = _markerDragMoved;
             var fromSample = _markerDragFromSample;
             var toSample = _markerDragPreviewSample ?? fromSample;
             ClearMarkerDragState();
             Capture = false;
-            Cursor = Cursors.Default;
+            Cursor = null;
 
             if (markerMoved && toSample != fromSample)
             {
@@ -3160,7 +3407,7 @@ internal sealed class WaveformView : Control
                     new MarkerSessionMoveRequestedEventArgs(
                         fromSample,
                         toSample,
-                        shiftPreviousMarker: (ModifierKeys & Keys.Alt) != 0));
+                        shiftPreviousMarker: (ModifierKeys & System.Windows.Input.ModifierKeys.Alt) != 0));
             }
             else
             {
@@ -3170,13 +3417,13 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        if (e.Button == MouseButtons.Left && _isDraggingFadeHandle)
+        if (e.ChangedButton == MouseButton.Left && _isDraggingFadeHandle)
         {
             var preview = _fadeDragPreview;
             var fadeMoved = _fadeDragMoved;
             ClearFadeDragState();
             Capture = false;
-            Cursor = Cursors.Default;
+            Cursor = null;
 
             if (fadeMoved && preview is { } fade)
             {
@@ -3204,7 +3451,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        if (e.Button != MouseButtons.Left || !_isDraggingSeek)
+        if (e.ChangedButton != MouseButton.Left || !_isDraggingSeek)
         {
             return;
         }
@@ -3215,7 +3462,7 @@ internal sealed class WaveformView : Control
         Capture = false;
         // ドラッグ終了位置だけ確定。クリックのみの場合は MouseDown 済みなので再シークしない。
         if (moved
-            && TryGetProgressFromX(e.X, out var progress)
+            && TryGetProgressFromX(location.X, out var progress)
             && (double.IsNaN(_lastMouseSeekProgress)
                 || Math.Abs(progress - _lastMouseSeekProgress) >= 1e-9))
         {
@@ -3224,7 +3471,7 @@ internal sealed class WaveformView : Control
         }
     }
 
-    protected override void OnMouseLeave(EventArgs e)
+    protected override void OnMouseLeave(MouseEventArgs e)
     {
         base.OnMouseLeave(e);
         UpdateTimelineTip(null);
@@ -3245,9 +3492,9 @@ internal sealed class WaveformView : Control
     private bool TryBeginMarkerStroke(Point location)
     {
         var modifiers = ModifierKeys;
-        var editMode = (modifiers & Keys.Control) == Keys.Control
+        var editMode = (modifiers & System.Windows.Input.ModifierKeys.Control) == System.Windows.Input.ModifierKeys.Control
             ? MarkerEditMode.Remove
-            : (modifiers & Keys.Shift) == Keys.Shift
+            : (modifiers & System.Windows.Input.ModifierKeys.Shift) == System.Windows.Input.ModifierKeys.Shift
                 ? MarkerEditMode.Add
                 : (MarkerEditMode?)null;
         if (editMode is null
@@ -3314,8 +3561,8 @@ internal sealed class WaveformView : Control
             return false;
         }
 
-        using var g = CreateGraphics();
-        var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+        using var g = CreateMeasureGraphics();
+        var content = ContentBounds;
         (_, labels, _, _, _, var rowHeight) = GetLayout(content, g);
         if (labels.Width <= 0 || rowHeight <= 0f)
         {
@@ -3422,7 +3669,7 @@ internal sealed class WaveformView : Control
         else
         {
             var averageGapPx = EstimateVisibleBarGapPx(labels, frameCount);
-            using var g = CreateGraphics();
+            using var g = CreateMeasureGraphics();
             var minGap = g.MeasureString("000", Font).Width + 6f;
             var step = ChooseBarThinningStep(averageGapPx, minGap);
             int? previousTempo = null;
@@ -3624,7 +3871,7 @@ internal sealed class WaveformView : Control
     public void RefreshLocalizedTips()
     {
         _timelineTipText = null;
-        var client = PointToClient(Cursor.Position);
+        var client = ToGdiPoint(Mouse.GetPosition(this));
         UpdateTimelineTip(ClientRectangle.Contains(client) ? client : null);
     }
 
@@ -3681,14 +3928,104 @@ internal sealed class WaveformView : Control
         return true;
     }
 
-    protected override void OnPaint(PaintEventArgs e)
+    protected override void OnRender(System.Windows.Media.DrawingContext dc)
     {
-        base.OnPaint(e);
+        base.OnRender(dc);
 
-        var g = e.Graphics;
-        g.Clear(UiColors.WaveformBack);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        var dipWidth = ActualWidth;
+        var dipHeight = ActualHeight;
+        if (dipWidth <= 0 || dipHeight <= 0)
+        {
+            return;
+        }
+
+        // デバイス px ビットマップに WinForms と同じ単位で描き、DIP 矩形へ貼る。
+        var scale = DpiScale;
+        var dpi = DeviceDpi;
+        var width = Math.Max(1, (int)Math.Round(dipWidth * scale));
+        var height = Math.Max(1, (int)Math.Round(dipHeight * scale));
+
+        if (_frameBitmap is null
+            || _frameBitmap.Width != width
+            || _frameBitmap.Height != height
+            || Math.Abs(_frameBitmap.HorizontalResolution - dpi) > 0.1f)
+        {
+            _frameBitmap?.Dispose();
+            _frameBitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            _frameBitmap.SetResolution(dpi, dpi);
+        }
+
+        using (var g = Graphics.FromImage(_frameBitmap))
+        {
+            PaintFrame(g);
+        }
+
+        // DpiX/Y をデバイス DPI に合わせないと、WPF がビットマップを DIP 換算で再スケールして滲む。
+        if (_presentationBitmap is null
+            || _presentationBitmap.PixelWidth != width
+            || _presentationBitmap.PixelHeight != height
+            || Math.Abs(_presentationBitmap.DpiX - dpi) > 0.1
+            || Math.Abs(_presentationBitmap.DpiY - dpi) > 0.1)
+        {
+            _presentationBitmap = new WriteableBitmap(
+                width,
+                height,
+                dpi,
+                dpi,
+                System.Windows.Media.PixelFormats.Pbgra32,
+                null);
+        }
+
+        CopyGdiBitmapToWriteableBitmap(_frameBitmap, _presentationBitmap);
+
+        // 論理サイズは BitmapSource.Width/Height（= Pixel / (Dpi/96)）を使い、強制ストレッチしない。
+        var destW = _presentationBitmap.Width;
+        var destH = _presentationBitmap.Height;
+        dc.DrawImage(_presentationBitmap, new System.Windows.Rect(0, 0, destW, destH));
+    }
+
+    /// <summary>
+    /// GDI+ の <see cref="Bitmap"/> をロックし、そのピクセルを WPF の <see cref="WriteableBitmap"/> へコピーする。
+    /// 両方とも事前乗算済み BGRA (Pbgra32 / Format32bppPArgb) のため、そのまま転送できる。
+    /// </summary>
+    private static void CopyGdiBitmapToWriteableBitmap(Bitmap source, WriteableBitmap target)
+    {
+        var rect = new Rectangle(0, 0, source.Width, source.Height);
+        var data = source.LockBits(
+            rect,
+            System.Drawing.Imaging.ImageLockMode.ReadOnly,
+            System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+        try
+        {
+            target.Lock();
+            try
+            {
+                target.WritePixels(
+                    new System.Windows.Int32Rect(0, 0, source.Width, source.Height),
+                    data.Scan0,
+                    data.Stride * source.Height,
+                    data.Stride);
+            }
+            finally
+            {
+                target.Unlock();
+            }
+        }
+        finally
+        {
+            source.UnlockBits(data);
+        }
+    }
+
+    private void PaintFrame(Graphics g)
+    {
+        g.Clear(WaveformGdiColors.WaveformBack);
+        // 毎フレームのプレイヘッド合成用。HighQuality はズーム／再生中のコピー負荷を増やすだけなので抑える。
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+        g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.None;
 
         var bounds = ClientRectangle;
         if (bounds.Width <= 2 || bounds.Height <= 2)
@@ -3714,13 +4051,13 @@ internal sealed class WaveformView : Control
         // 静的内容を先に暗くし、再生ヘッドやホバー枠は手前に残す。
         DrawDisabledPlaylistDimOverlay(g);
 
-        var content = Rectangle.Inflate(bounds, -4, -4);
+        var content = ContentBoundsOf(bounds, ContentPadPx);
         var timeline = GetTimelineRect(content);
         DrawSourceLevelMeter(g, content);
         DrawSourceNameHoverChrome(g);
         DrawPlaylistHoverOutline(g);
         DrawExportPartGlow(g, timeline);
-        DrawPlayhead(g, timeline, _playheadProgress, _trailSamples, UiColors.SeekCyan);
+        DrawPlayhead(g, timeline, _playheadProgress, _trailSamples, WaveformGdiColors.SeekCyan);
         foreach (var overlay in _overlayPlayheads)
         {
             DrawPlayhead(
@@ -3728,7 +4065,7 @@ internal sealed class WaveformView : Control
                 timeline,
                 overlay.Progress,
                 overlay.TrailSamples,
-                UiColors.SeekCyan);
+                WaveformGdiColors.SeekCyan);
         }
 
         DrawPlayhead(
@@ -3737,8 +4074,8 @@ internal sealed class WaveformView : Control
             _fadeOutPlayheadProgress,
             _fadeOutTrailSamples,
             _fadeOutPlayheadIsExit
-                ? UiColors.SeekExit
-                : UiColors.SeekFadeOut);
+                ? WaveformGdiColors.SeekExit
+                : WaveformGdiColors.SeekFadeOut);
         foreach (var overlayFadeOut in _overlayFadeOutPlayheads)
         {
             DrawPlayhead(
@@ -3746,10 +4083,10 @@ internal sealed class WaveformView : Control
                 timeline,
                 overlayFadeOut.Progress,
                 overlayFadeOut.TrailSamples,
-                UiColors.SeekFadeOut);
+                WaveformGdiColors.SeekFadeOut);
         }
 
-        DrawPlayhead(g, timeline, _exitPlayheadProgress, _exitTrailSamples, UiColors.SeekExit);
+        DrawPlayhead(g, timeline, _exitPlayheadProgress, _exitTrailSamples, WaveformGdiColors.SeekExit);
         foreach (var overlayExit in _overlayExitPlayheads)
         {
             DrawPlayhead(
@@ -3757,7 +4094,7 @@ internal sealed class WaveformView : Control
                 timeline,
                 overlayExit.Progress,
                 overlayExit.TrailSamples,
-                UiColors.SeekExit);
+                WaveformGdiColors.SeekExit);
         }
 
         DrawPlayhead(
@@ -3765,10 +4102,12 @@ internal sealed class WaveformView : Control
             timeline,
             _anacrusisPlayheadProgress,
             _anacrusisTrailSamples,
-            UiColors.SeekAnacrusis);
+            WaveformGdiColors.SeekAnacrusis);
         DrawAltMarkerPairDragGuides(g, timeline);
         DrawMouseGuide(g, timeline);
         DrawPlaylistGroupNameLaneOverlays(g);
+        // 不透明のグループ色の上に、コントラストを取った名前を載せ直す。
+        DrawNameLaneLabelsOverGroupColors(g);
         // フォーマット表示は最前面（グループ色・-R・シークバーより上）。
         DrawPlaylistFormatLabelsTopmost(g);
     }
@@ -3780,7 +4119,7 @@ internal sealed class WaveformView : Control
     {
         if (!_isDraggingMarker
             || !_allowsSessionMarkerEdit
-            || (ModifierKeys & Keys.Alt) == 0
+            || (ModifierKeys & System.Windows.Input.ModifierKeys.Alt) == 0
             || _markerDragPreviewSample is not { } preview
             || _peaks is null
             || _peaks.FrameCount <= 0
@@ -3799,7 +4138,7 @@ internal sealed class WaveformView : Control
         var draggedSample = preview;
         var pairedSample = previousSample + delta;
 
-        using var pen = new Pen(Color.FromArgb(150, UiColors.MarkerTriangle), 1f);
+        using var pen = new Pen(Color.FromArgb(150, WaveformGdiColors.MarkerTriangle), 1f);
         DrawMarkerPositionGuideLine(g, timeline, draggedSample, frameCount, pen);
         DrawMarkerPositionGuideLine(g, timeline, pairedSample, frameCount, pen);
     }
@@ -3823,7 +4162,7 @@ internal sealed class WaveformView : Control
 
     /// <summary>
     /// 無効 Playlist の範囲をテーマ背景色で覆い、約 25% 不透明度に見せる。
-    /// Measure〜Marker・波形・Music Segment／Playlist レーン全体を覆う。
+    /// Measure?Marker・波形・Music Segment／Playlist レーン全体を覆う。
     /// </summary>
     private void DrawDisabledPlaylistDimOverlay(Graphics g)
     {
@@ -3835,7 +4174,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        var layoutContent = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var layoutContent = ContentBounds;
         var (_, labels, wave, playlistLane, segmentLane, _) = GetLayout(layoutContent, g);
         if (wave.Width <= 0)
         {
@@ -3861,8 +4200,8 @@ internal sealed class WaveformView : Control
         }
 
         var frameCount = _peaks.FrameCount;
-        // 191/255 ≈ 75%。背景で覆うと下の描画が約 25% 残って見える。
-        using var brush = new SolidBrush(Color.FromArgb(191, UiColors.WaveformBack));
+        // 191/255 ? 75%。背景で覆うと下の描画が約 25% 残って見える。
+        using var brush = new SolidBrush(Color.FromArgb(191, WaveformGdiColors.WaveformBack));
         var previousSmoothing = g.SmoothingMode;
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
         try
@@ -3895,8 +4234,8 @@ internal sealed class WaveformView : Control
     }
 
     /// <summary>
-    /// グループ化された Playlist の範囲を、Music Segment／Playlist 名前レーンへ
-    /// 半透明色で最前面に重ねる。波形本体には着色しない。
+    /// Music Playlist 側のグループ色をそのまま（アルファ編集なし）で
+    /// Music Segment／Playlist 名前レーンへ塗る。波形本体には着色しない。
     /// </summary>
     private void DrawPlaylistGroupNameLaneOverlays(Graphics g)
     {
@@ -3908,7 +4247,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        var layoutContent = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var layoutContent = ContentBounds;
         var (_, _, wave, playlistLane, segmentLane, _) = GetLayout(layoutContent, g);
         if (wave.Width <= 0
             || (playlistLane.Height <= 0 && segmentLane.Height <= 0))
@@ -3941,8 +4280,8 @@ internal sealed class WaveformView : Control
                     continue;
                 }
 
-                // 名前を読み取りやすいよう、グループ色は 25% の薄い重ね塗りにする。
-                using var fill = new SolidBrush(Color.FromArgb(64, color));
+                // Playlist スウォッチと同じ色を不透明のまま使う（薄めない）。
+                using var fill = new SolidBrush(WaveformGdiColors.ToDrawing(color));
                 if (segmentLane.Height > 0)
                 {
                     g.FillRectangle(fill, x0, segmentLane.Top, x1 - x0, segmentLane.Height);
@@ -3960,9 +4299,109 @@ internal sealed class WaveformView : Control
         }
     }
 
+    /// <summary>
+    /// グループ色で塗りつぶしたレーン上に、白／黒のコントラスト文字で名前を描き直す。
+    /// </summary>
+    private void DrawNameLaneLabelsOverGroupColors(Graphics g)
+    {
+        if (_playlistGroupColors.Count == 0
+            || _peaks is null
+            || _peaks.FrameCount <= 0)
+        {
+            return;
+        }
+
+        var layoutContent = ContentBounds;
+        var (_, _, wave, playlistLane, segmentLane, _) = GetLayout(layoutContent, g);
+        if (wave.Width <= 0)
+        {
+            return;
+        }
+
+        if (playlistLane.Height > 0 && _outputParts.Count > 0)
+        {
+            var items = new List<(string Text, long Start, long End, Color Back)>();
+            foreach (var part in _outputParts)
+            {
+                if (_disabledPlaylistPartNumbers.Contains(part.Number)
+                    || !_playlistGroupColors.TryGetValue(part.Number, out var color))
+                {
+                    continue;
+                }
+
+                var name = _playlistDisplayNames.TryGetValue(part.Number, out var displayName)
+                    ? displayName
+                    : Path.GetFileNameWithoutExtension(part.FileName);
+                if (string.IsNullOrEmpty(name))
+                {
+                    name = part.FileName;
+                }
+
+                items.Add((
+                    $"{name} (.wav)",
+                    part.StartSampleOffset,
+                    part.EndSampleOffset,
+                    WaveformGdiColors.ToDrawing(color)));
+            }
+
+            DrawTimedNameLaneWithBackColors(g, wave, playlistLane, items, FontStyle.Bold);
+        }
+
+        if (segmentLane.Height > 0 && _segmentNames.Count > 0)
+        {
+            var items = new List<(string Text, long Start, long End, Color Back)>();
+            foreach (var segment in _segmentNames)
+            {
+                if (!TryGetGroupColorCoveringSample(segment.StartSampleOffset, out var color))
+                {
+                    continue;
+                }
+
+                items.Add((
+                    segment.Name,
+                    segment.StartSampleOffset,
+                    segment.EndSampleOffset,
+                    color));
+            }
+
+            DrawTimedNameLaneWithBackColors(g, wave, segmentLane, items, FontStyle.Regular);
+            DrawSegmentLaneDividers(g, wave, segmentLane);
+        }
+    }
+
+    private bool TryGetGroupColorCoveringSample(long sampleOffset, out Color color)
+    {
+        foreach (var part in _outputParts)
+        {
+            if (_disabledPlaylistPartNumbers.Contains(part.Number)
+                || sampleOffset < part.StartSampleOffset
+                || sampleOffset >= part.EndSampleOffset
+                || !_playlistGroupColors.TryGetValue(part.Number, out var wpf))
+            {
+                continue;
+            }
+
+            color = WaveformGdiColors.ToDrawing(wpf);
+            return true;
+        }
+
+        color = default;
+        return false;
+    }
+
+    /// <summary>
+    /// 背景が明るいときは黒、暗いときは白（既定の OutputPartFg＝白系）を選ぶ。
+    /// </summary>
+    private static Color PickContrastingForeColor(Color back)
+    {
+        // ITU-R BT.601 近似。閾値付近の暖色でも白が沈まないようやや高め。
+        var y = (back.R * 299 + back.G * 587 + back.B * 114) / 1000;
+        return y >= 140 ? Color.Black : WaveformGdiColors.OutputPartFg;
+    }
+
     private void DrawEmptyScaffold(Graphics g, Rectangle bounds)
     {
-        var content = Rectangle.Inflate(bounds, -4, -4);
+        var content = ContentBoundsOf(bounds, ContentPadPx);
         var (info, labels, wave, playlistLane, segmentLane, rowHeight) = GetLayout(content, g);
         DrawInfoLane(g, info, labels, wave, playlistLane, segmentLane, rowHeight, LabelRowCount);
         DrawLabelRows(g, labels, rowHeight, LabelRowCount);
@@ -3973,7 +4412,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        using var brush = new SolidBrush(UiColors.EmptyHint);
+        using var brush = new SolidBrush(WaveformGdiColors.EmptyHint);
         var message = UiStrings.WaveformEmptyHint;
         var size = g.MeasureString(message, Font);
         var centerX = wave.Width > 0
@@ -3998,6 +4437,7 @@ internal sealed class WaveformView : Control
         float RowHeight)
         GetLayout(Rectangle content, Graphics g)
     {
+        // WinForms と同じ: Font.GetHeight(g)+2（デバイス px ビットマップ上）。
         var rowHeight = Font.GetHeight(g) + 2f;
         var labelsHeight = (int)Math.Ceiling(rowHeight * LabelRowCount);
         var nameLaneHeight = (int)Math.Ceiling(rowHeight);
@@ -4091,7 +4531,7 @@ internal sealed class WaveformView : Control
 
     private Rectangle GetTimelineContentRect()
     {
-        var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var content = ContentBounds;
         return GetTimelineRect(content);
     }
 
@@ -4105,24 +4545,32 @@ internal sealed class WaveformView : Control
 
     private void BuildStaticLayer(Rectangle bounds)
     {
-        // サイズが同じなら Bitmap を作り直さず再利用する（ズーム連打時の GC 圧を抑える）
+        // サイズ・DPI が同じなら Bitmap を作り直さず再利用する（ズーム連打時の GC 圧を抑える）
+        var dpi = DeviceDpi;
         if (_staticLayer is null
             || _staticLayer.Width != bounds.Width
-            || _staticLayer.Height != bounds.Height)
+            || _staticLayer.Height != bounds.Height
+            || Math.Abs(_staticLayer.HorizontalResolution - dpi) > 0.1f)
         {
             DisposeStaticLayer();
             _staticLayer = new Bitmap(
                 bounds.Width,
                 bounds.Height,
                 System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            _staticLayer.SetResolution(dpi, dpi);
         }
 
         using var g = Graphics.FromImage(_staticLayer);
-        g.Clear(UiColors.WaveformBack);
+        g.Clear(WaveformGdiColors.WaveformBack);
+        // 文字は AntiAlias、波形柱は DrawWaveform 側で SmoothingMode.None。
+        // HighQuality 合成はズーム連打時の負荷が大きいので抑える（Form1 OnPaint 相当）。
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        g.CompositingMode = System.Drawing.Drawing2D.CompositingMode.SourceOver;
+        g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+        g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighSpeed;
 
-        var content = Rectangle.Inflate(bounds, -4, -4);
+        var content = ContentBoundsOf(bounds, ContentPadPx);
         var (info, labels, wave, playlistLane, segmentLane, rowHeight) = GetLayout(content, g);
         DrawInfoLane(g, info, labels, wave, playlistLane, segmentLane, rowHeight, LabelRowCount);
         DrawLabelRows(g, labels, rowHeight, LabelRowCount);
@@ -4146,13 +4594,13 @@ internal sealed class WaveformView : Control
     {
         if (segmentLane.Height > 0)
         {
-            using var segmentBg = new SolidBrush(UiColors.MusicSegmentLaneBg);
+            using var segmentBg = new SolidBrush(WaveformGdiColors.MusicSegmentLaneBg);
             g.FillRectangle(segmentBg, segmentLane);
         }
 
         if (playlistLane.Height > 0)
         {
-            using var playlistBg = new SolidBrush(UiColors.MusicPlaylistLaneBg);
+            using var playlistBg = new SolidBrush(WaveformGdiColors.MusicPlaylistLaneBg);
             g.FillRectangle(playlistBg, playlistLane);
         }
     }
@@ -4160,10 +4608,10 @@ internal sealed class WaveformView : Control
     /// <summary>情報レーン 4 行（小節番号／テンポ／拍子／マーカー）の背景色。都度取得（色は実行時に変わり得る）。</summary>
     private static Color[] InfoRowBackColors =>
     [
-        UiColors.BarNumberBg,
-        UiColors.TempoBg,
-        UiColors.SignatureBg,
-        UiColors.MarkerRowBg,
+        WaveformGdiColors.BarNumberBg,
+        WaveformGdiColors.TempoBg,
+        WaveformGdiColors.SignatureBg,
+        WaveformGdiColors.MarkerRowBg,
     ];
 
     private void DrawInfoLane(
@@ -4183,8 +4631,8 @@ internal sealed class WaveformView : Control
 
         var rowColors = InfoRowBackColors;
 
-        using var textBrush = new SolidBrush(UiColors.WaveformInfoFg);
-        using var disabledTextBrush = new SolidBrush(UiColors.TransportDisabledFore);
+        using var textBrush = new SolidBrush(WaveformGdiColors.WaveformInfoFg);
+        using var disabledTextBrush = new SolidBrush(WaveformGdiColors.TransportDisabledFore);
         using var infoFont = new Font(Font, FontStyle.Bold);
         using var format = new StringFormat
         {
@@ -4218,7 +4666,7 @@ internal sealed class WaveformView : Control
         }
 
         // 情報レーンとタイムラインの区切り（波形背景色・3px）
-        using (var sepBrush = new SolidBrush(UiColors.WaveformBack))
+        using (var sepBrush = new SolidBrush(WaveformGdiColors.WaveformBack))
         {
             g.FillRectangle(
                 sepBrush,
@@ -4236,7 +4684,7 @@ internal sealed class WaveformView : Control
             infoFont,
             textBrush,
             format,
-            UiColors.MusicSegmentLaneBg);
+            WaveformGdiColors.MusicSegmentLaneBg);
         DrawBottomLaneInfoLabel(
             g,
             info,
@@ -4245,7 +4693,7 @@ internal sealed class WaveformView : Control
             infoFont,
             textBrush,
             format,
-            UiColors.MusicPlaylistLaneBg);
+            WaveformGdiColors.MusicPlaylistLaneBg);
 
         if (_sourceDisplayName.Length == 0 || wave.Height <= 0)
         {
@@ -4259,7 +4707,8 @@ internal sealed class WaveformView : Control
             - InfoLanePadX * 2
             - SourceMeterGapPx
             - SourceMeterWidthPx);
-        var nameHeight = Math.Max(0, wave.Height - 4f);
+        var namePadY = 2f;
+        var nameHeight = Math.Max(0, wave.Height - namePadY * 2f);
         if (nameWidth <= 0 || nameHeight <= 0)
         {
             return;
@@ -4276,7 +4725,7 @@ internal sealed class WaveformView : Control
             _sourceDisplayName,
             infoFont,
             textBrush,
-            new RectangleF(info.Left + InfoLanePadX, wave.Top + 2f, nameWidth, nameHeight),
+            new RectangleF(info.Left + InfoLanePadX, wave.Top + namePadY, nameWidth, nameHeight),
             nameFormat);
     }
 
@@ -4288,7 +4737,7 @@ internal sealed class WaveformView : Control
     {
         if (!_sourceNameEditable
             || !_sourceNameHovered
-            || _sourceNameEditor is { Visible: true }
+            || _sourceNameEditor is { Visibility: System.Windows.Visibility.Visible }
             || !TryGetSourceNameBounds(out var available))
         {
             return;
@@ -4300,11 +4749,11 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        using var fill = new SolidBrush(UiColors.ForControlBack(UiColors.DialogInputBack));
+        using var fill = new SolidBrush(WaveformGdiColors.ForControlBack(WaveformGdiColors.DialogInputBack));
         g.FillRectangle(fill, hoverBounds);
 
         using var font = new Font(Font, FontStyle.Bold);
-        using var nameBrush = new SolidBrush(UiColors.DialogFore);
+        using var nameBrush = new SolidBrush(WaveformGdiColors.DialogFore);
         using var nameFormat = new StringFormat
         {
             Alignment = StringAlignment.Center,
@@ -4324,30 +4773,11 @@ internal sealed class WaveformView : Control
             hoverBounds.Height - 1);
     }
 
-    private static Color? _fixedSingleBorderColor;
-
     /// <summary>
-    /// システム描画の FixedSingle TextBox（Digits エディタ等）の実際の枠色。
-    /// テーマにより固定値では合わないため、一度だけ実測してキャッシュする。
+    /// WPF の TextBox 枠色（ChromeMid）に合わせた固定値。
+    /// WinForms 版は実際の TextBox を描画して実測していたが、WPF 版ではテーマ色を直接使う。
     /// </summary>
-    private static Color GetFixedSingleBorderColor()
-    {
-        if (_fixedSingleBorderColor is Color cached)
-        {
-            return cached;
-        }
-
-        using var probe = new TextBox
-        {
-            BorderStyle = BorderStyle.FixedSingle,
-            Size = new Size(24, 24),
-        };
-        using var bmp = new Bitmap(probe.Width, probe.Height);
-        probe.DrawToBitmap(bmp, new Rectangle(Point.Empty, probe.Size));
-        var color = bmp.GetPixel(0, 0);
-        _fixedSingleBorderColor = color;
-        return color;
-    }
+    private static Color GetFixedSingleBorderColor() => WaveformGdiColors.ChromeMid;
 
     private void DrawSourceLevelMeter(Graphics g, Rectangle content)
     {
@@ -4367,7 +4797,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        using var trackBrush = new SolidBrush(UiColors.WaveformSourceMeterTrack);
+        using var trackBrush = new SolidBrush(WaveformGdiColors.WaveformSourceMeterTrack);
         g.FillRectangle(trackBrush, meter);
 
         var fillHeight = (int)Math.Round(meter.Height * _outputLevel);
@@ -4378,8 +4808,8 @@ internal sealed class WaveformView : Control
 
         using var levelBrush = new System.Drawing.Drawing2D.LinearGradientBrush(
             meter,
-            UiColors.WaveformSourceMeterMaximum,
-            UiColors.WaveformSourceMeterMinimum,
+            WaveformGdiColors.WaveformSourceMeterMaximum,
+            WaveformGdiColors.WaveformSourceMeterMinimum,
             System.Drawing.Drawing2D.LinearGradientMode.Vertical);
         g.FillRectangle(
             levelBrush,
@@ -4389,7 +4819,7 @@ internal sealed class WaveformView : Control
             fillHeight);
     }
 
-    private static void DrawBottomLaneInfoLabel(
+    private void DrawBottomLaneInfoLabel(
         Graphics g,
         Rectangle info,
         Rectangle lane,
@@ -4404,6 +4834,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
+        var padX = InfoLanePadX;
         using var laneBg = new SolidBrush(laneBackColor);
         g.FillRectangle(laneBg, info.Left, lane.Top, info.Width, lane.Height);
         g.DrawString(
@@ -4411,9 +4842,9 @@ internal sealed class WaveformView : Control
             font,
             textBrush,
             new RectangleF(
-                info.Left + InfoLanePadX,
+                info.Left + padX,
                 lane.Top,
-                Math.Max(0, info.Width - InfoLanePadX * 2),
+                Math.Max(0, info.Width - padX * 2),
                 lane.Height),
             format);
     }
@@ -4446,7 +4877,7 @@ internal sealed class WaveformView : Control
 
         var peaks = _peaks!;
         var midY = wave.Top + wave.Height / 2f;
-        using (var zeroDbPen = new Pen(UiColors.WaveZeroDbLine, 1f))
+        using (var zeroDbPen = new Pen(WaveformGdiColors.WaveZeroDbLine, 1f))
         {
             g.DrawLine(zeroDbPen, wave.Left, midY, wave.Right, midY);
         }
@@ -4459,7 +4890,7 @@ internal sealed class WaveformView : Control
 
         // 縦ズーム込み。±1.0 が既定で波形上下端、それ以上はクリップ
         var amplitude = wave.Height * 0.5f * (float)_ampZoom;
-        using var wavePen = new Pen(UiColors.WaveFill, 1f);
+        using var wavePen = new Pen(WaveformGdiColors.WaveFill, 1f);
         var displayFades = GetDisplayRegionEdgeFades();
         var frameCount = peaks.FrameCount;
 
@@ -4477,7 +4908,7 @@ internal sealed class WaveformView : Control
                 endFrame = Math.Clamp(endFrame, startFrame, frameCount);
                 var rangeFrames = endFrame - startFrame;
 
-                // 表示内サンプルが疎〜中密度なら、DAW 定番のサンプル間直線折れ線。
+                // 表示内サンプルが疎?中密度なら、DAW 定番のサンプル間直線折れ線。
                 // （曲線補間は実サンプルを偽るので使わない）
                 if (CanDrawSamplePolyline(detail, rangeFrames, wave.Width))
                 {
@@ -4704,10 +5135,10 @@ internal sealed class WaveformView : Control
 
         var frameCount = _peaks.FrameCount;
         var markerRowTop = labels.Top + rowHeight * 3f;
-        var white = UiColors.ForControlBack(UiColors.RegionBoundaryMarker);
-        var entryColor = UiColors.ForControlBack(UiColors.EntryCueMarker);
-        var exitColor = UiColors.ForControlBack(UiColors.ExitCueMarker);
-        var fadeCurve = UiColors.ForControlBack(UiColors.RegionFadeCurve);
+        var white = WaveformGdiColors.ForControlBack(WaveformGdiColors.RegionBoundaryMarker);
+        var entryColor = WaveformGdiColors.ForControlBack(WaveformGdiColors.EntryCueMarker);
+        var exitColor = WaveformGdiColors.ForControlBack(WaveformGdiColors.ExitCueMarker);
+        var fadeCurve = WaveformGdiColors.ForControlBack(WaveformGdiColors.RegionFadeCurve);
         var displayFades = GetDisplayRegionEdgeFades();
 
         using var whiteHandlePen = new Pen(white, 1f);
@@ -4884,7 +5315,7 @@ internal sealed class WaveformView : Control
         }
     }
 
-    private static FadeHandleHitRegion CreateFadeHandleHit(
+    private FadeHandleHitRegion CreateFadeHandleHit(
         float glyphX,
         float baseY,
         bool isStart,
@@ -4892,15 +5323,16 @@ internal sealed class WaveformView : Control
         long outSample,
         bool isFadeIn)
     {
-        const float halfW = 18f;
+        var halfW = RegionEdgeGlyphHalfW;
+        var pad = 2f;
         var triH = halfW * MathF.Sqrt(3f) / 2f;
-        var left = isStart ? glyphX - 2f : glyphX - halfW - 2f;
-        var right = isStart ? glyphX + halfW + 2f : glyphX + 2f;
+        var left = isStart ? glyphX - pad : glyphX - halfW - pad;
+        var right = isStart ? glyphX + halfW + pad : glyphX + pad;
         return new FadeHandleHitRegion(
             inSample,
             outSample,
             isFadeIn,
-            RectangleF.FromLTRB(left, baseY - 2f, right, baseY + triH + 2f));
+            RectangleF.FromLTRB(left, baseY - pad, right, baseY + triH + pad));
     }
 
     private void DrawRegionFadeCurve(
@@ -4971,7 +5403,7 @@ internal sealed class WaveformView : Control
     /// 三角位置から真下へ 1px 線を引く。
     /// Entry/Exit Cue は <paramref name="glyphAnchorY"/> で Marker 段へ置く。
     /// </summary>
-    private static void DrawRegionEdgeGlyph(
+    private void DrawRegionEdgeGlyph(
         Graphics g,
         Pen pen,
         Brush brush,
@@ -4982,7 +5414,7 @@ internal sealed class WaveformView : Control
         float? glyphAnchorY = null,
         bool dropLineAtGlyph = false)
     {
-        const float halfW = 18f;
+        var halfW = RegionEdgeGlyphHalfW;
 
         var baseY = glyphAnchorY ?? wave.Top;
         if (dropLineAtGlyph)
@@ -5067,9 +5499,8 @@ internal sealed class WaveformView : Control
 
     /// <summary>
     /// 表示窓の範囲を画面幅分のピークに集計する（ズーム時の粒度を確保）。
-    /// UI スレッドではメモリ上のピーク階層だけを使い、ディスク読みは一切しない。
-    /// 階層の粒度が足りない深いズームでは、まず近似を即描画し、
-    /// 生サンプルの精密ピークをバックグラウンドで読んで完成後に差し替える。
+    /// ピラミッド粒度が足りない中間ズームでは、軽い範囲を同期で精密化し、
+    /// それ以外は近似を即描画しつつ背景読みで差し替える（Form1 相当）。
     /// </summary>
     private WavPeakData? EnsureDetailPeaks(Rectangle wave)
     {
@@ -5087,20 +5518,31 @@ internal sealed class WaveformView : Control
         var rangeFrames = endFrame - startFrame;
         var polylineZoom = IsPolylineZoom(rangeFrames, wave.Width);
 
-        if (_detailPeaks is not null
-            && !_detailPeaks.IsEmpty
-            && _detailPixelWidth == wave.Width
-            && Math.Abs(_detailViewStart - _viewStart) < 1e-12
-            && Math.Abs(_detailViewEnd - viewEnd) < 1e-12)
+        if (IsDetailCacheValid(wave.Width, viewEnd))
         {
-            if (polylineZoom && (_detailIsApproximate || _detailPeaks.Mins.Length != rangeFrames))
+            _detailPixelWidth = wave.Width;
+
+            var hasPolylineSamples = !_detailIsApproximate
+                && _detailPeaks!.Mins.Length == rangeFrames;
+            if (polylineZoom && !hasPolylineSamples)
             {
+                if (TryLoadRawDetailPeaks(startFrame, endFrame, wave.Width, polylineZoom: true))
+                {
+                    return _detailPeaks;
+                }
+
                 RequestRawDetail(_viewStart, viewEnd, wave.Width);
-                return null;
+                return _detailIsApproximate ? _detailPeaks : null;
             }
 
             if (_detailIsApproximate)
             {
+                // 近似キャッシュ中は精密化を促す（同期が取れれば即差し替え）。
+                if (TryLoadRawDetailPeaks(startFrame, endFrame, wave.Width, polylineZoom: false))
+                {
+                    return _detailPeaks;
+                }
+
                 RequestRawDetail(_viewStart, viewEnd, wave.Width);
             }
 
@@ -5117,7 +5559,6 @@ internal sealed class WaveformView : Control
         if (polylineZoom)
         {
             // 折れ線は表示内の全サンプル点が必要。幅バケットのピラミッド集計では足りない。
-            RequestRawDetail(_viewStart, viewEnd, wave.Width);
             if (pyramid is not null
                 && pyramid.HasFullDetailFor(startFrame, endFrame, (int)rangeFrames))
             {
@@ -5129,26 +5570,45 @@ internal sealed class WaveformView : Control
                 return _detailPeaks;
             }
 
-            return null;
+            if (TryLoadRawDetailPeaks(startFrame, endFrame, wave.Width, polylineZoom: true))
+            {
+                return _detailPeaks;
+            }
+
+            RequestRawDetail(_viewStart, viewEnd, wave.Width);
+            return AssignApproximateDetail(pyramid, startFrame, endFrame, viewEnd, wave.Width);
         }
 
         if (pyramid is not null)
         {
             var fullDetail = pyramid.HasFullDetailFor(startFrame, endFrame, wave.Width);
-            _detailPeaks = pyramid.ReadRange(startFrame, endFrame, wave.Width);
-            _detailViewStart = _viewStart;
-            _detailViewEnd = viewEnd;
-            _detailPixelWidth = wave.Width;
-            _detailIsApproximate = !fullDetail;
-            if (_detailIsApproximate)
+            if (fullDetail)
             {
-                RequestRawDetail(_viewStart, viewEnd, wave.Width);
+                _detailPeaks = pyramid.ReadRange(startFrame, endFrame, wave.Width);
+                _detailViewStart = _viewStart;
+                _detailViewEnd = viewEnd;
+                _detailPixelWidth = wave.Width;
+                _detailIsApproximate = false;
+                return _detailPeaks;
             }
 
+            // ピラミッド不足 = 1px あたり基底バケット未満。読み量は小さく同期で即精密化できる。
+            // （Form1 の背景読みは WinForms ではすぐ届くが、WPF では遅延し約 45 段ズームまで荒いまま固まった）
+            if (TryLoadRawDetailPeaks(startFrame, endFrame, wave.Width, polylineZoom: false))
+            {
+                return _detailPeaks;
+            }
+
+            RequestRawDetail(_viewStart, viewEnd, wave.Width);
+            return AssignApproximateDetail(pyramid, startFrame, endFrame, viewEnd, wave.Width);
+        }
+
+        // 階層構築中: 軽い範囲は同期、だめなら背景読み。
+        if (TryLoadRawDetailPeaks(startFrame, endFrame, wave.Width, polylineZoom: false))
+        {
             return _detailPeaks;
         }
 
-        // 階層構築中: 概要ピークのフォールバック描画で即応答する。
         var overviewFramesPerBucket = frameCount / (double)Math.Max(1, _peaks.Mins.Length);
         if (rangeFrames / (double)wave.Width < overviewFramesPerBucket)
         {
@@ -5156,6 +5616,110 @@ internal sealed class WaveformView : Control
         }
 
         return null;
+    }
+
+    private WavPeakData? AssignApproximateDetail(
+        WavPeakPyramid? pyramid,
+        long startFrame,
+        long endFrame,
+        double viewEnd,
+        int waveWidth)
+    {
+        if (pyramid is null)
+        {
+            return null;
+        }
+
+        _detailPeaks = pyramid.ReadRange(startFrame, endFrame, waveWidth);
+        _detailViewStart = _viewStart;
+        _detailViewEnd = viewEnd;
+        _detailPixelWidth = waveWidth;
+        _detailIsApproximate = true;
+        return _detailPeaks;
+    }
+
+    private bool IsDetailCacheValid(int waveWidth, double viewEnd)
+    {
+        if (_detailPeaks is null || _detailPeaks.IsEmpty)
+        {
+            return false;
+        }
+
+        const double viewEpsilon = 1e-9;
+        if (Math.Abs(_detailViewStart - _viewStart) > viewEpsilon
+            || Math.Abs(_detailViewEnd - viewEnd) > viewEpsilon)
+        {
+            return false;
+        }
+
+        return Math.Abs(_detailPixelWidth - waveWidth) <= 1;
+    }
+
+    /// <summary>
+    /// 生サンプルから詳細ピークを同期読みする。
+    /// 折れ線は短窓の全サンプル、中間ズームは画面幅バケット（ピラミッド不足時は軽い）。
+    /// </summary>
+    private bool TryLoadRawDetailPeaks(
+        long startFrame,
+        long endFrame,
+        int width,
+        bool polylineZoom)
+    {
+        var info = _wavInfo;
+        var peaks = _peaks;
+        if (info is null || peaks is null || peaks.IsEmpty || width <= 0)
+        {
+            return false;
+        }
+
+        var rangeFrames = endFrame - startFrame;
+        if (rangeFrames <= 0)
+        {
+            return false;
+        }
+
+        int peakCount;
+        if (polylineZoom)
+        {
+            if (rangeFrames > 96_000L)
+            {
+                return false;
+            }
+
+            peakCount = (int)rangeFrames;
+        }
+        else
+        {
+            // 中間ズームの安全上限（通常は width×BaseBucketFrames 未満でここまで来ない）
+            if (rangeFrames > (long)width * 1024L)
+            {
+                return false;
+            }
+
+            peakCount = width;
+        }
+
+        try
+        {
+            var data = _sourceSpans.Count > 1
+                ? WavPeakReader.ReadVirtualRange(_sourceSpans, startFrame, endFrame, peakCount)
+                : WavPeakReader.ReadRange(info, startFrame, endFrame, peakCount);
+            if (data is null || data.IsEmpty)
+            {
+                return false;
+            }
+
+            _detailPeaks = data;
+            _detailViewStart = _viewStart;
+            _detailViewEnd = ViewEnd;
+            _detailPixelWidth = width;
+            _detailIsApproximate = false;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -5194,9 +5758,9 @@ internal sealed class WaveformView : Control
         if (!_detailIsApproximate
             && _detailPeaks is not null
             && !_detailPeaks.IsEmpty
-            && _detailPixelWidth == wanted.Width
-            && Math.Abs(_detailViewStart - wanted.ViewStart) < 1e-12
-            && Math.Abs(_detailViewEnd - wanted.ViewEnd) < 1e-12
+            && Math.Abs(_detailPixelWidth - wanted.Width) <= 1
+            && Math.Abs(_detailViewStart - wanted.ViewStart) <= 1e-9
+            && Math.Abs(_detailViewEnd - wanted.ViewEnd) <= 1e-9
             && (!polylineZoom || _detailPeaks.Mins.Length == rangeFrames))
         {
             return;
@@ -5242,18 +5806,16 @@ internal sealed class WaveformView : Control
 
             try
             {
-                if (!IsHandleCreated || IsDisposed)
+                if (IsDisposed)
                 {
-                    // UI へマーシャリングできない。次回 SetPreview / Clear で再構築する。
                     _rawDetailReading = false;
                     return;
                 }
 
-                BeginInvoke(CompleteOnUi);
+                Dispatcher.BeginInvoke(() => CompleteOnUi(), DispatcherPriority.Render);
             }
             catch (InvalidOperationException)
             {
-                // ハンドル破棄レースなどは無視（次回 SetPreview で再構築）
                 _rawDetailReading = false;
             }
         });
@@ -5266,9 +5828,10 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        // ズーム連打中に届いた古い結果は捨てる（表示窓が一致するときだけ反映）
-        if (Math.Abs(wanted.ViewStart - _viewStart) > 1e-12
-            || Math.Abs(wanted.ViewEnd - ViewEnd) > 1e-12)
+        // ズーム連打中に届いた古い結果は捨てる（表示窓が一致するときだけ反映）。
+        const double viewEpsilon = 1e-9;
+        if (Math.Abs(wanted.ViewStart - _viewStart) > viewEpsilon
+            || Math.Abs(wanted.ViewEnd - ViewEnd) > viewEpsilon)
         {
             return;
         }
@@ -5339,29 +5902,26 @@ internal sealed class WaveformView : Control
     {
         try
         {
-            if (!IsHandleCreated || IsDisposed)
-            {
-                // UI へマーシャリングできない。次回 SetPreview で再構築する。
-                return;
-            }
-
-            BeginInvoke(() =>
-            {
-                if (generation != _pyramidGeneration || IsDisposed)
+            // 背景スレッドから IsLoaded を見ると落とすことがある。常に UI へ載せる。
+            Dispatcher.BeginInvoke(
+                () =>
                 {
-                    return;
-                }
+                    if (generation != _pyramidGeneration || IsDisposed)
+                    {
+                        return;
+                    }
 
-                _peakPyramid = pyramid;
-                // 初回表示は概要の間引きピークのまま焼き付いていることがある。
-                // 階層完成後に再構築しないと、初回ズーム時に初めて真のピークへ切り替わり
-                // 「縦が少し大きくなった」ように見える。
-                RebuildPresentationLayers(clearDetailPeaks: true);
-            });
+                    _peakPyramid = pyramid;
+                    // 初回表示は概要の間引きピークのまま焼き付いていることがある。
+                    // 階層完成後に再構築しないと、初回ズーム時に初めて真のピークへ切り替わり
+                    // 「縦が少し大きくなった」ように見える。
+                    RebuildPresentationLayers(clearDetailPeaks: true);
+                },
+                DispatcherPriority.Normal);
         }
         catch (InvalidOperationException)
         {
-            // ハンドル破棄後などは無視（次回 SetPreview で再構築）
+            // Dispatcher 破棄後などは無視（次回 SetPreview で再構築）
         }
     }
 
@@ -5373,10 +5933,10 @@ internal sealed class WaveformView : Control
         }
 
         var frameCount = _peaks.FrameCount;
-        using var gray = new SolidBrush(UiColors.RegionWaveFillGray);
-        using var loop = new SolidBrush(UiColors.RegionWaveFillLoop);
-        using var anacrusis = new SolidBrush(UiColors.RegionWaveFillAnacrusis);
-        using var exit = new SolidBrush(UiColors.RegionWaveFillExit);
+        using var gray = new SolidBrush(WaveformGdiColors.RegionWaveFillGray);
+        using var loop = new SolidBrush(WaveformGdiColors.RegionWaveFillLoop);
+        using var anacrusis = new SolidBrush(WaveformGdiColors.RegionWaveFillAnacrusis);
+        using var exit = new SolidBrush(WaveformGdiColors.RegionWaveFillExit);
 
         foreach (var region in _regions)
         {
@@ -5461,7 +6021,7 @@ internal sealed class WaveformView : Control
         }
 
         var frameCount = _peaks.FrameCount;
-        using var excluded = new SolidBrush(UiColors.RegionWaveFillExcluded);
+        using var excluded = new SolidBrush(WaveformGdiColors.RegionWaveFillExcluded);
 
         foreach (var region in _regions)
         {
@@ -5539,7 +6099,7 @@ internal sealed class WaveformView : Control
             items.Add(($"{name} (.wav)", part.StartSampleOffset, part.EndSampleOffset));
         }
 
-        DrawTimedNameLane(g, wave, playlistLane, items, FontStyle.Bold, UiColors.MusicPlaylistLaneBg);
+        DrawTimedNameLane(g, wave, playlistLane, items, FontStyle.Bold, WaveformGdiColors.MusicPlaylistLaneBg);
     }
 
     /// <summary>
@@ -5557,7 +6117,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        var content = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var content = ContentBounds;
         var (_, _, wave, _, _, _) = GetLayout(content, g);
         if (wave.Width <= 0 || wave.Height <= 0)
         {
@@ -5572,8 +6132,8 @@ internal sealed class WaveformView : Control
         const float leftPad = 4f;
         const float bottomPad = 3f;
 
-        using var normalBrush = new SolidBrush(UiColors.OutputPartFg);
-        using var warningBrush = new SolidBrush(UiColors.LogWarning);
+        using var normalBrush = new SolidBrush(WaveformGdiColors.OutputPartFg);
+        using var warningBrush = new SolidBrush(WaveformGdiColors.LogWarning);
         using var outlineBrush = new SolidBrush(Color.Black);
 
         foreach (var part in _outputParts)
@@ -5696,7 +6256,7 @@ internal sealed class WaveformView : Control
             items.Add((segment.Name, segment.StartSampleOffset, segment.EndSampleOffset));
         }
 
-        DrawTimedNameLane(g, wave, segmentLane, items, FontStyle.Regular, UiColors.MusicSegmentLaneBg);
+        DrawTimedNameLane(g, wave, segmentLane, items, FontStyle.Regular, WaveformGdiColors.MusicSegmentLaneBg);
         DrawSegmentLaneDividers(g, wave, segmentLane);
     }
 
@@ -5714,7 +6274,7 @@ internal sealed class WaveformView : Control
             .OrderBy(s => s.StartSampleOffset)
             .ToList();
         var frameCount = _peaks.FrameCount;
-        using var pen = new Pen(UiColors.WaveformBack, 3f);
+        using var pen = new Pen(WaveformGdiColors.WaveformBack, 3f);
 
         for (var i = 1; i < ordered.Count; i++)
         {
@@ -5759,6 +6319,34 @@ internal sealed class WaveformView : Control
             g.FillRectangle(laneBg, lane);
         }
 
+        var withBack = new List<(string Text, long Start, long End, Color Back)>(items.Count);
+        foreach (var item in items)
+        {
+            withBack.Add((item.Text, item.Start, item.End, laneBackColor));
+        }
+
+        DrawTimedNameLaneWithBackColors(g, wave, lane, withBack, fontStyle);
+    }
+
+    /// <summary>
+    /// 各区間の背景色に合わせたコントラスト文字で名前レーンを描く。
+    /// </summary>
+    private void DrawTimedNameLaneWithBackColors(
+        Graphics g,
+        Rectangle wave,
+        Rectangle lane,
+        IReadOnlyList<(string Text, long Start, long End, Color Back)> items,
+        FontStyle fontStyle)
+    {
+        if (_peaks is null
+            || _peaks.FrameCount <= 0
+            || items.Count == 0
+            || wave.Width <= 0
+            || lane.Height <= 0)
+        {
+            return;
+        }
+
         var frameCount = _peaks.FrameCount;
         // レーン高さに収まる最大サイズ（上下レーン同士の縦重なり防止）
         var fontMaxPx = FitFontSizeToLaneHeight(g, Font.FontFamily, fontStyle, lane.Height);
@@ -5769,7 +6357,7 @@ internal sealed class WaveformView : Control
         // セグメント幅に収まるまで縮小（見えなくても拡大で読める）
         const float minFontSize = 0.5f;
 
-        var parts = new List<(string Text, float X0, float X1)>(items.Count);
+        var parts = new List<(string Text, float X0, float X1, Color Back)>(items.Count);
         foreach (var item in items)
         {
             var a0 = SampleToAbsolute(item.Start, frameCount);
@@ -5784,15 +6372,13 @@ internal sealed class WaveformView : Control
                 continue;
             }
 
-            parts.Add((item.Text, x0, x1));
+            parts.Add((item.Text, x0, x1, item.Back));
         }
 
         if (parts.Count == 0)
         {
             return;
         }
-
-        using var brush = new SolidBrush(UiColors.OutputPartFg);
 
         for (var i = 0; i < parts.Count; i++)
         {
@@ -5830,6 +6416,7 @@ internal sealed class WaveformView : Control
             var x = parts[i].X0 + (slotWidth - drawWidth) * 0.5f;
             var labelHeight = labelFont.GetHeight(g);
             var y = lane.Top + (lane.Height - labelHeight) * 0.5f;
+            using var brush = new SolidBrush(PickContrastingForeColor(parts[i].Back));
 
             if (scaleX < 0.999f)
             {
@@ -5894,7 +6481,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        var layoutContent = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var layoutContent = ContentBounds;
         var (_, _, wave, _, _, _) = GetLayout(layoutContent, g);
         if (wave.Width <= 0 || wave.Height <= 0)
         {
@@ -5915,7 +6502,7 @@ internal sealed class WaveformView : Control
         // 約 1.1 秒周期で明滅（巨大ファイル書き出し中も動き続ける）
         var phase = (Environment.TickCount64 % 1100) / 1100f;
         var pulse = 0.40f + 0.60f * (0.5f + 0.5f * MathF.Sin(phase * MathF.PI * 2f));
-        var baseColor = UiColors.ExportPartGlow;
+        var baseColor = WaveformGdiColors.ExportPartGlow;
 
         // 内側を半透明で塗り、「今この固まり」をはっきり見せる
         using (var fill = new SolidBrush(Color.FromArgb((int)(72 * pulse), baseColor)))
@@ -5950,7 +6537,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        var layoutContent = Rectangle.Inflate(ClientRectangle, -4, -4);
+        var layoutContent = ContentBounds;
         var (_, _, wave, _, _, _) = GetLayout(layoutContent, g);
         if (wave.Width <= 0 || wave.Height <= 0)
         {
@@ -5971,12 +6558,12 @@ internal sealed class WaveformView : Control
             wave.Top,
             width,
             Math.Max(1f, wave.Height - 1f));
-        using (var fill = new SolidBrush(Color.FromArgb(26, UiColors.PlaylistHoverBorder)))
+        using (var fill = new SolidBrush(Color.FromArgb(26, WaveformGdiColors.PlaylistHoverBorder)))
         {
             g.FillRectangle(fill, rect);
         }
 
-        using var pen = new Pen(UiColors.PlaylistHoverBorder, 1f);
+        using var pen = new Pen(WaveformGdiColors.PlaylistHoverBorder, 1f);
         g.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
     }
 
@@ -6003,14 +6590,14 @@ internal sealed class WaveformView : Control
         var minBarNumberGap = threeDigitWidth + 6f; // 描画オフセット分の余白
         var barStep = ChooseBarThinningStep(averageGapPx, minBarNumberGap);
 
-        using var barPen = new Pen(UiColors.BarLine, 1f);
-        using var tempoChangePen = new Pen(UiColors.TempoChangeLine, 1f)
+        using var barPen = new Pen(WaveformGdiColors.BarLine, 1f);
+        using var tempoChangePen = new Pen(WaveformGdiColors.TempoChangeLine, 1f)
         {
             DashStyle = System.Drawing.Drawing2D.DashStyle.Dash,
             DashPattern = [3f, 3f],
         };
         // 小節番号／テンポ／拍子ラベルは同色（WaveformInfoFg）で 1 本のブラシを共有する。
-        using var infoLabelBrush = new SolidBrush(UiColors.WaveformInfoFg);
+        using var infoLabelBrush = new SolidBrush(WaveformGdiColors.WaveformInfoFg);
 
         var barLabelY = barRowTop + 1f;
         var tempoLabelY = tempoRowTop + 1f;
@@ -6122,7 +6709,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        using var beatPen = new Pen(UiColors.BeatLine, 1f);
+        using var beatPen = new Pen(WaveformGdiColors.BeatLine, 1f);
         for (var i = 0; i + 1 < barStarts.Length; i++)
         {
             var bar = barStarts[i];
@@ -6279,15 +6866,16 @@ internal sealed class WaveformView : Control
         var markerRowBottom = markerRowTop + rowHeight;
         // ▼ の先端をマーカー時刻の X に厳密に合わせる（下向き）
         var tipY = markerRowBottom - 1f;
+        // WinForms と同じ 5/9 device px 上限。
         var triHalfW = Math.Min(5f, rowHeight * 0.35f);
         var triH = Math.Min(rowHeight - 3f, 9f);
 
-        using var triangleBrush = new SolidBrush(UiColors.MarkerTriangle);
-        using var selectedTriangleBrush = new SolidBrush(UiColors.MarkerTriangleSelected);
-        using var sharedTriangleBrush = new SolidBrush(Color.FromArgb(64, UiColors.MarkerTriangle));
+        using var triangleBrush = new SolidBrush(WaveformGdiColors.MarkerTriangle);
+        using var selectedTriangleBrush = new SolidBrush(WaveformGdiColors.MarkerTriangleSelected);
+        using var sharedTriangleBrush = new SolidBrush(Color.FromArgb(64, WaveformGdiColors.MarkerTriangle));
         using var selectedTriangleOutlinePen = new Pen(Color.White, 1.5f);
-        using var textBrush = new SolidBrush(UiColors.WaveformInfoFg);
-        using var selectedTextBrush = new SolidBrush(UiColors.MarkerCommentSelected);
+        using var textBrush = new SolidBrush(WaveformGdiColors.WaveformInfoFg);
+        using var selectedTextBrush = new SolidBrush(WaveformGdiColors.MarkerCommentSelected);
 
         // 三角は時刻順に描画
         foreach (var marker in _markers)
@@ -6645,7 +7233,7 @@ internal sealed class WaveformView : Control
             return;
         }
 
-        using var pen = new Pen(UiColors.MouseGuide, 1f);
+        using var pen = new Pen(WaveformGdiColors.MouseGuide, 1f);
         g.DrawLine(pen, mx, content.Top, mx, content.Bottom);
     }
 

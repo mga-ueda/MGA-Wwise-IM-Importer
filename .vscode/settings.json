@@ -1,4 +1,4 @@
-﻿{
+{
   "files.encoding": "utf8bom",
   "files.autoGuessEncoding": false,
   "[csharp]": {
@@ -12,5 +12,6 @@
   },
   "[xml]": {
     "files.encoding": "utf8bom"
-  }
+  },
+  "dotrush.roslyn.projectOrSolutionFiles": []
 }

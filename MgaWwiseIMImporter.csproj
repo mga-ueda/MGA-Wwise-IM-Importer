@@ -4,34 +4,27 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
+    <StartupObject>MgaWwiseIMImporter.Program</StartupObject>
     <RootNamespace>MgaWwiseIMImporter</RootNamespace>
     <AssemblyName>MGA Wwise IM Importer</AssemblyName>
     <Product>MGA Wwise IM Importer</Product>
     <ApplicationTitle>MGA Wwise IM Importer</ApplicationTitle>
     <ApplicationIcon>Assets\Branding\MgaWwiseIMImporter.ico</ApplicationIcon>
-    <!-- レイアウトは 150%（144 DPI）設計＋ DesignMetrics 換算 -->
-    <ApplicationHighDpiMode>SystemAware</ApplicationHighDpiMode>
-    <!-- 表示・比較・GitHub タグ共通の SemVer（例: 1.1.4-beta ↔ tag v1.1.4-beta） -->
     <Version>1.1.4-beta</Version>
     <AssemblyVersion>1.1.4.0</AssemblyVersion>
     <FileVersion>1.1.4.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
-    <!-- コンパイラ診断メッセージを UTF-8 で出力し、日本語環境での文字化けを防ぐ。 -->
     <Utf8Output>true</Utf8Output>
-    <!-- 配布は単一 exe（自己完結）。dotnet publish 時のみ効く。 -->
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-    <!-- 配布 zip に pdb（デバッグ記号）は含めない。開発用 bin 出力には残る。 -->
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
-    <!-- Win32 P/Invoke は DllImport 維持（LibraryImport は ByValArray 等で壊れやすい）。 -->
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- 実行時比較用に Version をアセンブリへ埋め込む -->
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>AppVersion</_Parameter1>
       <_Parameter2>$(Version)</_Parameter2>
@@ -40,17 +33,17 @@
 
   <ItemGroup>
     <!-- 色調整パネルは開発ビルド専用。Release バイナリには含めない。 -->
-    <Compile Remove="UI\ColorDevPanelForm.cs" Condition="'$(Configuration)' == 'Release'" />
+    <Compile Remove="UI\ColorDevPanelWindow.xaml.cs" Condition="'$(Configuration)' == 'Release'" />
+    <Page Remove="UI\ColorDevPanelWindow.xaml" Condition="'$(Configuration)' == 'Release'" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.2.1" />
-    <!-- テキスト読み取りで ANSI(CP932) フォールバックできるようにする。 -->
     <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ブランディング／フォント本体は exe に埋め込む。ApplicationIcon は別途 PE リソースとしても埋め込まれる。 -->
     <EmbeddedResource Include="Assets\Branding\MiyabiGameAudio.png">
       <LogicalName>MgaWwiseIMImporter.Branding.MiyabiGameAudio.png</LogicalName>
     </EmbeddedResource>
@@ -66,19 +59,15 @@
     <EmbeddedResource Include="Assets\Wave\Low.wav">
       <LogicalName>MgaWwiseIMImporter.Wave.Low.wav</LogicalName>
     </EmbeddedResource>
-    <!-- SIL OFL 1.1: 埋め込み。フッタリンクからログへ全文表示する。 -->
     <EmbeddedResource Include="Assets\Fonts\LICENSE-UDEV-GOTHIC.txt">
       <LogicalName>MgaWwiseIMImporter.Fonts.LICENSE-UDEV-GOTHIC.txt</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="UI\Form1.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Update="UI\Form1.Designer.cs">
-      <DependentUpon>Form1.cs</DependentUpon>
-    </Compile>
+    <Resource Include="Assets\Fonts\UDEVGothic-Regular.ttf" />
+    <Resource Include="Assets\Branding\MiyabiGameAudio.png" />
+    <Resource Include="Assets\Branding\MgaWwiseIMImporter.ico" />
   </ItemGroup>
 
 </Project>

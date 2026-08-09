@@ -1,4 +1,9 @@
-﻿using MgaWwiseIMImporter.Wave;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using MgaWwiseIMImporter.Wave;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -8,10 +13,10 @@ internal static class FadeCurveIcons
     public const int IconSize = 18;
     public const int LeftMargin = 6;
 
-    /// <summary>アイコンは正方形（高さ＝幅）。</summary>
+    /// <summary>描画幅（leftMargin は含めない）。メニューでは WidthFor+leftMargin を Image 幅にする。</summary>
     public static int WidthFor(int pixelSize) => Math.Max(8, pixelSize);
 
-    public static Image Create(
+    public static ImageSource Create(
         RegionFadeCurveKind kind,
         bool isFadeIn,
         bool selected,
@@ -21,42 +26,53 @@ internal static class FadeCurveIcons
         var size = Math.Max(8, pixelSize);
         var width = WidthFor(size);
         var margin = Math.Max(0, leftMargin);
-        var bmp = new Bitmap(
-            width + margin,
-            size,
-            System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(bmp);
-        g.Clear(Color.Transparent);
-        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-
-        using var pen = new Pen(Color.FromArgb(220, 220, 220), 1.4f);
-        var points = new PointF[17];
-        for (var i = 0; i < points.Length; i++)
+        var drawing = new DrawingGroup();
+        using (var dc = drawing.Open())
         {
-            var t = i / (double)(points.Length - 1);
-            var rising = IconRising(kind, t);
-            var yGain = isFadeIn ? rising : 1d - rising;
-            points[i] = new PointF(
-                margin + 1.5f + (float)t * (width - 3f),
-                size - 2f - (float)(yGain * (size - 4f)));
+            var pen = new Pen(new SolidColorBrush(Color.FromArgb(220, 220, 220, 220)), 1.4)
+            {
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round,
+                LineJoin = PenLineJoin.Round,
+            };
+            if (pen.CanFreeze)
+            {
+                pen.Freeze();
+            }
+
+            var points = new Point[17];
+            for (var i = 0; i < points.Length; i++)
+            {
+                var t = i / (double)(points.Length - 1);
+                var rising = IconRising(kind, t);
+                var yGain = isFadeIn ? rising : 1d - rising;
+                points[i] = new Point(
+                    margin + 1.5 + t * (width - 3),
+                    size - 2 - yGain * (size - 4));
+            }
+
+            for (var i = 0; i < points.Length - 1; i++)
+            {
+                dc.DrawLine(pen, points[i], points[i + 1]);
+            }
+
+            if (selected)
+            {
+                // 選択枠は AccentCyan（ホバー／選択アクセントと統一）
+                var selectPen = new Pen(UiColors.Brush(UiColors.AccentCyan), 1);
+                if (selectPen.CanFreeze)
+                {
+                    selectPen.Freeze();
+                }
+
+                dc.DrawRectangle(null, selectPen, new Rect(margin, 0, width - 1, size - 1));
+            }
         }
 
-        g.DrawLines(pen, points);
-
-        if (selected)
-        {
-            using var selectPen = new Pen(Color.FromArgb(80, 170, 255), 1f);
-            g.DrawRectangle(selectPen, margin, 0, width - 1, size - 1);
-        }
-
-        return bmp;
+        drawing.Freeze();
+        return new DrawingImage(drawing);
     }
 
-    /// <summary>
-    /// アイコン描画専用の立ち上がり形状。実フェード演算（<see cref="RegionEdgeFade"/>）は変えず、
-    /// S / Inverted S のみ同型カーブを二重適用して曲率を誇張する
-    /// （実式の smoothstep は小さなアイコンではほぼ直線に見えるため）。
-    /// </summary>
     private static double IconRising(RegionFadeCurveKind kind, double t)
     {
         var once = RegionEdgeFade.EvaluateRising(kind, t);
@@ -65,128 +81,75 @@ internal static class FadeCurveIcons
             : once;
     }
 
-    /// <summary>暗いコンテキストメニュー（歯車／カーブ選択共通）。</summary>
-    public static ContextMenuStrip CreateDarkMenu(Control? scaleRef = null)
+    public static ContextMenu CreateDarkMenu()
     {
-        // IconSize / LeftMargin は 150% 設計値。メインフォーム同様 DesignMetrics で換算する
-        // （固定だと 100% で行が間延びして密度が落ちる）。
-        var icon = DesignMetrics.Px(IconSize, scaleRef);
-        var margin = DesignMetrics.Px(LeftMargin, scaleRef);
-        return new ContextMenuStrip
+        var menu = new ContextMenu
         {
-            ShowImageMargin = true,
-            BackColor = UiColors.ForControlBack(UiColors.SurfaceBack),
-            ForeColor = UiColors.PrimaryFore,
-            Renderer = new DarkFadeCurveMenuRenderer(),
-            Padding = DesignMetrics.Pad(2, scaleRef),
-            ImageScalingSize = new Size(WidthFor(icon) + margin, icon),
+            Background = UiColors.Brush(UiColors.ForControlBack(UiColors.SurfaceBack)),
+            Foreground = UiColors.Brush(UiColors.PrimaryFore),
+            BorderBrush = UiColors.Brush(UiColors.ChromeBorder),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(2),
         };
+        return menu;
     }
 
-    /// <summary>カーブ一覧をメニュー項目へ追加する。</summary>
     public static void AddCurveChoices(
-        ToolStripItemCollection items,
+        ItemCollection items,
         RegionFadeCurveKind current,
         bool isFadeIn,
         Action<RegionFadeCurveKind> onSelected,
-        Control? scaleRef = null)
+        int iconSize = IconSize,
+        int leftMargin = LeftMargin)
     {
-        var iconSize = DesignMetrics.Px(IconSize, scaleRef);
-        var leftMargin = DesignMetrics.Px(LeftMargin, scaleRef);
-        var padding = DesignMetrics.Pad(2, 1, 2, 1, scaleRef);
         var order = isFadeIn
             ? RegionEdgeFade.MenuOrderFadeIn
             : RegionEdgeFade.MenuOrderFadeOut;
         foreach (var kind in order)
         {
-            var item = new ToolStripMenuItem(UiStrings.LabelRegionFadeCurve(kind))
-            {
-                Tag = kind,
-                Image = Create(kind, isFadeIn, selected: kind == current, iconSize, leftMargin),
-                ImageScaling = ToolStripItemImageScaling.None,
-                Padding = padding,
-            };
             var captured = kind;
+            var item = new MenuItem
+            {
+                Header = UiStrings.LabelRegionFadeCurve(kind),
+                Tag = kind,
+                Foreground = UiColors.Brush(UiColors.PrimaryFore),
+                Background = Brushes.Transparent,
+                Icon = new Image
+                {
+                    Source = Create(kind, isFadeIn, selected: kind == current, iconSize, leftMargin),
+                    Width = WidthFor(iconSize) + leftMargin,
+                    Height = iconSize,
+                    Stretch = Stretch.None,
+                },
+                Padding = new Thickness(2, 1, 2, 1),
+            };
             item.Click += (_, _) => onSelected(captured);
             items.Add(item);
         }
     }
 
-    /// <summary>
-    /// フェードカーブ選択メニューを表示する。選択時は <paramref name="onSelected"/> を呼ぶ。
-    /// </summary>
-    public static ContextMenuStrip ShowPicker(
-        Control owner,
+    public static ContextMenu ShowPicker(
+        FrameworkElement owner,
         Point clientLocation,
         RegionFadeCurveKind current,
         bool isFadeIn,
         Action<RegionFadeCurveKind> onSelected,
-        ref ContextMenuStrip? menuSlot)
+        ref ContextMenu? menuSlot)
     {
-        menuSlot?.Dispose();
-        var menu = CreateDarkMenu(owner);
+        if (menuSlot is not null)
+        {
+            menuSlot.IsOpen = false;
+        }
+
+        var menu = CreateDarkMenu();
         menuSlot = menu;
-        AddCurveChoices(menu.Items, current, isFadeIn, onSelected, owner);
+        AddCurveChoices(menu.Items, current, isFadeIn, onSelected);
 
-        menu.PerformLayout();
-        var preferred = menu.PreferredSize;
-        int trimRight;
-        using (var g = menu.CreateGraphics())
-        {
-            trimRight = TextRenderer.MeasureText(
-                g,
-                "MM",
-                menu.Font,
-                Size.Empty,
-                TextFormatFlags.NoPadding).Width;
-        }
-
-        menu.AutoSize = false;
-        menu.Size = new Size(
-            Math.Max(preferred.Width - trimRight, 120),
-            preferred.Height);
-        menu.Show(owner, clientLocation);
+        menu.PlacementTarget = owner;
+        menu.Placement = PlacementMode.RelativePoint;
+        menu.HorizontalOffset = clientLocation.X;
+        menu.VerticalOffset = clientLocation.Y;
+        menu.IsOpen = true;
         return menu;
-    }
-
-    private sealed class DarkFadeCurveMenuRenderer : ToolStripProfessionalRenderer
-    {
-        /// <summary>テキストをアイコン側へ寄せる量（150% 設計 8）。</summary>
-        private const int TextRightGapDesignPx = 8;
-
-        public DarkFadeCurveMenuRenderer()
-            : base(new DarkFadeCurveColorTable())
-        {
-        }
-
-        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
-        {
-        }
-
-        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
-        {
-            var gap = DesignMetrics.Px(TextRightGapDesignPx, e.ToolStrip);
-            var r = e.TextRectangle;
-            e.TextRectangle = new Rectangle(
-                r.X - gap,
-                r.Y,
-                r.Width + gap,
-                r.Height);
-            base.OnRenderItemText(e);
-        }
-    }
-
-    private sealed class DarkFadeCurveColorTable : ProfessionalColorTable
-    {
-        public override Color MenuItemSelected => Color.FromArgb(70, 70, 74);
-        public override Color MenuItemSelectedGradientBegin => MenuItemSelected;
-        public override Color MenuItemSelectedGradientEnd => MenuItemSelected;
-        public override Color MenuItemBorder => Color.FromArgb(90, 90, 94);
-        public override Color ToolStripDropDownBackground => Color.FromArgb(30, 30, 30);
-        public override Color ImageMarginGradientBegin => ToolStripDropDownBackground;
-        public override Color ImageMarginGradientMiddle => ToolStripDropDownBackground;
-        public override Color ImageMarginGradientEnd => ToolStripDropDownBackground;
-        public override Color SeparatorDark => Color.FromArgb(60, 60, 64);
-        public override Color SeparatorLight => SeparatorDark;
     }
 }

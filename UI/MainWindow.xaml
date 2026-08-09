@@ -1,0 +1,400 @@
+﻿<Window x:Class="MgaWwiseIMImporter.UI.MainWindow"
+        x:ClassModifier="public"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:MgaWwiseIMImporter.UI"
+        Title="MGA Wwise IM Importer"
+        MinWidth="480"
+        MinHeight="320"
+        Width="960"
+        Height="640"
+        Background="{StaticResource SurfaceBackBrush}">
+  <!-- すりガラスは DockPanel 外の Grid に載せ、Z 順と絶対配置を安定させる -->
+  <Grid x:Name="rootChromeGrid">
+  <DockPanel x:Name="rootDockPanel" LastChildFill="True">
+
+    <!-- Top: project bar -->
+    <Border x:Name="projectBar"
+            DockPanel.Dock="Top"
+            Height="{x:Static ui:DesignMetrics.ProjectBarHeight}"
+            Padding="8,3"
+            Background="{StaticResource ProjectBarBackBrush}"
+            BorderThickness="0">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition x:Name="projectNameColumn" Width="168" />
+          <ColumnDefinition Width="8" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <ui:DarkProjectComboBox x:Name="projectNameComboBox"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                TabIndex="0" />
+
+        <Border x:Name="projectNameSpacer" Grid.Column="1" />
+
+        <ui:DarkBorderTextBox x:Name="projectOutputPathTextBox"
+                              Grid.Column="2"
+                              VerticalAlignment="Center"
+                              FontSize="12"
+                              IsReadOnly="True"
+                              TabIndex="1" />
+
+        <StackPanel x:Name="projectActionPanel"
+                    Grid.Column="3"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Margin="8,0,0,0">
+          <ui:FlatOptionCheckBox x:Name="keepLastSessionCheckBox"
+                                 Margin="0,0,8,0"
+                                 FontSize="12"
+                                 VerticalAlignment="Center" />
+          <ui:FlatOptionCheckBox x:Name="topMostCheckBox"
+                                 Margin="0,0,8,0"
+                                 FontSize="12"
+                                 VerticalAlignment="Center" />
+          <ui:LanguageFlagButton x:Name="languageFlagButton" TabIndex="4" />
+          <ui:TipsToggleButton x:Name="tipsToggleButton" TabIndex="5" />
+          <ui:ManualHelpButton x:Name="manualHelpButton" TabIndex="6" />
+          <ui:SettingsGearButton x:Name="settingsGearButton" TabIndex="7" />
+          <ui:ProjectSpectrumView x:Name="projectSpectrumView"
+                                  Height="{x:Static ui:DesignMetrics.ToolbarButtonSide}"
+                                  VerticalAlignment="Center"
+                                  Margin="4,0,0,0" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Top: waveform host -->
+    <Border x:Name="waveformHostPanel"
+            DockPanel.Dock="Top"
+            Height="{x:Static ui:DesignMetrics.WaveformHostHeight}"
+            AllowDrop="True"
+            Background="{StaticResource WaveformScrollTrackBrush}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="{x:Static ui:DesignMetrics.WaveformScrollBarHeightGrid}" />
+        </Grid.RowDefinitions>
+        <ui:WaveformView x:Name="waveformView"
+                         Grid.Row="0"
+                         AllowDrop="True"
+                         Focusable="True"
+                         Background="{StaticResource WaveformBackBrush}" />
+        <ui:ThinHorizontalScrollBar x:Name="waveformHorizontalScrollBar"
+                                    Grid.Row="1" />
+      </Grid>
+    </Border>
+
+    <!-- Top: transport -->
+    <ui:TransportBar x:Name="transportBar" DockPanel.Dock="Top" />
+
+    <!-- Bottom: WAAPI status bar（Dock は先に宣言した方が下端。WinForms Controls.Add 順と同じ） -->
+    <ui:WaapiStatusBar x:Name="waapiStatusBar" DockPanel.Dock="Bottom" />
+
+    <!-- Bottom: action bar（ステータスバーの上） -->
+    <Border x:Name="actionBar"
+            DockPanel.Dock="Bottom"
+            Height="{x:Static ui:DesignMetrics.ActionBarHeight}"
+            Padding="10,6,8,6"
+            Background="{StaticResource ActionBarBackBrush}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <Image x:Name="brandLogoPictureBox"
+               Grid.Column="0"
+               Width="214"
+               Height="32"
+               VerticalAlignment="Center"
+               Cursor="Hand"
+               Stretch="Uniform" />
+
+        <ui:SmoothLinkLabel x:Name="copyrightLinkLabel"
+                            Grid.Column="1"
+                            Margin="8,0,8,0"
+                            VerticalAlignment="Center"
+                            FontSize="10"
+                            LineHeightScale="0.78"
+                            MinHeight="{x:Static ui:DesignMetrics.CopyrightBlockMinHeight}"
+                            TextWrapping="NoWrap"
+                            Foreground="{StaticResource ActionCopyrightForeBrush}" />
+
+        <!-- Form1 見た目順: detailedLog / CLEAR / RELOAD / EXPORT -->
+        <StackPanel x:Name="actionControlsPanel"
+                    Grid.Column="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center">
+          <ui:FlatOptionCheckBox x:Name="detailedLogCheckBox"
+                                 Margin="0,0,8,0"
+                                 FontSize="12"
+                                 VerticalAlignment="Center"
+                                 IsChecked="True" />
+          <ui:RoundedButton x:Name="clearButton"
+                            Width="108"
+                            Height="{x:Static ui:DesignMetrics.ActionButtonHeight}"
+                            Margin="0,0,8,0"
+                            FontWeight="Bold"
+                            FontSize="12" />
+          <ui:RoundedButton x:Name="reloadButton"
+                            Width="108"
+                            Height="{x:Static ui:DesignMetrics.ActionButtonHeight}"
+                            Margin="0,0,8,0"
+                            FontWeight="Bold"
+                            FontSize="12"
+                            IsEnabled="False" />
+          <ui:RoundedButton x:Name="exportButton"
+                            Width="108"
+                            Height="{x:Static ui:DesignMetrics.ActionButtonHeight}"
+                            Margin="0"
+                            FontWeight="Bold"
+                            FontSize="12"
+                            IsEnabled="False" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Fill: log (left) + rightSide (transition / playlist / markers) — Form1 と同じ構成 -->
+    <DockPanel x:Name="mainContentPanel" LastChildFill="True">
+
+      <Border x:Name="rightSidePanel"
+              DockPanel.Dock="Right"
+              Width="457"
+              Background="{StaticResource SurfaceBackBrush}">
+        <!-- 高さを Fade 行 + MarkerOptions に固定し、ログ領域が縦に伸びても Playlist が伸びない -->
+        <DockPanel x:Name="rightSideContentHost"
+                   LastChildFill="True"
+                   VerticalAlignment="Top"
+                   Height="380">
+
+          <ui:MarkerOptionsPanel x:Name="markerOptionsPanel"
+                                 DockPanel.Dock="Bottom"
+                                 Height="156"
+                                 AllowDrop="True" />
+
+          <Border x:Name="playlistSelectorPanel"
+                  DockPanel.Dock="Right"
+                  Width="240"
+                  AllowDrop="True"
+                  Background="{StaticResource PlaylistBackBrush}">
+            <DockPanel LastChildFill="True">
+              <!-- WinForms playlistSeparator.Width=0（縦線なし） -->
+              <ui:FlatOptionCheckBox x:Name="compactFileNumbersCheckBox"
+                                     DockPanel.Dock="Bottom"
+                                     FontSize="12"
+                                     IsEnabled="False"
+                                     VerticalContentAlignment="Center" />
+              <DockPanel x:Name="playlistScrollPanel" LastChildFill="True">
+                <ui:SectionHeaderLabel x:Name="playlistHeaderLabel"
+                                       DockPanel.Dock="Top"
+                                       Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                       Padding="12,0,8,0"
+                                       FontWeight="Bold"
+                                       FontSize="12"
+                                       AllowDrop="True" />
+                <ScrollViewer x:Name="playlistScrollViewer"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="0,0,8,8"
+                              AllowDrop="True">
+                  <!-- Stretch でビューポート幅に合わせ、ボタン右枠が欠けないようにする（Form1 Percent 列相当） -->
+                  <StackPanel x:Name="playlistListLayout"
+                              AllowDrop="True"
+                              HorizontalAlignment="Stretch" />
+                </ScrollViewer>
+              </DockPanel>
+            </DockPanel>
+          </Border>
+
+          <Border x:Name="transitionTimePanel"
+                  AllowDrop="True"
+                  Background="{StaticResource SurfaceBackBrush}">
+              <WrapPanel x:Name="transitionSettingsPanel"
+                         Orientation="Horizontal"
+                         Margin="1,0,0,0">
+
+                <!-- Fade In section -->
+                <StackPanel x:Name="fadeInSectionPanel" Width="100">
+                  <Grid x:Name="fadeInHeaderPanel" Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}">
+                    <ui:SectionHeaderLabel x:Name="fadeInHeaderLabel"
+                                           Padding="10,0,2,0"
+                                           FontWeight="Bold"
+                                           FontSize="11.333" />
+                    <!-- 帯内に重ねる（WinForms LayoutPlaylistFadeCurveIcon 同等） -->
+                    <Image x:Name="fadeInCurveIcon"
+                           Stretch="None"
+                           SnapsToDevicePixels="True"
+                           Cursor="Hand"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top" />
+                  </Grid>
+                  <StackPanel x:Name="fadeInChoicesPanel"
+                              Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
+                    <ui:FlatOptionRadioButton x:Name="fadeInNoneRadio" GroupName="FadeIn" Tag="0" IsChecked="True" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInHalfSecondRadio" GroupName="FadeIn" Tag="0.5" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInOneSecondRadio" GroupName="FadeIn" Tag="1" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInThreeSecondsRadio" GroupName="FadeIn" Tag="3" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInSixSecondsRadio" GroupName="FadeIn" Tag="6" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                  </StackPanel>
+                  <ui:SectionHeaderLabel x:Name="optionsHeaderLabel"
+                                         Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                         Padding="10,0,4,0"
+                                         FontWeight="Bold"
+                                         FontSize="11.333" />
+                  <StackPanel x:Name="optionsChoicesPanel"
+                              Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
+                    <ui:FlatOptionCheckBox x:Name="playMinusECheckBox" IsChecked="True" FontSize="11.333" />
+                    <ui:FlatOptionCheckBox x:Name="additiveLayersCheckBox" IsEnabled="False" FontSize="11.333" />
+                  </StackPanel>
+                </StackPanel>
+
+                <!-- Fade Out section -->
+                <StackPanel x:Name="fadeOutSectionPanel" Width="100">
+                  <Grid x:Name="fadeOutHeaderPanel" Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}">
+                    <ui:SectionHeaderLabel x:Name="transitionTimeHeaderLabel"
+                                           Padding="10,0,2,0"
+                                           FontWeight="Bold"
+                                           FontSize="11.333" />
+                    <Image x:Name="fadeOutCurveIcon"
+                           Stretch="None"
+                           SnapsToDevicePixels="True"
+                           Cursor="Hand"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top" />
+                  </Grid>
+                  <StackPanel x:Name="transitionTimeChoicesPanel"
+                              Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
+                    <ui:FlatOptionRadioButton x:Name="transitionTimeNoneRadio" GroupName="FadeOut" Tag="0" IsChecked="True" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="transitionTimeHalfSecondRadio" GroupName="FadeOut" Tag="0.5" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="transitionTimeOneSecondRadio" GroupName="FadeOut" Tag="1" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="transitionTimeThreeSecondsRadio" GroupName="FadeOut" Tag="3" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="transitionTimeSixSecondsRadio" GroupName="FadeOut" Tag="6" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                  </StackPanel>
+                  <ui:SectionHeaderLabel x:Name="fadeInGroupDividerLabel"
+                                         Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                         Padding="10,0,4,0"
+                                         FontWeight="Bold"
+                                         FontSize="11.333" />
+                  <StackPanel x:Name="fadeInGroupChoicesPanel"
+                              Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
+                    <ui:FlatOptionRadioButton x:Name="fadeInGroupNoneRadio" GroupName="FadeInGroup" Tag="0" IsChecked="True" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInGroupOneSecondRadio" GroupName="FadeInGroup" Tag="1" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInGroupThreeSecondsRadio" GroupName="FadeInGroup" Tag="3" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInGroupSixSecondsRadio" GroupName="FadeInGroup" Tag="6" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="fadeInGroupNineSecondsRadio" GroupName="FadeInGroup" Tag="9" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                  </StackPanel>
+                </StackPanel>
+
+                <!-- Exit Source At section -->
+                <StackPanel x:Name="exitSourceAtSectionPanel" Width="100">
+                  <ui:SectionHeaderLabel x:Name="exitSourceAtHeaderLabel"
+                                         Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                         Padding="10,0,4,0"
+                                         FontWeight="Bold"
+                                         FontSize="11.333" />
+                  <StackPanel x:Name="exitSourceAtChoicesPanel"
+                              Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
+                    <ui:FlatOptionRadioButton x:Name="exitSourceImmediateRadio" GroupName="ExitSource" Tag="Immediate" IsChecked="True" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="exitSourceNextBarRadio" GroupName="ExitSource" Tag="NextBar" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="exitSourceNextBeatRadio" GroupName="ExitSource" Tag="NextBeat" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="exitSourceNextCueRadio" GroupName="ExitSource" Tag="NextCue" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="exitSourceExitCueRadio" GroupName="ExitSource" Tag="ExitCue" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                  </StackPanel>
+                  <ui:SectionHeaderLabel x:Name="changeOccursAtHeaderLabel"
+                                         Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                         Padding="10,0,4,0"
+                                         FontWeight="Bold"
+                                         FontSize="11.333" />
+                  <StackPanel x:Name="changeOccursAtChoicesPanel"
+                              Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
+                    <ui:FlatOptionRadioButton x:Name="changeOccursImmediateRadio" GroupName="ChangeOccurs" Tag="Immediate" IsChecked="True" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="changeOccursNextBarRadio" GroupName="ChangeOccurs" Tag="NextBar" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="changeOccursNextBeatRadio" GroupName="ChangeOccurs" Tag="NextBeat" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="changeOccursNextCueRadio" GroupName="ChangeOccurs" Tag="NextCue" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                    <ui:FlatOptionRadioButton x:Name="changeOccursExitCueRadio" GroupName="ChangeOccurs" Tag="ExitCue" FontSize="11.333" Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}" />
+                  </StackPanel>
+                </StackPanel>
+
+              </WrapPanel>
+          </Border>
+
+        </DockPanel>
+      </Border>
+
+      <!-- Left: log area (Fill) -->
+      <Border x:Name="logAreaPanel"
+              AllowDrop="True"
+              Background="{StaticResource LogBackBrush}">
+        <DockPanel x:Name="logColumnPanel" LastChildFill="True">
+          <Border x:Name="tipsPanel"
+                  DockPanel.Dock="Top"
+                  Height="0"
+                  Background="{StaticResource LogBackBrush}">
+            <DockPanel LastChildFill="True">
+              <ui:SectionHeaderLabel x:Name="tipsHeaderLabel"
+                                     DockPanel.Dock="Top"
+                                     Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                     BarMarginLeft="0"
+                                     BarMarginRight="0"
+                                     Padding="6,0,2,0"
+                                     FontWeight="Bold"
+                                     FontSize="11.333"
+                                     Foreground="{StaticResource PlaylistDefaultForeBrush}" />
+              <TextBlock x:Name="tipsLabel"
+                         Padding="6,4,6,5"
+                         FontSize="11.333"
+                         TextWrapping="Wrap"
+                         TextTrimming="None"
+                         Foreground="{StaticResource LogDefaultBrush}" />
+            </DockPanel>
+          </Border>
+
+          <DockPanel x:Name="logEditorPanel" LastChildFill="True">
+            <ui:SectionHeaderLabel x:Name="logHeaderLabel"
+                                   DockPanel.Dock="Top"
+                                   Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
+                                   BarMarginLeft="0"
+                                   BarMarginRight="0"
+                                   Padding="6,0,2,0"
+                                   FontWeight="Bold"
+                                   FontSize="11.333"
+                                   Foreground="{StaticResource PlaylistDefaultForeBrush}" />
+
+            <Grid>
+              <ui:ShortcutForwardingRichTextBox x:Name="editorTextBox"
+                                                AllowDrop="True"
+                                                IsReadOnly="True"
+                                                BorderThickness="0"
+                                                Background="{StaticResource LogBackBrush}"
+                                                Foreground="{StaticResource LogDefaultBrush}"
+                                                VerticalScrollBarVisibility="Auto"
+                                                HorizontalScrollBarVisibility="Disabled" />
+              <Border x:Name="logButtonPanel"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Bottom"
+                      Height="30"
+                      Width="82"
+                      Padding="2,4,2,0"
+                      Background="{StaticResource LogBackBrush}">
+                <StackPanel x:Name="logButtonHost"
+                            Orientation="Horizontal"
+                            FlowDirection="RightToLeft">
+                  <!-- logClearButton, logCopyButton, logDownloadButton inserted in code-behind -->
+                </StackPanel>
+              </Border>
+            </Grid>
+          </DockPanel>
+        </DockPanel>
+      </Border>
+
+    </DockPanel>
+  </DockPanel>
+  </Grid>
+</Window>

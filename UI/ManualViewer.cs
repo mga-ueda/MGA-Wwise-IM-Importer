@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Windows;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -8,7 +9,7 @@ namespace MgaWwiseIMImporter.UI;
 /// </summary>
 internal static class ManualViewer
 {
-    public static void Open(IWin32Window owner)
+    public static void Open(Window? owner)
     {
         try
         {
@@ -27,8 +28,8 @@ internal static class ManualViewer
                 owner,
                 UiStrings.ErrManualOpenFailed(ex.Message),
                 UiStrings.DialogManualTitle,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 }

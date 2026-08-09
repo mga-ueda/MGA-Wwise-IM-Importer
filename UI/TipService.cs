@@ -1,4 +1,9 @@
 ﻿using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -7,28 +12,24 @@ namespace MgaWwiseIMImporter.UI;
 /// </summary>
 internal static class TipService
 {
-    private static readonly ConditionalWeakTable<Control, TipBinding> Bindings = new();
+    private static readonly ConditionalWeakTable<FrameworkElement, TipBinding> Bindings = new();
+    private static readonly ConditionalWeakTable<FrameworkElement, object> WiredParents = new();
 
-    /// <summary>無効コントロール用に MouseMove を張った親（二重購読防止）。</summary>
-    private static readonly ConditionalWeakTable<Control, object> WiredParents = new();
-
-    private static readonly TextFormatFlags MeasureFlags =
-        TextFormatFlags.WordBreak
-        | TextFormatFlags.TextBoxControl
-        | TextFormatFlags.NoPrefix
-        | TextFormatFlags.NoPadding;
-
-    /// <summary>Tips オン時に必ず確保する最小行数。</summary>
     private const int MinVisibleLines = 5;
 
-    private static Label? _display;
-    private static Panel? _host;
+    /// <summary>Tips のない領域へ移っても、この時間は直前の Tips を残す。</summary>
+    private static readonly TimeSpan ClearHoldDuration = TimeSpan.FromSeconds(1);
+
+    private static TextBlock? _display;
+    private static FrameworkElement? _host;
     private static object? _activeSource;
     private static int _suspendCount;
     private static bool _layoutWired;
     private static bool _enabled = true;
+    private static DispatcherTimer? _clearTimer;
+    private static object? _pendingClearSource;
+    private static bool _pendingClearAny;
 
-    /// <summary>Tips 枠の表示が有効なら true（既定 true）。</summary>
     public static bool Enabled
     {
         get => _enabled;
@@ -42,35 +43,33 @@ internal static class TipService
             _enabled = value;
             if (!_enabled)
             {
-                Clear();
+                ClearImmediate();
             }
 
             RelayoutHost();
         }
     }
 
-    /// <summary>Tips 表示先（ログ上の Label と、高さを可変にするホスト Panel）。</summary>
-    public static void BindDisplay(Label display, Panel host)
+    public static void BindDisplay(TextBlock display, FrameworkElement host)
     {
         _display = display;
         _host = host;
-        display.AutoEllipsis = false;
-        display.AutoSize = false;
-        display.TextAlign = ContentAlignment.TopLeft;
-        display.UseMnemonic = false;
+        display.TextWrapping = TextWrapping.Wrap;
+        display.TextTrimming = TextTrimming.None;
 
         if (!_layoutWired)
         {
             _layoutWired = true;
             host.SizeChanged += (_, _) => RelayoutHost();
-            display.FontChanged += (_, _) => RelayoutHost();
+            var fontSizeDescriptor = System.ComponentModel.DependencyPropertyDescriptor.FromProperty(
+                TextBlock.FontSizeProperty, typeof(TextBlock));
+            fontSizeDescriptor?.AddValueChanged(display, (_, _) => RelayoutHost());
         }
 
         SetDisplayText(null);
     }
 
-    /// <summary>静的文言を紐づける（再呼出しで文言だけ更新可）。</summary>
-    public static void Set(Control control, string? tip, bool respectsEnabled = true)
+    public static void Set(FrameworkElement control, string? tip, bool respectsEnabled = true)
     {
         var binding = Bindings.GetOrCreateValue(control);
         binding.Text = tip ?? string.Empty;
@@ -78,7 +77,6 @@ internal static class TipService
         EnsureWired(control, binding);
     }
 
-    /// <summary>動的 Tip（波形ヒットテスト等）。</summary>
     public static void Show(string? text, object source, bool respectsEnabled = true)
     {
         if (_suspendCount > 0)
@@ -97,18 +95,16 @@ internal static class TipService
             return;
         }
 
+        CancelPendingClear();
         _activeSource = source;
         SetDisplayText(text);
     }
 
-    /// <summary>表示を空にする。</summary>
     public static void Clear()
     {
-        _activeSource = null;
-        SetDisplayText(null);
+        ScheduleClear(source: null, clearAny: true);
     }
 
-    /// <summary><paramref name="source"/> が現在の表示元のときだけクリアする。</summary>
     public static void Clear(object source)
     {
         if (!ReferenceEquals(_activeSource, source))
@@ -116,7 +112,7 @@ internal static class TipService
             return;
         }
 
-        Clear();
+        ScheduleClear(source, clearAny: false);
     }
 
     public static void Suspend()
@@ -124,7 +120,7 @@ internal static class TipService
         _suspendCount++;
         if (_suspendCount == 1)
         {
-            Clear();
+            ClearImmediate();
         }
     }
 
@@ -136,7 +132,7 @@ internal static class TipService
         }
     }
 
-    private static void EnsureWired(Control control, TipBinding binding)
+    private static void EnsureWired(FrameworkElement control, TipBinding binding)
     {
         if (!binding.Wired)
         {
@@ -156,44 +152,123 @@ internal static class TipService
                 Show(binding.Text, control, binding.RespectsEnabled);
             };
             control.MouseLeave += (_, _) => Clear(control);
-            control.ParentChanged += (_, _) => EnsureParentWired(control);
-            control.Disposed += (_, _) =>
+            control.IsEnabledChanged += (_, _) =>
+            {
+                if (!control.IsEnabled && ReferenceEquals(_activeSource, control))
+                {
+                    ScheduleClear(control, clearAny: false);
+                }
+            };
+            control.Unloaded += (_, _) =>
             {
                 if (ReferenceEquals(_activeSource, control))
                 {
-                    Clear(control);
+                    // アンロード時はホバー継続の対象が消えるので即消去。
+                    ClearImmediateIfSource(control);
                 }
             };
         }
 
-        // 無効コントロールは自身へ MouseEnter が来ないため、親の MouseMove で拾う。
         EnsureParentWired(control);
     }
 
-    private static void EnsureParentWired(Control control)
+    private static void ScheduleClear(object? source, bool clearAny)
     {
-        var parent = control.Parent;
-        if (parent is null || parent.IsDisposed)
+        if (_display is null && _activeSource is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_display?.Text) && _activeSource is null)
+        {
+            return;
+        }
+
+        _pendingClearAny = clearAny;
+        _pendingClearSource = source;
+        var timer = EnsureClearTimer();
+        timer.Stop();
+        timer.Start();
+    }
+
+    private static void CancelPendingClear()
+    {
+        _pendingClearAny = false;
+        _pendingClearSource = null;
+        _clearTimer?.Stop();
+    }
+
+    private static DispatcherTimer EnsureClearTimer()
+    {
+        if (_clearTimer is not null)
+        {
+            return _clearTimer;
+        }
+
+        _clearTimer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = ClearHoldDuration,
+        };
+        _clearTimer.Tick += (_, _) =>
+        {
+            _clearTimer.Stop();
+            var clearAny = _pendingClearAny;
+            var source = _pendingClearSource;
+            _pendingClearAny = false;
+            _pendingClearSource = null;
+
+            if (clearAny)
+            {
+                ClearImmediate();
+                return;
+            }
+
+            ClearImmediateIfSource(source);
+        };
+        return _clearTimer;
+    }
+
+    private static void ClearImmediate()
+    {
+        CancelPendingClear();
+        _activeSource = null;
+        SetDisplayText(null);
+    }
+
+    private static void ClearImmediateIfSource(object? source)
+    {
+        if (source is null || !ReferenceEquals(_activeSource, source))
+        {
+            CancelPendingClear();
+            return;
+        }
+
+        ClearImmediate();
+    }
+
+    private static void EnsureParentWired(FrameworkElement control)
+    {
+        if (control.Parent is not FrameworkElement parent)
         {
             return;
         }
 
         _ = WiredParents.GetValue(parent, static p =>
         {
-            p.MouseMove += Parent_MouseMove;
+            p.PreviewMouseMove += Parent_PreviewMouseMove;
             p.MouseLeave += Parent_MouseLeave;
             return new object();
         });
     }
 
-    private static void Parent_MouseMove(object? sender, MouseEventArgs e)
+    private static void Parent_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (sender is not Control parent || _suspendCount > 0)
+        if (sender is not FrameworkElement parent || _suspendCount > 0)
         {
             return;
         }
 
-        var hit = FindDisabledTipControl(parent, e.Location);
+        var hit = FindDisabledTipElement(parent, e.GetPosition(parent));
         if (hit is not null && Bindings.TryGetValue(hit, out var binding))
         {
             if (!_enabled && binding.RespectsEnabled)
@@ -205,78 +280,89 @@ internal static class TipService
             return;
         }
 
-        if (_activeSource is Control { Enabled: false } active
-            && ReferenceEquals(active.Parent, parent))
+        if (_activeSource is FrameworkElement { IsEnabled: false } active
+            && ReferenceEquals(GetParent(active), parent))
         {
             Clear(active);
         }
     }
 
-    private static void Parent_MouseLeave(object? sender, EventArgs e)
+    private static void Parent_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (sender is not Control parent)
+        if (sender is not FrameworkElement parent)
         {
             return;
         }
 
-        if (_activeSource is not Control { Enabled: false } active
-            || !ReferenceEquals(active.Parent, parent))
+        if (_activeSource is not FrameworkElement { IsEnabled: false } active
+            || !ReferenceEquals(GetParent(active), parent))
         {
             return;
         }
 
-        var client = parent.PointToClient(Control.MousePosition);
-        if (!parent.ClientRectangle.Contains(client))
+        if (!parent.IsMouseOver)
         {
             Clear(active);
         }
     }
 
-    /// <summary>
-    /// 親クライアント座標上の、Tips 紐づけがある無効コントロールを探す（前面優先）。
-    /// </summary>
-    private static Control? FindDisabledTipControl(Control parent, Point clientPt)
+    private static FrameworkElement? GetParent(FrameworkElement element) =>
+        element.Parent as FrameworkElement;
+
+    private static FrameworkElement? FindDisabledTipElement(FrameworkElement parent, Point parentPoint)
     {
-        for (var i = parent.Controls.Count - 1; i >= 0; i--)
+        var hit = parent.InputHitTest(parentPoint) as DependencyObject;
+        while (hit is not null)
         {
-            var child = parent.Controls[i];
-            if (!child.Visible || !child.Bounds.Contains(clientPt))
+            if (hit is FrameworkElement element
+                && !element.IsEnabled
+                && Bindings.TryGetValue(element, out _))
             {
-                continue;
+                return element;
             }
 
-            var local = new Point(clientPt.X - child.Left, clientPt.Y - child.Top);
-            var nested = FindDisabledTipControl(child, local);
-            if (nested is not null)
-            {
-                return nested;
-            }
-
-            if (!child.Enabled && Bindings.TryGetValue(child, out _))
-            {
-                return child;
-            }
+            hit = GetVisualOrContentParent(hit);
         }
 
         return null;
     }
 
+    /// <summary>
+    /// InputHitTest は FlowDocument / Run など非 Visual を返すことがある。
+    /// VisualTreeHelper.GetParent はそれらで例外になるため分岐する。
+    /// </summary>
+    private static DependencyObject? GetVisualOrContentParent(DependencyObject current)
+    {
+        if (current is Visual)
+        {
+            return VisualTreeHelper.GetParent(current);
+        }
+
+        if (current is ContentElement content)
+        {
+            var parent = ContentOperations.GetParent(content);
+            if (parent is not null)
+            {
+                return parent;
+            }
+
+            return LogicalTreeHelper.GetParent(current);
+        }
+
+        return LogicalTreeHelper.GetParent(current);
+    }
+
     private static void SetDisplayText(string? text)
     {
-        if (_display is null || _display.IsDisposed)
+        if (_display is null)
         {
             return;
         }
 
         var value = string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
-        if (_display.InvokeRequired)
+        if (!_display.Dispatcher.CheckAccess())
         {
-            if (!_display.IsHandleCreated)
-            {
-                return;
-            }
-
-            _display.BeginInvoke(() => ApplyDisplayText(value));
+            _display.Dispatcher.BeginInvoke(() => ApplyDisplayText(value));
             return;
         }
 
@@ -285,7 +371,7 @@ internal static class TipService
 
     private static void ApplyDisplayText(string value)
     {
-        if (_display is null || _display.IsDisposed)
+        if (_display is null)
         {
             return;
         }
@@ -300,8 +386,7 @@ internal static class TipService
 
     private static void RelayoutHost()
     {
-        if (_display is null || _host is null
-            || _display.IsDisposed || _host.IsDisposed)
+        if (_display is null || _host is null)
         {
             return;
         }
@@ -314,63 +399,94 @@ internal static class TipService
 
         var chromeHeight = MeasureChromeHeight(_host, _display);
         var padding = _display.Padding;
-        var contentWidth = Math.Max(1, _host.ClientSize.Width - padding.Horizontal);
-        var minContentHeight = MeasureLineHeight(_display.Font) * MinVisibleLines;
-        var contentHeight = minContentHeight;
+        var contentWidth = Math.Max(1d, _host.ActualWidth - padding.Left - padding.Right);
+        // 空でも本文 5 行でも同じ測り方にする（行高×5 と FormattedText 実測で差が出ないように）。
+        var minContentHeight = MeasureContentHeight(_display, BuildMinLinesSample(), contentWidth);
+        var contentHeight = string.IsNullOrEmpty(_display.Text)
+            ? minContentHeight
+            : Math.Max(minContentHeight, MeasureContentHeight(_display, _display.Text, contentWidth));
 
-        if (!string.IsNullOrEmpty(_display.Text))
-        {
-            var measured = TextRenderer.MeasureText(
-                _display.Text,
-                _display.Font,
-                new Size(contentWidth, int.MaxValue),
-                MeasureFlags);
-            // 計測と実描画の端数差で最終行が欠けないよう 1px 余裕を足す。
-            contentHeight = Math.Max(minContentHeight, measured.Height + 1);
-        }
-
-        SetHostHeight(chromeHeight + padding.Vertical + contentHeight);
+        SetHostHeight(chromeHeight + padding.Top + padding.Bottom + contentHeight);
     }
 
-    /// <summary>帯・区切り線など、本文以外の Dock=Top/Bottom 部品の合計高さ。</summary>
-    private static int MeasureChromeHeight(Panel host, Control display)
+    private static string BuildMinLinesSample()
     {
-        var height = 0;
-        foreach (Control child in host.Controls)
+        // 実テキスト 5 行と同じく改行で積む（単行高×5 だと行間が合わず空時だけ低くなる）。
+        return string.Join("\n", Enumerable.Repeat("Ag", MinVisibleLines));
+    }
+
+    /// <summary>WinForms TextRenderer の +1px 余裕に相当。空／本文で同じ値を使う。</summary>
+    private static double MeasureContentHeight(TextBlock display, string text, double contentWidth)
+    {
+        var formatted = CreateMeasureText(display, text, contentWidth);
+        return Math.Max(1d, formatted.Height + 1d);
+    }
+
+    private static FormattedText CreateMeasureText(TextBlock display, string text, double contentWidth)
+    {
+        var typeface = new Typeface(display.FontFamily, display.FontStyle, display.FontWeight, display.FontStretch);
+        return new FormattedText(
+            text,
+            System.Globalization.CultureInfo.CurrentUICulture,
+            display.FlowDirection,
+            typeface,
+            display.FontSize,
+            Brushes.White,
+            VisualTreeHelper.GetDpi(display).PixelsPerDip)
+        {
+            MaxTextWidth = Math.Max(1d, contentWidth),
+            Trimming = TextTrimming.None,
+        };
+    }
+
+    private static double MeasureChromeHeight(FrameworkElement host, FrameworkElement display)
+    {
+        // tipsPanel は Border → 内側 DockPanel。Panel 以外だと見出し高さが落ちて本文が欠ける。
+        var panel = host as Panel
+            ?? (host as Decorator)?.Child as Panel;
+        if (panel is null)
+        {
+            return 0d;
+        }
+
+        var height = 0d;
+        foreach (UIElement child in panel.Children)
         {
             if (ReferenceEquals(child, display))
             {
                 continue;
             }
 
-            if (child.Dock is DockStyle.Top or DockStyle.Bottom)
+            if (child is not FrameworkElement fe)
             {
-                height += child.Height;
+                continue;
             }
+
+            var childHeight = fe.ActualHeight;
+            if (childHeight <= 0)
+            {
+                childHeight = fe.DesiredSize.Height;
+            }
+
+            if (childHeight <= 0 && fe is SectionHeaderLabel)
+            {
+                childHeight = DesignMetrics.CompactSectionHeaderHeight;
+            }
+
+            height += childHeight + fe.Margin.Top + fe.Margin.Bottom;
         }
 
         return height;
     }
 
-    private static int MeasureLineHeight(Font font)
+    private static void SetHostHeight(double height)
     {
-        // 実フォントの1行高（空行相当）を測り、最小5行分の高さを揃える。
-        var measured = TextRenderer.MeasureText(
-            "Ag",
-            font,
-            new Size(int.MaxValue, int.MaxValue),
-            MeasureFlags);
-        return Math.Max(1, measured.Height);
-    }
-
-    private static void SetHostHeight(int height)
-    {
-        if (_host is null || _host.IsDisposed)
+        if (_host is null)
         {
             return;
         }
 
-        if (_host.Height != height)
+        if (Math.Abs(_host.Height - height) > 0.5)
         {
             _host.Height = height;
         }

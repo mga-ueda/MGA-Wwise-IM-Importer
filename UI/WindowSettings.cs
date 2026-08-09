@@ -1,4 +1,6 @@
-﻿namespace MgaWwiseIMImporter.UI;
+﻿using System.Windows;
+
+namespace MgaWwiseIMImporter.UI;
 
 internal sealed class WindowSettings
 {
@@ -45,49 +47,64 @@ internal sealed class WindowSettings
         JsonSettingsStore.Update(doc => doc.Window = data);
     }
 
-    public static WindowSettings FromForm(Form form)
+    public static WindowSettings FromWindow(Window window)
     {
-        var bounds = form.WindowState == FormWindowState.Normal
-            ? form.Bounds
-            : form.RestoreBounds;
+        Rect bounds;
+        if (window.WindowState == WindowState.Normal)
+        {
+            bounds = new Rect(window.Left, window.Top, window.Width, window.Height);
+        }
+        else
+        {
+            bounds = window.RestoreBounds;
+        }
 
         return new WindowSettings
         {
-            X = bounds.X,
-            Y = bounds.Y,
-            Width = bounds.Width,
-            Height = bounds.Height,
+            X = (int)Math.Round(bounds.X),
+            Y = (int)Math.Round(bounds.Y),
+            Width = (int)Math.Round(bounds.Width),
+            Height = (int)Math.Round(bounds.Height),
         };
     }
 
-    public bool TryApply(Form form)
+    public bool TryApply(Window window)
     {
-        if (Width < form.MinimumSize.Width || Height < form.MinimumSize.Height)
+        if (Width < window.MinWidth || Height < window.MinHeight)
         {
             return false;
         }
 
-        var bounds = new Rectangle(X, Y, Width, Height);
-        if (!IsVisibleOnAnyScreen(bounds))
+        var bounds = new Rect(X, Y, Width, Height);
+        if (!IsVisibleOnVirtualScreen(bounds))
         {
             return false;
         }
 
-        form.StartPosition = FormStartPosition.Manual;
-        form.WindowState = FormWindowState.Normal;
-        form.Bounds = bounds;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.WindowState = WindowState.Normal;
+        window.Left = bounds.X;
+        window.Top = bounds.Y;
+        window.Width = bounds.Width;
+        window.Height = bounds.Height;
         return true;
     }
 
-    private static bool IsVisibleOnAnyScreen(Rectangle bounds)
+    private static bool IsVisibleOnVirtualScreen(Rect bounds)
     {
         const int margin = 40;
-        var visibleArea = new Rectangle(
+        var visibleArea = new Rect(
             bounds.X + margin,
             bounds.Y + margin,
             Math.Max(1, bounds.Width - margin * 2),
             Math.Max(1, bounds.Height - margin * 2));
 
-        return Screen.AllScreens.Any(screen => screen.WorkingArea.IntersectsWith(visibleArea));
+        var virtualScreen = new Rect(
+            SystemParameters.VirtualScreenLeft,
+            SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth,
+            SystemParameters.VirtualScreenHeight);
+
+        return virtualScreen.IntersectsWith(visibleArea);
     }
 }

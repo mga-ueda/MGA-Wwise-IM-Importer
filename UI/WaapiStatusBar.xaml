@@ -1,0 +1,48 @@
+﻿<UserControl x:Class="MgaWwiseIMImporter.UI.WaapiStatusBar"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:MgaWwiseIMImporter.UI"
+             Height="{x:Static ui:DesignMetrics.WaapiBarHeight}"
+             Padding="10,0"
+             Focusable="False"
+             Background="{StaticResource StatusBarBackBrush}">
+  <Grid x:Name="RootGrid">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="Auto" />
+    </Grid.ColumnDefinitions>
+
+    <StackPanel x:Name="LeftPanel"
+                Grid.Column="0"
+                Orientation="Horizontal"
+                VerticalAlignment="Center">
+      <TextBlock x:Name="TitleLabel"
+                 FontWeight="Bold"
+                 FontSize="12"
+                 VerticalAlignment="Center"
+                 Margin="0,0,8,0" />
+      <Canvas x:Name="BadgeCanvas" Width="80" Height="20" Margin="0,0,12,0" />
+      <StackPanel x:Name="DetailPanel" Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock x:Name="VersionLabel" FontSize="12" VerticalAlignment="Center" />
+        <TextBlock x:Name="SepAfterVersion" Text=" - " FontSize="12" VerticalAlignment="Center" />
+        <TextBlock x:Name="ProjectNameLabel" FontSize="12" VerticalAlignment="Center" Cursor="Hand"
+                   MouseLeftButtonUp="ProjectNameLabel_Click"
+                   MouseEnter="ProjectNameLabel_MouseEnter"
+                   MouseLeave="ProjectNameLabel_MouseLeave" />
+        <TextBlock x:Name="SepAfterProject" Text=" - " FontSize="12" VerticalAlignment="Center" />
+        <TextBlock x:Name="PathLabel" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="600" />
+      </StackPanel>
+      <StackPanel x:Name="KeepLockPanel" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0">
+        <ContentControl x:Name="KeepLockButtonHost" />
+        <TextBlock x:Name="KeepStateLabel" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0" />
+      </StackPanel>
+    </StackPanel>
+
+    <CheckBox x:Name="AutoActiveCheckBox"
+              Grid.Column="1"
+              VerticalAlignment="Center"
+              Checked="AutoActiveCheckBox_Changed"
+              Unchecked="AutoActiveCheckBox_Changed" />
+  </Grid>
+</UserControl>

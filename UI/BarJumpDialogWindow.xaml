@@ -1,0 +1,63 @@
+﻿<Window x:Class="MgaWwiseIMImporter.UI.BarJumpDialogWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:MgaWwiseIMImporter.UI"
+        Title="{x:Static ui:UiStrings.DialogBarJumpTitle}"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="WidthAndHeight"
+        FocusManager.FocusedElement="{Binding ElementName=BarNumberBox}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+  <!-- Form1 BarJumpDialogForm: 枠なし・柔らかい影・丸角本体。OK/Cancel ボタンなし（Enter/Esc）。 -->
+  <Grid Margin="30">
+    <Border Width="220"
+            Height="88"
+            CornerRadius="8"
+            Background="{StaticResource DialogBodyBackBrush}">
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="25"
+                          ShadowDepth="5"
+                          Direction="270"
+                          Color="Black"
+                          Opacity="0.16" />
+      </Border.Effect>
+      <Grid>
+        <TextBlock Text="{x:Static ui:UiStrings.LabelGoToMeasure}"
+                   Foreground="{StaticResource DialogForeBrush}"
+                   FontFamily="Yu Gothic UI"
+                   FontSize="12"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Top"
+                   Margin="0,8,0,0" />
+        <Border Width="170"
+                Height="34"
+                CornerRadius="4"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Margin="0,36,0,0"
+                Background="{StaticResource DialogInputBackBrush}"
+                BorderThickness="0">
+          <TextBox x:Name="BarNumberBox"
+                   Background="Transparent"
+                   Foreground="{StaticResource DialogForeBrush}"
+                   BorderThickness="0"
+                   CaretBrush="{StaticResource DialogForeBrush}"
+                   FontFamily="Yu Gothic UI"
+                   FontSize="18.667"
+                   MaxLength="8"
+                   TextAlignment="Center"
+                   VerticalContentAlignment="Center"
+                   Padding="0"
+                   PreviewTextInput="BarNumberBox_PreviewTextInput"
+                   PreviewKeyDown="BarNumberBox_PreviewKeyDown"
+                   DataObject.Pasting="BarNumberBox_Pasting" />
+        </Border>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>
