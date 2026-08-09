@@ -238,6 +238,7 @@ public partial class MainWindow : Window
             : UiStrings.TipLanguageEnglish);
         TipService.Set(settingsGearButton, UiStrings.TipAudioSettings);
         TipService.Set(manualHelpButton, UiStrings.TipManualHelp);
+        TipService.Set(tipsToggleButton, UiStrings.TipTipsToggle, respectsEnabled: false);
         TipService.Set(compactFileNumbersCheckBox, UiStrings.TipCompactFileNumbers);
         TipService.Set(keepLastSessionCheckBox, UiStrings.TipKeepLastSession);
         TipService.Set(topMostCheckBox, UiStrings.TipAlwaysOnTop);
@@ -246,6 +247,12 @@ public partial class MainWindow : Window
         TipService.Set(exportButton, UiStrings.TipExport);
         TipService.Set(copyrightLinkLabel, UiStrings.TipCopyright);
         TipService.Set(brandLogoPictureBox, UiStrings.TipBrandLogo);
+
+        // 言語バッジ等は OnRender 内で UiStrings を読むため、Tips 更新とあわせて再描画する。
+        languageFlagButton.RefreshAppearance();
+        settingsGearButton.RefreshAppearance();
+        manualHelpButton.RefreshAppearance();
+        tipsToggleButton.RefreshAppearance();
     }
 
     private void ApplyProjectBarTips()

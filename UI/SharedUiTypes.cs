@@ -13,15 +13,6 @@ internal static class PlaylistUiNames
 {
     /// <summary>Exit Source At ラジオの表示名。</summary>
     public static string ToUiName(this PlaylistExitSourceMode mode) => UiStrings.LabelExitSource(mode);
-
-    /// <summary>遷移先同期モードの表示名（ログ・診断用）。</summary>
-    public static string ToUiName(this PlaylistDestinationSyncMode mode) => UiStrings.LabelDestinationSync(mode);
-
-    /// <summary>Marker Grid ラジオの表示名。</summary>
-    public static string ToUiName(this MarkerGridOverrideMode mode) => UiStrings.LabelMarkerGrid(mode);
-
-    /// <summary>Fade In / Fade Out の秒数に対応する表示名。</summary>
-    public static string ToFadeUiName(double seconds, bool isFadeIn) => UiStrings.LabelFadeSeconds(seconds);
 }
 
 [Flags]

@@ -1,8 +1,14 @@
-﻿namespace MgaWwiseIMImporter.UI;
+﻿using System.Windows;
+
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>カラー設定パネルでの変更を、動的着色コントロールへ反映する。</summary>
 public partial class MainWindow
 {
+#if DEBUG
+    private ColorDevPanelWindow? _colorDevPanel;
+#endif
+
     private void ApplyUiColors()
     {
         Background = UiColors.Brush(UiColors.WindowBack);
@@ -148,4 +154,42 @@ public partial class MainWindow
             button.InvalidateVisual();
         }
     }
+
+#if DEBUG
+    private void ShowColorDevPanel()
+    {
+        if (_colorDevPanel is null)
+        {
+            _colorDevPanel = new ColorDevPanelWindow
+            {
+                Owner = this,
+            };
+            _colorDevPanel.ColorsChanged += (_, _) => ApplyUiColors();
+            _colorDevPanel.Closed += (_, _) => _colorDevPanel = null;
+            PositionColorDevPanel(_colorDevPanel);
+        }
+
+        _colorDevPanel.RefreshRows();
+        _colorDevPanel.Show();
+        _colorDevPanel.Activate();
+    }
+
+    private void PositionColorDevPanel(ColorDevPanelWindow panel)
+    {
+        // メイン窓の右隣。SizeToContent 後の実幅で収める。
+        panel.WindowStartupLocation = WindowStartupLocation.Manual;
+        panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var panelWidth = panel.DesiredSize.Width;
+        if (panelWidth <= 1)
+        {
+            panelWidth = panel.Width;
+        }
+
+        var work = SystemParameters.WorkArea;
+        var x = Math.Min(Left + ActualWidth + 8, work.Right - panelWidth);
+        var y = Math.Max(work.Top, Top);
+        panel.Left = Math.Max(work.Left, x);
+        panel.Top = y;
+    }
+#endif
 }

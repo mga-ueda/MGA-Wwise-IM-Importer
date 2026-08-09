@@ -2129,8 +2129,6 @@ internal static class UiStrings
     public static string LabelNextBeat => Get("Next Beat", "Next Beat");
     public static string LabelNextCue => Get("Next Cue", "Next Cue");
     public static string LabelExitCue => Get("Exit Cue", "Exit Cue");
-    public static string LabelEntryCue => Get("Entry Cue", "Entry Cue");
-    public static string LabelSameTime => Get("Same Time", "Same Time");
     public static string LabelTimeline => Get("Timeline", "Timeline");
     public static string LabelBar => Get("Bar", "Bar");
     public static string LabelBeat => Get("Beat", "Beat");
@@ -2155,23 +2153,6 @@ internal static class UiStrings
         PlaylistExitSourceMode.NextBeat => LabelNextBeat,
         PlaylistExitSourceMode.NextCue => LabelNextCue,
         PlaylistExitSourceMode.ExitCue => LabelExitCue,
-        _ => mode.ToString(),
-    };
-
-    /// <summary>遷移先同期モードの表示名（ログ・診断用）。</summary>
-    public static string LabelDestinationSync(PlaylistDestinationSyncMode mode) => mode switch
-    {
-        PlaylistDestinationSyncMode.EntryCue => LabelEntryCue,
-        PlaylistDestinationSyncMode.SameTime => LabelSameTime,
-        _ => mode.ToString(),
-    };
-
-    /// <summary>Marker Grid ラジオの表示名。</summary>
-    public static string LabelMarkerGrid(MarkerGridOverrideMode mode) => mode switch
-    {
-        MarkerGridOverrideMode.Default => LabelTimeline,
-        MarkerGridOverrideMode.Bar => LabelBar,
-        MarkerGridOverrideMode.Beat => LabelBeat,
         _ => mode.ToString(),
     };
 

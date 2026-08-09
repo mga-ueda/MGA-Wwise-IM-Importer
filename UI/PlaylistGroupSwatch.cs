@@ -55,13 +55,6 @@ internal sealed class PlaylistGroupSwatch : Border
         }
     }
 
-    /// <summary>互換用。Fill の別名（Form1 GroupColor）。</summary>
-    public Color? GroupColor
-    {
-        get => Fill;
-        set => Fill = value;
-    }
-
     private void ApplyGroupColorVisual()
     {
         if (_groupColor is Color fillColor)

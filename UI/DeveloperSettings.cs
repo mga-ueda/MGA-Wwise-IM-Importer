@@ -14,7 +14,8 @@ internal sealed class DeveloperSettings
         return new DeveloperSettings
         {
             DetailedPlaybackLog = data.DetailedPlaybackLog,
-            // UiScaleSimulateDpi は WPF 移行で廃止（設定ファイル互換のため読み捨て）。
+            // DeveloperSettingsData.UiScaleSimulateDpi は WPF 移行で廃止。
+            // 旧 settings.json に残っていても読み捨て（キー削除は互換のため行わない）。
         };
     }
 

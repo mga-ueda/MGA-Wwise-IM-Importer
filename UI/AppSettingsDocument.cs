@@ -66,6 +66,7 @@ internal sealed class DeveloperSettingsData
 {
     public bool DetailedPlaybackLog { get; set; } = true;
 
+    /// <summary>旧 WinForms DPI シミュレート。WPF では未使用（JSON 互換のため残置）。</summary>
     public int UiScaleSimulateDpi { get; set; }
 }
 

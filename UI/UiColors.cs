@@ -437,20 +437,11 @@ internal static class UiColors
     }
 
     /// <summary>フローズン <see cref="SolidColorBrush"/> を返す。</summary>
-    public static SolidColorBrush Brush(Color c)
-    {
-        var brush = new SolidColorBrush(c);
-        brush.Freeze();
-        return brush;
-    }
+    public static SolidColorBrush Brush(Color c) => WpfControlHelpers.FrozenBrush(c);
 
     /// <summary>WaveformView GDI レイヤー向けに System.Drawing.Color へ変換する。</summary>
     public static System.Drawing.Color ToDrawing(Color c) =>
         System.Drawing.Color.FromArgb(c.A, c.R, c.G, c.B);
-
-    /// <summary>System.Drawing.Color から WPF 色へ変換する。</summary>
-    public static Color FromDrawing(System.Drawing.Color c) =>
-        Color.FromArgb(c.A, c.R, c.G, c.B);
 }
 
 internal sealed class UiColorEntry

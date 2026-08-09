@@ -32,9 +32,6 @@ internal static class AppFonts
     /// <summary>ログ用 UDEV Gothic を登録する。UI フォントはシステム依存のため登録不要。</summary>
     public static void EnsureRegistered() => _ = EnsureLogFamily();
 
-    /// <summary>ログ表示用フォントファミリー。同梱フォントが使えない場合は Consolas。</summary>
-    public static WpfFontFamily CreateLogFont() => EnsureLogFamily();
-
     /// <summary>
     /// WinForms pt → WPF DIP（96 DPI 換算）。例: 9pt → 12、8.5pt → 11.333、7pt → 9.333。
     /// </summary>

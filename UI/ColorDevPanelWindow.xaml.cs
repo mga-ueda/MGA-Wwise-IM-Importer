@@ -36,16 +36,33 @@ internal partial class ColorDevPanelWindow : Window
         _swatches.Clear();
         _hexInputs.Clear();
 
+        var hexFontSize = AppFonts.DipFromPoints(9);
+        var hexWidth = MeasureHexEditorWidth(hexFontSize);
+
         foreach (var entry in UiColors.Entries)
         {
-            var row = new Grid { Height = 30, Margin = new Thickness(0, 0, 0, 2) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(250) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            // 名称／スウォッチ／#RRGGBB はいずれも Auto＋SharedSize。窓幅は SizeToContent で追随。
+            var row = new Grid { Height = 34, Margin = new Thickness(0, 0, 0, 2) };
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+                SharedSizeGroup = "ColorDevName",
+            });
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+                SharedSizeGroup = "ColorDevSwatch",
+            });
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+                SharedSizeGroup = "ColorDevHex",
+            });
 
             var nameLabel = new TextBlock
             {
                 Text = entry.Label,
+                Margin = new Thickness(0, 0, 12, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = UiColors.Brush(UiColors.ColorPanelInputFore),
             };
@@ -54,7 +71,8 @@ internal partial class ColorDevPanelWindow : Window
             {
                 Width = 40,
                 Height = 22,
-                Margin = new Thickness(4),
+                Margin = new Thickness(0, 4, 4, 4),
+                VerticalAlignment = VerticalAlignment.Center,
                 BorderBrush = UiColors.Brush(UiColors.ChromeBorder),
                 BorderThickness = new Thickness(1),
                 Cursor = Cursors.Hand,
@@ -64,9 +82,15 @@ internal partial class ColorDevPanelWindow : Window
 
             var hex = new TextBox
             {
-                Margin = new Thickness(4, 3, 4, 3),
+                Width = hexWidth,
+                MinWidth = hexWidth,
+                MaxLength = 7,
+                Margin = new Thickness(0, 2, 0, 2),
+                Padding = new Thickness(6, 1, 6, 1),
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 FontFamily = new FontFamily("Consolas"),
-                FontSize = 12,
+                FontSize = hexFontSize,
                 Background = UiColors.Brush(UiColors.ForControlBack(UiColors.ColorPanelInputBack)),
                 Foreground = UiColors.Brush(UiColors.ColorPanelInputFore),
                 BorderBrush = UiColors.Brush(UiColors.ChromeBorder),
@@ -88,6 +112,35 @@ internal partial class ColorDevPanelWindow : Window
         }
     }
 
+    /// <summary>#RRGGBB（7 文字）が欠けずに入る TextBox 幅（Padding・枠・キャレット込み）。</summary>
+    private double MeasureHexEditorWidth(double fontSize)
+    {
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        if (dpi < 0.01)
+        {
+            dpi = 1d;
+        }
+
+        var typeface = new Typeface(
+            new FontFamily("Consolas"),
+            FontStyles.Normal,
+            FontWeights.Normal,
+            FontStretches.Normal);
+        var formatted = new FormattedText(
+            "#RRGGBB",
+            System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            fontSize,
+            Brushes.Black,
+            dpi);
+
+        // 等幅の実測が細い環境向けに、字幅下限も取る。
+        var textWidth = Math.Max(formatted.WidthIncludingTrailingWhitespace, fontSize * 0.7 * 7);
+        // Padding 6+6、Border 1+1、キャレット／内部余白
+        return Math.Ceiling(textWidth) + 6 + 6 + 2 + 10;
+    }
+
     private void UiStrings_LanguageChanged(object? sender, EventArgs e) => ApplyLocalizedLabels();
 
     public void ApplyLocalizedLabels()
@@ -105,6 +158,9 @@ internal partial class ColorDevPanelWindow : Window
                 nameLabel.Text = UiColors.Entries[i].Label;
             }
         }
+
+        // 名称長が変わったら SizeToContent 幅を付け直す。
+        InvalidateMeasure();
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -346,9 +402,14 @@ internal partial class ColorDevPanelWindow : Window
 
         private static TextBox CreateChannelBox(byte value) => new()
         {
-            Width = 48,
+            Width = 56,
+            Height = 28,
             MaxLength = 3,
+            Padding = new Thickness(4, 1, 4, 1),
+            VerticalContentAlignment = VerticalAlignment.Center,
             HorizontalContentAlignment = HorizontalAlignment.Center,
+            FontFamily = new FontFamily("Consolas"),
+            FontSize = AppFonts.DipFromPoints(9),
             Text = value.ToString(),
         };
 

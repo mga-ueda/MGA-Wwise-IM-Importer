@@ -121,11 +121,7 @@ internal sealed class SettingsGearButton : SquareToolbarButton
         RefreshAppearance();
     }
 
-    public void RefreshAppearance()
-    {
-        TipService.Set(this, UiStrings.TipAudioSettings);
-        InvalidateVisual();
-    }
+    public void RefreshAppearance() => InvalidateVisual();
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -192,13 +188,7 @@ internal sealed class LanguageFlagButton : SquareToolbarButton
         RefreshAppearance();
     }
 
-    public void RefreshAppearance()
-    {
-        TipService.Set(this, UiStrings.IsJapanese
-            ? UiStrings.TipLanguageJapanese
-            : UiStrings.TipLanguageEnglish);
-        InvalidateVisual();
-    }
+    public void RefreshAppearance() => InvalidateVisual();
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -231,11 +221,7 @@ internal sealed class ManualHelpButton : SquareToolbarButton
         RefreshAppearance();
     }
 
-    public void RefreshAppearance()
-    {
-        TipService.Set(this, UiStrings.TipManualHelp);
-        InvalidateVisual();
-    }
+    public void RefreshAppearance() => InvalidateVisual();
 
     protected override void OnRender(DrawingContext dc)
     {
@@ -282,11 +268,7 @@ internal sealed class TipsToggleButton : SquareToolbarButton
         }
     }
 
-    public void RefreshAppearance()
-    {
-        TipService.Set(this, UiStrings.TipTipsToggle, respectsEnabled: false);
-        InvalidateVisual();
-    }
+    public void RefreshAppearance() => InvalidateVisual();
 
     protected override void OnRender(DrawingContext dc)
     {
