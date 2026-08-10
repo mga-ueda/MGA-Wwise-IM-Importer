@@ -1,4 +1,6 @@
-using System.Windows;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Media;
 
@@ -7,8 +9,79 @@ namespace MgaWwiseIMImporter.UI;
 /// <summary>ログ表示（RichTextBox への色分け出力）とログ操作ボタン。</summary>
 public partial class MainWindow
 {
+    /// <summary>DarkScrollBarStyle Width fallback.</summary>
+    private const double LogScrollBarFallbackWidth = 8;
+
     /// <summary>Form1 LogLineSpacingTwips=200（10pt）相当。</summary>
     private static double LogLineHeightDip => AppFonts.DipFromPoints(10);
+
+    private ScrollBar? _logVerticalScrollBar;
+
+    private void WireLogButtonLayout()
+    {
+        // 右余白は縦スクロール幅が本命。host サイズ変化とスクロールバー可視化で足りる。
+        logEditorHost.SizeChanged += LogEditorHost_SizeChanged;
+    }
+
+    private void LogEditorHost_SizeChanged(object sender, SizeChangedEventArgs e) => PositionLogButtons();
+
+    /// <summary>
+    /// ログ本文へ重ねたボタン行の右余白を、縦スクロールバー幅に合わせる（Form1 相当）。
+    /// 位置そのものは logEditorHost 内の右下寄せ（XAML）に任せる。
+    /// </summary>
+    private void PositionLogButtons()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        var scrollBar = ResolveLogVerticalScrollBar();
+        var rightInset = scrollBar switch
+        {
+            { IsVisible: true, ActualWidth: > 0 } => scrollBar.ActualWidth,
+            not null when !double.IsNaN(scrollBar.Width) && scrollBar.Width > 0 => scrollBar.Width,
+            _ => LogScrollBarFallbackWidth,
+        };
+
+        logButtonPanel.Margin = new Thickness(0, 0, rightInset, 0);
+    }
+
+    private ScrollBar? ResolveLogVerticalScrollBar()
+    {
+        if (_logVerticalScrollBar is not null)
+        {
+            return _logVerticalScrollBar;
+        }
+
+        editorTextBox.ApplyTemplate();
+        var scrollViewer = editorTextBox.Template?.FindName("PART_ContentHost", editorTextBox) as ScrollViewer
+            ?? VisualTreeUtil.FindVisualDescendant<ScrollViewer>(editorTextBox);
+        scrollViewer?.ApplyTemplate();
+        var scrollBar = scrollViewer?.Template?.FindName("PART_VerticalScrollBar", scrollViewer) as ScrollBar
+            ?? VisualTreeUtil.FindVisualDescendant<ScrollBar>(
+                editorTextBox,
+                sb => sb.Orientation == Orientation.Vertical);
+        if (scrollBar is null)
+        {
+            return null;
+        }
+
+        _logVerticalScrollBar = scrollBar;
+        scrollBar.IsVisibleChanged += (_, _) => PositionLogButtons();
+        scrollBar.SizeChanged += (_, _) => PositionLogButtons();
+        return scrollBar;
+    }
+
+    /// <summary>すりガラス下のログボタン。busy 中はヒットだけ切る（非表示にしない）。</summary>
+    private void SyncLogButtonsForBusy(bool busy)
+    {
+        logButtonPanel.IsHitTestVisible = !busy;
+        if (!busy)
+        {
+            PositionLogButtons();
+        }
+    }
 
     private void LogClearButton_Click(object? sender, RoutedEventArgs e) => ClearLogText();
 
@@ -87,8 +160,7 @@ public partial class MainWindow
             }
         }
 
-        if (_uiInteractionLocks.HasFlag(UiInteractionLock.Export)
-            || _uiInteractionLocks.HasFlag(UiInteractionLock.Load))
+        if (IsExportOrLoadBusy)
         {
             _exportOverlay.AppendLog(report);
         }

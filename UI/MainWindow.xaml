@@ -9,7 +9,7 @@
         Width="960"
         Height="640"
         Background="{StaticResource SurfaceBackBrush}">
-  <!-- すりガラスは DockPanel 外の Grid に載せ、Z 順と絶対配置を安定させる -->
+  <!-- すりガラス用ホスト（rootDockPanel の前面） -->
   <Grid x:Name="rootChromeGrid">
   <DockPanel x:Name="rootDockPanel" LastChildFill="True">
 
@@ -367,7 +367,7 @@
                                    FontSize="11.333"
                                    Foreground="{StaticResource PlaylistDefaultForeBrush}" />
 
-            <Grid x:Name="logEditorHost" SizeChanged="LogEditorHost_SizeChanged">
+            <Grid x:Name="logEditorHost">
               <ui:ShortcutForwardingRichTextBox x:Name="editorTextBox"
                                                 AllowDrop="True"
                                                 IsReadOnly="True"
@@ -377,7 +377,7 @@
                                                 VerticalScrollBarVisibility="Auto"
                                                 HorizontalScrollBarVisibility="Disabled" />
 
-              <!-- ログ本文の上へ右下寄せで重ねる（rootDockPanel 内なのですりガラスの下に入る） -->
+              <!-- ログ本文右下オーバーレイ（rootDockPanel 内＝すりガラス下） -->
               <Border x:Name="logButtonPanel"
                       Panel.ZIndex="1"
                       HorizontalAlignment="Right"

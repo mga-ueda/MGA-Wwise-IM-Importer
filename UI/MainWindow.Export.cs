@@ -632,6 +632,11 @@ public partial class MainWindow
         RefreshUiInteractionEnabled();
     }
 
+    /// <summary>書き出し／読み込みロック中（すりガラス表示対象）。</summary>
+    private bool IsExportOrLoadBusy =>
+        _uiInteractionLocks.HasFlag(UiInteractionLock.Export)
+        || _uiInteractionLocks.HasFlag(UiInteractionLock.Load);
+
     /// <summary>クライアント領域全体（WAAPI ステータスバー含む）。</summary>
     private Rect GetBusyGlassCoverBounds()
     {
@@ -668,7 +673,7 @@ public partial class MainWindow
             }
             else
             {
-                // ボタンは畳まず rootDockPanel 内に残し、フロストに含めてすりガラスの下に見せる
+                // フロスト取り込み前に右余白を確定（ボタンは畳まない）
                 rootChromeGrid.UpdateLayout();
                 PositionLogButtons();
                 rootDockPanel.UpdateLayout();
@@ -697,19 +702,12 @@ public partial class MainWindow
 
     private void RefreshUiInteractionEnabled()
     {
-        var busy = _uiInteractionLocks.HasFlag(UiInteractionLock.Export)
-            || _uiInteractionLocks.HasFlag(UiInteractionLock.Load);
+        var busy = IsExportOrLoadBusy;
         UpdateExportEnabled();
         reloadButton.IsEnabled = !busy && _lastInputFiles.Count > 0;
         clearButton.IsEnabled = !busy;
         projectNameComboBox.IsEnabled = !busy;
         transportBar.IsEnabled = !busy;
-        // ログボタンは常時表示（すりガラスより下のレイヤ）。ヒットはオーバーレイ側が受ける。
-        logButtonPanel.Visibility = Visibility.Visible;
-        logButtonPanel.IsHitTestVisible = !busy;
-        if (!busy)
-        {
-            PositionLogButtons();
-        }
+        SyncLogButtonsForBusy(busy);
     }
 }

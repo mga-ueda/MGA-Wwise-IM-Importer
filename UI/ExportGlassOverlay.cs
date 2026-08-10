@@ -30,9 +30,6 @@ internal sealed class ExportGlassOverlay : FrameworkElement
     private float _paintOpacity = 1f;
     private Panel? _host;
 
-    /// <summary>完全に非表示になったとき（フェード終了／即時 Hide）。</summary>
-    public event Action? Hidden;
-
     public ExportGlassOverlay()
     {
         Focusable = false;
@@ -141,7 +138,6 @@ internal sealed class ExportGlassOverlay : FrameworkElement
 
     public void HideOverlay()
     {
-        var wasVisible = Visibility == Visibility.Visible;
         CancelFade();
         _dotsTimer.Stop();
         _paintOpacity = 1f;
@@ -154,10 +150,6 @@ internal sealed class ExportGlassOverlay : FrameworkElement
 
         _host = null;
         InvalidateVisual();
-        if (wasVisible)
-        {
-            Hidden?.Invoke();
-        }
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -273,14 +265,25 @@ internal sealed class ExportGlassOverlay : FrameworkElement
     private void DrawMessage(DrawingContext dc, float opacity)
     {
         var typeface = new Typeface(AppFonts.AppFamily, FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var fore = UiColors.Brush(UiColors.PrimaryFore);
         var baseFormatted = new FormattedText(
             _baseText,
             System.Globalization.CultureInfo.CurrentUICulture,
             FlowDirection.LeftToRight,
             typeface,
             15,
-            UiColors.Brush(UiColors.PrimaryFore),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            fore,
+            dpi);
+        // ドット数で本文が横に動かないよう、常に MaxDots 分の幅で中央寄せする。
+        var dotsReserve = new FormattedText(
+            " " + new string('.', MaxDots),
+            System.Globalization.CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            typeface,
+            15,
+            fore,
+            dpi);
         var dotsText = " " + new string('.', _dotCount);
         var dotsFormatted = new FormattedText(
             dotsText,
@@ -288,9 +291,9 @@ internal sealed class ExportGlassOverlay : FrameworkElement
             FlowDirection.LeftToRight,
             typeface,
             15,
-            UiColors.Brush(UiColors.PrimaryFore),
-            VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        var x = (ActualWidth - (baseFormatted.Width + dotsFormatted.Width)) / 2;
+            fore,
+            dpi);
+        var x = (ActualWidth - (baseFormatted.Width + dotsReserve.Width)) / 2;
         var y = (ActualHeight - baseFormatted.Height) / 2;
         dc.PushOpacity(opacity);
         DrawTextWithOutline(dc, baseFormatted, new Point(x, y), opacity, _baseText, typeface, 15);

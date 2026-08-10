@@ -748,8 +748,7 @@ public partial class MainWindow
     {
         var preflight = EvaluateExportPreflight();
         exportButton.IsEnabled = !_exportBusy
-            && !_uiInteractionLocks.HasFlag(UiInteractionLock.Export)
-            && !_uiInteractionLocks.HasFlag(UiInteractionLock.Load)
+            && !IsExportOrLoadBusy
             && preflight.CanExport;
 
         // 読み込み済みのときだけ事前検証の変化をログ（起動直後の空状態は黙る）
