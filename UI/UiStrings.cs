@@ -262,12 +262,18 @@ internal static class UiStrings
         + " The project itself is not deleted.");
 
     public static string TipReload => Get(
-        "最後にドロップまたは自動読み込みした WAV／XML を、元のファイルから再読み込みします。"
+        "最後に読み込んだ WAV／XML を、元のファイルから再読み込みします。"
         + Environment.NewLine
-        + "ログは消去します。サイドカー JSON があれば、グループ／無効化／追加マーカー／Fade・Exit Source At を復元します。",
-        "Reload the last dropped or auto-loaded WAV/XML from the original files."
+        + "DAW などで波形を更新したあとに使います。"
+        + " グループ／無効化／追加マーカー／Fade・Exit Source At など、いまの作業内容は可能な範囲で維持します（ログは消しません）。"
         + Environment.NewLine
-        + "The log is cleared. If a sidecar JSON exists, grouping, disables, added markers, and Fade / Exit Source At are restored.");
+        + "波形の内容が大幅に変わっているとおかしくなることがあるので、そのときは手動ドロップでやり直してください。",
+        "Re-read the last loaded WAV/XML from the original files."
+        + Environment.NewLine
+        + "Use this after updating the wave in a DAW (or similar)."
+        + " Current groups, disables, added markers, and Fade / Exit Source At are kept when possible (the log is not cleared)."
+        + Environment.NewLine
+        + "If the wave content changed substantially, that may look wrong — drop the files again to start fresh.");
 
     public static string TipExport => Get(
         "[Ctrl+Shift+E] 分割 WAV を書き出し、続けて Wwise へインポートします。"

@@ -361,7 +361,8 @@
       <ul>
         <li>複数のペアを一度にドロップした場合、処理は順に行いますが、<strong>画面に残るプレビューは最後に成功した 1 件</strong>です</li>
         <li>手動ドロップではログがクリアされ、その読み込みは「やり直し」扱いです（Keep Last Session の自動復元はしません）</li>
-        <li><span class="ui">RELOAD</span> や Keep Last Session による再読み込みでは、グループ／フェード等を可能な範囲で復元します</li>
+        <li><span class="ui">RELOAD</span> …… アプリを開いたままソース WAV／XML が更新されたときに、同じファイルをディスクから再読み込みします。グループ／フェード／追加マーカー等の<strong>いまの作業内容</strong>は可能な範囲で維持します（ログは消しません）。波形の内容が大幅に変わっていると維持しきれず表示や設定がおかしくなることがあるので、そのときは手動ドロップでやり直してください</li>
+        <li><span class="ui">Keep Last Session</span> …… 起動時／プロジェクト復帰時に、保存済みセッション（グループ／フェード等）を可能な範囲で復元します</li>
       </ul>
 
       <h2 id="wwise-prep">6. Wwise 側の準備と EXPORT</h2>
@@ -378,7 +379,7 @@
 
       <h3>6-2. 作成先と書き出しパス</h3>
       <ul>
-        <li><strong>作成先</strong> …… Wwise の Project Explorer で、生成物を置きたいオブジェクト（<span class="ui">Interactive Music Hierarchy</span> の Work Unit や Virtual Folder など）をクリックして選択します。本アプリは「Wwise 上でいま選択されているオブジェクト」を作成先として使います。毎回選び直すのが煩わしい場合は、操作バーの <span class="ui">Keep Target</span> で固定できます。</li>
+        <li><strong>作成先</strong> …… Wwise の Project Explorer で、生成物を置きたいオブジェクト（<span class="ui">Interactive Music Hierarchy</span> の Work Unit や Virtual Folder など）をクリックして選択します。本アプリは「Wwise 上でいま選択されているオブジェクト」を作成先として使います。毎回選び直すのが煩わしい場合は、WAAPI ステータスバーの <span class="ui">Keep Target</span> で固定できます。</li>
         <li><strong>書き出しパス</strong> …… プロジェクトバーで、切り出した WAV の保存先を指定します。<strong>接続中の Wwise プロジェクトの <code>Originals</code> フォルダ配下</strong>である必要があります（例: <code>&lt;プロジェクト&gt;\Originals\Music\IM-Importer</code>）。Wwise がソース WAV を参照できる場所に置くためです。</li>
       </ul>
 
@@ -485,14 +486,15 @@
       </div>
 
       <h2 id="action-bar">12. 操作バー／WAAPI ステータスバー</h2>
+      <p><span class="ui">CLEAR</span>／<span class="ui">RELOAD</span>／<span class="ui">EXPORT</span> は操作バー、<span class="ui">Keep Target</span>／<span class="ui">Auto Active</span> は WAAPI ステータスバーにあります。</p>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
         <tbody>
           <tr><td class="ui">CLEAR</td><td>波形・セッション・ログをクリアし、プロジェクト設定をアプリ既定へ。書き出し先・Keep Target・Always on Top は維持。</td></tr>
-          <tr><td class="ui">RELOAD</td><td>最後の WAV／XML を再読み込み。セッション情報を可能な範囲で復元。</td></tr>
+          <tr><td class="ui">RELOAD</td><td>最後の WAV／XML をディスクから再読み込み。更新された波形を取り込みつつ、グループ／フェード等の現状作業を可能な範囲で維持。内容が大きく変わっている場合はおかしくなることがあるので、手動ドロップでやり直してください。</td></tr>
           <tr><td class="ui">EXPORT</td><td>分割 WAV 書き出し＋Wwise 登録。</td></tr>
-          <tr><td class="ui">Keep Target</td><td>作成先固定。プロジェクト名リンクまたは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面化。</td></tr>
-          <tr><td class="ui">Auto Active</td><td>既定オン。EXPORT 後に Wwise を前面化。</td></tr>
+          <tr><td class="ui">Keep Target</td><td>作成先固定（WAAPI ステータスバー）。プロジェクト名リンクまたは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面化。</td></tr>
+          <tr><td class="ui">Auto Active</td><td>既定オン（WAAPI ステータスバー）。EXPORT 後に Wwise を前面化。</td></tr>
         </tbody>
       </table>
 

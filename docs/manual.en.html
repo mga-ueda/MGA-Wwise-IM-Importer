@@ -361,7 +361,8 @@
       <ul>
         <li>If multiple pairs are dropped, they are processed in order, but <strong>only the last successful preview stays on screen</strong></li>
         <li>A manual drop clears the log and is treated as a fresh load (not Keep Last Session restore)</li>
-        <li><span class="ui">RELOAD</span> / Keep Last Session restore groups, fades, and related session data when possible</li>
+        <li><span class="ui">RELOAD</span> — while the app stays open, re-read the same WAV/XML from disk after the source was updated. Keeps your <strong>current</strong> groups, fades, added markers, and related work when possible (does not clear the log). If the wave content changed substantially, that carry-over can look wrong — drop the files again to start fresh</li>
+        <li><span class="ui">Keep Last Session</span> — on startup / returning to a project, restores the saved session (groups, fades, etc.) when possible</li>
       </ul>
 
       <h2 id="wwise-prep">6. Wwise setup and EXPORT</h2>
@@ -378,7 +379,7 @@
 
       <h3>6-2. Destination and export path</h3>
       <ul>
-        <li><strong>Destination</strong> — in Wwise’s Project Explorer, click the object that should receive the generated content (a Work Unit or Virtual Folder under <span class="ui">Interactive Music Hierarchy</span>, etc.). The app uses “whatever is currently selected in Wwise” as the destination. If reselecting every time is tedious, pin it with <span class="ui">Keep Target</span> on the action bar.</li>
+        <li><strong>Destination</strong> — in Wwise’s Project Explorer, click the object that should receive the generated content (a Work Unit or Virtual Folder under <span class="ui">Interactive Music Hierarchy</span>, etc.). The app uses “whatever is currently selected in Wwise” as the destination. If reselecting every time is tedious, pin it with <span class="ui">Keep Target</span> on the WAAPI status bar.</li>
         <li><strong>Export path</strong> — set in the project bar; where the cut WAVs are saved. It must be <strong>under the connected Wwise project’s <code>Originals</code> folder</strong> (e.g. <code>&lt;project&gt;\Originals\Music\IM-Importer</code>) so Wwise can reference the source WAVs.</li>
       </ul>
 
@@ -485,14 +486,15 @@
       </div>
 
       <h2 id="action-bar">12. Action bar / WAAPI status</h2>
+      <p><span class="ui">CLEAR</span> / <span class="ui">RELOAD</span> / <span class="ui">EXPORT</span> are on the action bar; <span class="ui">Keep Target</span> / <span class="ui">Auto Active</span> are on the WAAPI status bar.</p>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
         <tbody>
           <tr><td class="ui">CLEAR</td><td>Clear wave/session/log; reset project settings to app defaults. Keeps export path, Keep Target, Always on Top.</td></tr>
-          <tr><td class="ui">RELOAD</td><td>Reload last WAV/XML; restore session data when possible.</td></tr>
+          <tr><td class="ui">RELOAD</td><td>Re-read the last WAV/XML from disk. Picks up an updated wave while keeping current groups, fades, and related work when possible. If the content changed a lot, that may look wrong — drop the files again to start fresh.</td></tr>
           <tr><td class="ui">EXPORT</td><td>Write split WAVs and register in Wwise.</td></tr>
-          <tr><td class="ui">Keep Target</td><td>Pin destination. Project-name link or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> opens/focuses Wwise.</td></tr>
-          <tr><td class="ui">Auto Active</td><td>Default on. Bring Wwise to front after EXPORT.</td></tr>
+          <tr><td class="ui">Keep Target</td><td>Pin destination (WAAPI status bar). Project-name link or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> opens/focuses Wwise.</td></tr>
+          <tr><td class="ui">Auto Active</td><td>Default on (WAAPI status bar). Bring Wwise to front after EXPORT.</td></tr>
         </tbody>
       </table>
 

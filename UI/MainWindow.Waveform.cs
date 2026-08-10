@@ -117,7 +117,13 @@ public partial class MainWindow
             return;
         }
 
-        await ProcessDroppedFilesAsync(_lastInputFiles, isLastSessionLoad: false).ConfigureAwait(true);
+        // ディスク上の更新を取り込みつつ、いまの作業状態を可能な範囲で維持する。
+        var captured = TryCaptureCurrentWaveSession();
+        await ProcessDroppedFilesAsync(
+                _lastInputFiles,
+                isLastSessionLoad: false,
+                capturedSession: captured)
+            .ConfigureAwait(true);
     }
 
     /// <summary>

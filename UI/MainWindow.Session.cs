@@ -7,8 +7,6 @@ public partial class MainWindow
     {
         if (_closing
             || _creatingNewProject
-            || _loadedPreview is null
-            || _previewSession is null
             || !_projectStore.ContainsName(_loadedProjectName))
         {
             return;
@@ -16,37 +14,56 @@ public partial class MainWindow
 
         try
         {
-            var wavePaths = _loadedPreview.IsMultiWaveOnly
-                ? _loadedPreview.SourceSpans.Select(s => s.Path).ToArray()
-                : null;
-            var state = LastWaveSessionState.Capture(
-                _loadedPreview.SourcePath,
-                _previewSession.EffectiveOutputParts,
-                _partGroupIds,
-                _groupColorIndexes,
-                _nextGroupId,
-                _nextColorIndex,
-                _previewSession.GetUserMarkerSampleOffsets(),
-                _disabledPartNumbers,
-                _partExitSourceModes,
-                _partChangeOccursAtModes,
-                _partFadeInSeconds,
-                _partFadeOutSeconds,
-                _partFadeInCurves,
-                _partFadeOutCurves,
-                _partGroupFadeSeconds,
-                _partPlayPostExit,
-                _partAdditiveLayers,
-                _previewSession.GetWaveOnlySessionMarkers(),
-                _previewSession.RegionEdgeFades,
-                wavePaths,
-                _sourceBaseNameOverride);
+            var state = TryCaptureCurrentWaveSession();
+            if (state is null)
+            {
+                return;
+            }
+
             _projectStore.SaveLastWaveSession(_loadedProjectName, state);
         }
         catch
         {
             // セッション保存失敗は作業を止めない。
         }
+    }
+
+    /// <summary>
+    /// いま画面上の作業状態（グループ／無効化／トランジション／マーカー等）をキャプチャする。
+    /// RELOAD で再解析後に再適用するためにも使う（ディスク保存はしない）。
+    /// </summary>
+    private LastWaveSessionState? TryCaptureCurrentWaveSession()
+    {
+        if (_loadedPreview is null || _previewSession is null)
+        {
+            return null;
+        }
+
+        var wavePaths = _loadedPreview.IsMultiWaveOnly
+            ? _loadedPreview.SourceSpans.Select(s => s.Path).ToArray()
+            : null;
+        return LastWaveSessionState.Capture(
+            _loadedPreview.SourcePath,
+            _previewSession.EffectiveOutputParts,
+            _partGroupIds,
+            _groupColorIndexes,
+            _nextGroupId,
+            _nextColorIndex,
+            _previewSession.GetUserMarkerSampleOffsets(),
+            _disabledPartNumbers,
+            _partExitSourceModes,
+            _partChangeOccursAtModes,
+            _partFadeInSeconds,
+            _partFadeOutSeconds,
+            _partFadeInCurves,
+            _partFadeOutCurves,
+            _partGroupFadeSeconds,
+            _partPlayPostExit,
+            _partAdditiveLayers,
+            _previewSession.GetWaveOnlySessionMarkers(),
+            _previewSession.RegionEdgeFades,
+            wavePaths,
+            _sourceBaseNameOverride);
     }
 
     /// <summary>読み込み済み波形パスを Keep Last Session 用フィールドへ反映する。</summary>
