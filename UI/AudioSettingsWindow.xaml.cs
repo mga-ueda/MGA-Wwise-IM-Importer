@@ -112,8 +112,35 @@ internal partial class AudioSettingsWindow : Window
 
         SelectApi(current.Api);
         ReloadDevices(preserveSelection: true, preferredDeviceId: current.DeviceId);
-        Loaded += (_, _) => FitContentWidth();
+        Loaded += (_, _) =>
+        {
+            FitContentWidth();
+            CenterOnOwner();
+        };
         FitContentWidth();
+    }
+
+    /// <summary>
+    /// SizeToContent／幅合わせ後に、オーナー（メインウィンドウ）の中央へ出す。
+    /// <see cref="WindowStartupLocation.CenterOwner"/> だけでは初期サイズ基準のまま残るため。
+    /// </summary>
+    private void CenterOnOwner()
+    {
+        if (Owner is not { } owner)
+        {
+            return;
+        }
+
+        UpdateLayout();
+        var width = ActualWidth;
+        var height = ActualHeight;
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        Left = owner.Left + ((owner.ActualWidth - width) / 2);
+        Top = owner.Top + ((owner.ActualHeight - height) / 2);
     }
 
     /// <summary>
@@ -164,6 +191,11 @@ internal partial class AudioSettingsWindow : Window
 
         ContentRoot.MinWidth = desired;
         ContentRoot.Width = desired;
+
+        if (IsLoaded)
+        {
+            CenterOnOwner();
+        }
     }
 
     private double MeasureComboContentWidth(ComboBox combo)
