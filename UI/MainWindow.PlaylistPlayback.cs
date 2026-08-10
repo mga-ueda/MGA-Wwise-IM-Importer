@@ -110,7 +110,7 @@ public partial class MainWindow
 
             if (isPlaying && isPending)
             {
-                button.BorderSize = 2;
+                button.BorderSize = 1;
                 button.BorderColor = WpfControlHelpers.BlendColor(
                     UiColors.PlaylistButtonBorder,
                     UiColors.PlaylistTransitionBorder,
@@ -150,7 +150,7 @@ public partial class MainWindow
             if (_playlistTransitionGlowPartNumber == partNumber
                 && _playlistTransitionGlowLevel > 0d)
             {
-                button.BorderSize = 2;
+                button.BorderSize = 1;
                 button.BorderColor = WpfControlHelpers.BlendColor(
                     UiColors.PlaylistButtonBorder,
                     isManual ? UiColors.PlaylistManualBorder : UiColors.PlaylistTransitionBorder,

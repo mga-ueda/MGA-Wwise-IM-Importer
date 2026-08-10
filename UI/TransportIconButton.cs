@@ -112,6 +112,32 @@ internal sealed class TransportIconButton : Button
 
     private long _shortcutFadeStartMs;
 
+    // IsMouseOver / IsPressed は AffectsRender ではない。空 Template の自前 OnRender だと
+    // 離脱・押下解除後に Invalidate されないとハイライトが残る。
+    protected override void OnMouseEnter(MouseEventArgs e)
+    {
+        base.OnMouseEnter(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnIsPressedChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnIsPressedChanged(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        InvalidateVisual();
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         base.OnRender(dc);

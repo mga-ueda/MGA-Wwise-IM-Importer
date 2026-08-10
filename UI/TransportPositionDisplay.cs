@@ -270,6 +270,31 @@ internal sealed class TransportMetronomeButton : Button
         _shortcutFadeTimer.Start();
     }
 
+    // TransportIconButton と同様、ホバー／押下の変化で再描画する。
+    protected override void OnMouseEnter(MouseEventArgs e)
+    {
+        base.OnMouseEnter(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnIsPressedChanged(DependencyPropertyChangedEventArgs e)
+    {
+        base.OnIsPressedChanged(e);
+        InvalidateVisual();
+    }
+
+    protected override void OnLostMouseCapture(MouseEventArgs e)
+    {
+        base.OnLostMouseCapture(e);
+        InvalidateVisual();
+    }
+
     protected override void OnRender(DrawingContext dc)
     {
         var bounds = new Rect(0, 0, ActualWidth, ActualHeight);

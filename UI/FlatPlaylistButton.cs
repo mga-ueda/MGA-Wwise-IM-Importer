@@ -102,7 +102,7 @@ internal sealed class FlatPlaylistButton : Button
         Background = UiColors.Brush(UiColors.PlaylistBack);
         Foreground = UiColors.Brush(UiColors.PlaylistActiveFore);
         BorderColor = UiColors.PlaylistTransitionBorder;
-        BorderSize = 2;
+        BorderSize = 1;
     }
 
     /// <summary>

@@ -15,8 +15,8 @@
         PreviewKeyDown="Window_PreviewKeyDown">
   <!-- Form1 BarJumpDialogForm: 枠なし・柔らかい影・丸角本体。OK/Cancel ボタンなし（Enter/Esc）。 -->
   <Grid Margin="30">
-    <Border Width="220"
-            Height="88"
+    <Border Width="160"
+            Height="72"
             CornerRadius="8"
             Background="{StaticResource DialogBodyBackBrush}">
       <Border.Effect>
@@ -34,12 +34,13 @@
                    HorizontalAlignment="Center"
                    VerticalAlignment="Top"
                    Margin="0,8,0,0" />
-        <Border Width="170"
-                Height="34"
+        <!-- 4桁＋わずかな余白 -->
+        <Border Width="84"
+                Height="26"
                 CornerRadius="4"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top"
-                Margin="0,36,0,0"
+                Margin="0,34,0,0"
                 Background="{StaticResource DialogInputBackBrush}"
                 BorderThickness="0">
           <TextBox x:Name="BarNumberBox"
@@ -48,11 +49,11 @@
                    BorderThickness="0"
                    CaretBrush="{StaticResource DialogForeBrush}"
                    FontFamily="Yu Gothic UI"
-                   FontSize="18.667"
-                   MaxLength="8"
+                   FontSize="16"
+                   MaxLength="4"
                    TextAlignment="Center"
                    VerticalContentAlignment="Center"
-                   Padding="0"
+                   Padding="4,0"
                    PreviewTextInput="BarNumberBox_PreviewTextInput"
                    PreviewKeyDown="BarNumberBox_PreviewKeyDown"
                    DataObject.Pasting="BarNumberBox_Pasting" />
