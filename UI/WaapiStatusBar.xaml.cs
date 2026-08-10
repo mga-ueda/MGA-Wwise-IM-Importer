@@ -367,7 +367,7 @@ internal sealed partial class WaapiStatusBar : UserControl
             _keepLockButton.ActiveForeColor = UiColors.KeepTargetUnlockFore;
         }
 
-        _keepLockButton.ApplyColors();
+        _keepLockButton.InvalidateVisual();
     }
 
     private void ApplyProjectNameColors()

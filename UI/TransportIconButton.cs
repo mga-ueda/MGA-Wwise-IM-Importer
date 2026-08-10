@@ -180,7 +180,9 @@ internal sealed class TransportIconButton : Button
             ? UiColors.TransportDisabledFore
             : Icon == TransportIcon.PlayPause && IsPlaying
                 ? ActiveForeColor
-                : UiColors.TransportFore;
+                : Foreground is SolidColorBrush foreBrush
+                    ? foreBrush.Color
+                    : UiColors.TransportFore;
 
         if (Icon == TransportIcon.WaveformHeight)
         {
