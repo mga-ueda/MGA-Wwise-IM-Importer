@@ -45,12 +45,14 @@ public partial class MainWindow
         // Diagnostic は ASIO コールバック等の非 UI スレッドから来る。IsChecked を触らない。
         _audioPlayer.Diagnostic += (_, message) =>
         {
+#if DEBUG
             if (!_developerSettings.DetailedPlaybackLog)
             {
                 return;
             }
 
             Dispatcher.BeginInvoke(() => AppendColoredLine(message));
+#endif
         };
 
         InstallMetronomeClicks();

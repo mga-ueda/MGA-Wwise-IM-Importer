@@ -91,6 +91,7 @@ public partial class MainWindow
         _appSettings.SaveAlwaysOnTop(enabled);
     }
 
+#if DEBUG
     private void DetailedLogCheckBox_CheckedChanged(object? sender, RoutedEventArgs e)
     {
         if (_suppressProjectUiEvents)
@@ -101,6 +102,7 @@ public partial class MainWindow
         DeveloperSettings.SaveDetailedPlaybackLog(detailedLogCheckBox.IsChecked == true);
         _developerSettings = DeveloperSettings.Load();
     }
+#endif
 
     private void CompactFileNumbersCheckBox_CheckedChanged(object? sender, RoutedEventArgs e)
     {

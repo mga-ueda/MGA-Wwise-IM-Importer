@@ -150,7 +150,9 @@ public partial class MainWindow : Window
 
         keepLastSessionCheckBox.Content = UiStrings.LabelKeepLastSession;
         topMostCheckBox.Content = UiStrings.LabelAlwaysOnTop;
+#if DEBUG
         detailedLogCheckBox.Content = UiStrings.LabelDebugLog;
+#endif
         compactFileNumbersCheckBox.Content = UiStrings.LabelCompactFileNumbers;
 
         clearButton.Content = UiStrings.LabelClear;
@@ -235,7 +237,9 @@ public partial class MainWindow : Window
 
     private void ApplyActionBarTips()
     {
+#if DEBUG
         TipService.Set(detailedLogCheckBox, UiStrings.TipDebugLog);
+#endif
         TipService.Set(languageFlagButton, UiStrings.IsJapanese
             ? UiStrings.TipLanguageJapanese
             : UiStrings.TipLanguageEnglish);
@@ -366,8 +370,10 @@ public partial class MainWindow : Window
         // Action bar
         brandLogoPictureBox.MouseLeftButtonUp += (_, _) => TryOpenUrl(AppVersion.CompanyUrl);
         copyrightLinkLabel.LinkClick += CopyrightLinkLabel_LinkClick;
+#if DEBUG
         detailedLogCheckBox.Checked += DetailedLogCheckBox_CheckedChanged;
         detailedLogCheckBox.Unchecked += DetailedLogCheckBox_CheckedChanged;
+#endif
         clearButton.Click += ClearButton_Click;
         reloadButton.Click += ReloadButton_Click;
         exportButton.Click += ExportButton_Click;
@@ -697,7 +703,15 @@ public partial class MainWindow : Window
         RefreshProjectComboItems(_loadedProjectName);
         topMostCheckBox.IsChecked = _appSettings.AlwaysOnTop;
         Topmost = _appSettings.AlwaysOnTop;
+#if DEBUG
         detailedLogCheckBox.IsChecked = _developerSettings.DetailedPlaybackLog;
+#else
+        // リリース版では開発用ログ UI をレイアウトから除去し、イベントも無効化する。
+        detailedLogCheckBox.IsChecked = false;
+        detailedLogCheckBox.IsEnabled = false;
+        detailedLogCheckBox.Visibility = Visibility.Collapsed;
+        actionControlsPanel.Children.Remove(detailedLogCheckBox);
+#endif
         TipService.Enabled = _appSettings.ShowTips;
         tipsToggleButton.Checked = _appSettings.ShowTips;
         UiStrings.SetLanguage(_appSettings.UiLanguage);
