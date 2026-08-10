@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -179,14 +179,17 @@ internal sealed partial class WaveformView
                 }
 
                 // Playlist スウォッチと同じ色を不透明のまま使う（薄めない）。
-                using var fill = new SolidBrush(WaveformGdiColors.ToDrawing(color));
+                // Segment レーンだけ少し濃くして上下の見分けを付ける。
+                var drawing = WaveformGdiColors.ToDrawing(color);
                 if (segmentLane.Height > 0)
                 {
-                    g.FillRectangle(fill, x0, segmentLane.Top, x1 - x0, segmentLane.Height);
+                    using var segmentFill = new SolidBrush(DarkenGroupColorForSegmentLane(drawing));
+                    g.FillRectangle(segmentFill, x0, segmentLane.Top, x1 - x0, segmentLane.Height);
                 }
 
                 if (playlistLane.Height > 0)
                 {
+                    using var fill = new SolidBrush(drawing);
                     g.FillRectangle(fill, x0, playlistLane.Top, x1 - x0, playlistLane.Height);
                 }
             }
@@ -259,12 +262,23 @@ internal sealed partial class WaveformView
                     segment.Name,
                     segment.StartSampleOffset,
                     segment.EndSampleOffset,
-                    color));
+                    DarkenGroupColorForSegmentLane(color)));
             }
 
             DrawTimedNameLaneWithBackColors(g, wave, segmentLane, items, FontStyle.Regular);
             DrawSegmentLaneDividers(g, wave, segmentLane);
         }
+    }
+
+    /// <summary>Music Segment Name レーン用にグループ色を少し濃くする（Playlist レーンとの差）。</summary>
+    private static Color DarkenGroupColorForSegmentLane(Color color)
+    {
+        const float factor = 0.5f;
+        return Color.FromArgb(
+            color.A,
+            (int)Math.Round(color.R * factor),
+            (int)Math.Round(color.G * factor),
+            (int)Math.Round(color.B * factor));
     }
 
     private bool TryGetGroupColorCoveringSample(long sampleOffset, out Color color)
@@ -1790,9 +1804,9 @@ internal sealed partial class WaveformView
         }
 
         var withBack = new List<(string Text, long Start, long End, Color Back)>(items.Count);
-        foreach (var item in items)
+        foreach (var (text, start, end) in items)
         {
-            withBack.Add((item.Text, item.Start, item.End, laneBackColor));
+            withBack.Add((text, start, end, laneBackColor));
         }
 
         DrawTimedNameLaneWithBackColors(g, wave, lane, withBack, fontStyle);
@@ -1828,10 +1842,10 @@ internal sealed partial class WaveformView
         const float minFontSize = 0.5f;
 
         var parts = new List<(string Text, float X0, float X1, Color Back)>(items.Count);
-        foreach (var item in items)
+        foreach (var (text, start, end, back) in items)
         {
-            var a0 = SampleToAbsolute(item.Start, frameCount);
-            var a1 = SampleToAbsolute(item.End, frameCount);
+            var a0 = SampleToAbsolute(start, frameCount);
+            var a1 = SampleToAbsolute(end, frameCount);
             if (!TryMapAbsoluteRange(a0, a1, wave, out var x0, out var x1))
             {
                 continue;
@@ -1842,7 +1856,7 @@ internal sealed partial class WaveformView
                 continue;
             }
 
-            parts.Add((item.Text, x0, x1, item.Back));
+            parts.Add((text, x0, x1, back));
         }
 
         if (parts.Count == 0)
@@ -2631,7 +2645,7 @@ internal sealed partial class WaveformView
         }
     }
 
-    private float contentWidthForTrail()
+    private float ContentWidthForTrail()
     {
         var timeline = GetTimelineContentRect();
         return Math.Max(0, timeline.Width);
@@ -2639,7 +2653,7 @@ internal sealed partial class WaveformView
 
     private void PruneTrailSamplesByAge(long now, List<(double Progress, long TickMs)> trailSamples)
     {
-        var retainMs = Math.Max(TrailSampleRetainMs, TrailFadeMsForView(contentWidthForTrail()));
+        var retainMs = Math.Max(TrailSampleRetainMs, TrailFadeMsForView(ContentWidthForTrail()));
         var remove = 0;
         while (remove < trailSamples.Count && now - trailSamples[remove].TickMs >= retainMs)
         {

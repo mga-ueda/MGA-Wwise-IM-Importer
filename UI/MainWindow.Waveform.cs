@@ -93,6 +93,16 @@ public partial class MainWindow
             return;
         }
 
+        // 手動ドロップはやり直し扱い（同一／別波形を問わず前回のグループ等を引き継がない）。
+        var hadLoadedWave = _loadedPreview is not null;
+        ClearLogText();
+        if (hadLoadedWave)
+        {
+            AppendColoredLine(UiStrings.LogManualDropSessionDiscarded);
+        }
+
+        ClearWaveformState();
+
         var preview = await ProcessDroppedFilesAsync(paths, isLastSessionLoad: false).ConfigureAwait(true);
         if (preview is not null)
         {
