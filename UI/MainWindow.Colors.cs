@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -163,6 +163,8 @@ public partial class MainWindow
             _colorDevPanel = new ColorDevPanelWindow
             {
                 Owner = this,
+                // メインが最前面でもパネルが背面に回らないようにする。
+                Topmost = Topmost,
             };
             _colorDevPanel.ColorsChanged += (_, _) => ApplyUiColors();
             _colorDevPanel.Closed += (_, _) => _colorDevPanel = null;

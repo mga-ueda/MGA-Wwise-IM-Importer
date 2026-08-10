@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
@@ -123,6 +123,7 @@ public partial class MainWindow
         var next = UiStrings.IsJapanese ? UiLanguage.English : UiLanguage.Japanese;
         UiStrings.SetLanguage(next);
         _appSettings.SaveUiLanguage(next);
+        ReleaseFocusToWaveform();
     }
 
     private void TipsToggleButton_Click(object? sender, RoutedEventArgs e)
@@ -131,6 +132,7 @@ public partial class MainWindow
         _appSettings.SaveShowTips(enabled);
         TipService.Enabled = enabled;
         tipsToggleButton.Checked = enabled;
+        ReleaseFocusToWaveform();
     }
 
     private void SettingsGearButton_Click(object? sender, RoutedEventArgs e)
@@ -313,6 +315,7 @@ public partial class MainWindow
 
             profile.CopyMarkerInto(_markerSettings);
             markerOptionsPanel.Bind(_markerSettings);
+            ApplyMarkerSettings();
             markerOptionsPanel.BindStreaming(profile.StreamEnabled, profile.LookAheadMs, profile.PrefetchLengthMs);
             markerOptionsPanel.BindLoudness(profile.LoudnessPreserveGroupBalance);
             markerOptionsPanel.BindMoreOptions(profile.MoreOptionsExpanded);

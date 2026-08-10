@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -209,7 +209,12 @@ public partial class MainWindow
             return;
         }
 
-        foreach (var number in EnumerateTransitionSettingsScope(part))
+        StorePlayPostExit(part, enabled);
+    }
+
+    private void StorePlayPostExit(int partNumber, bool enabled)
+    {
+        foreach (var number in EnumerateTransitionSettingsScope(partNumber))
         {
             _partPlayPostExit[number] = enabled;
         }
@@ -228,9 +233,14 @@ public partial class MainWindow
         }
     }
 
-    private void ClearPlaylistChoices()
+    private void ClearPlaylistChoices(string? statusMessage = null)
     {
         playlistListLayout.Children.Clear();
+        if (!string.IsNullOrEmpty(statusMessage))
+        {
+            AddPlaylistStatusLabel(statusMessage);
+        }
+
         _playlistButtons.Clear();
         _disabledPartNumbers.Clear();
         _partGroupIds.Clear();
@@ -256,6 +266,25 @@ public partial class MainWindow
         waveformView.SetPlaylistHoverHighlight(null);
         EndPlaylistGroupPaint();
         EndPlaylistDisablePaint();
+    }
+
+    /// <summary>波形が空のときに一覧へ出すステータス表示（Form1 AddPlaylistStatusLabel 相当）。</summary>
+    private void AddPlaylistStatusLabel(string message)
+    {
+        playlistListLayout.Children.Add(new TextBlock
+        {
+            Text = message,
+            Foreground = UiColors.Brush(UiColors.PrimaryFore),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            VerticalAlignment = VerticalAlignment.Center,
+            Height = DesignMetrics.FlatOptionRowHeight,
+            Padding = new Thickness(DesignMetrics.From96(2), 0, DesignMetrics.From96(2), 0),
+            Margin = new Thickness(
+                DesignMetrics.PlaylistItemIndent,
+                DesignMetrics.From96(1),
+                DesignMetrics.From96(3),
+                DesignMetrics.From96(1)),
+        });
     }
 
     /// <summary>波形読込・グループ変更・有効無効切替後に、プレイリスト行 UI を再構築する。</summary>
@@ -728,6 +757,8 @@ public partial class MainWindow
         }
 
         SyncTransitionSettingsForGroup(groupId);
+        // Form1 同等: 再生中パートがグループに入ったら Group / Chg Occ At を即有効化。
+        UpdateGroupFadeRadioEnabled();
         if (!_playlistGroupPaintActive && !_playlistDisablePaintActive)
         {
             UpdateLayerMusicOptionEnabled();
@@ -742,6 +773,7 @@ public partial class MainWindow
         }
 
         DiscardPlaylistGroupIfEmpty(groupId);
+        UpdateGroupFadeRadioEnabled();
         if (!_playlistGroupPaintActive && !_playlistDisablePaintActive)
         {
             UpdateLayerMusicOptionEnabled();
@@ -756,6 +788,72 @@ public partial class MainWindow
         }
 
         _groupColorIndexes.Remove(groupId);
+    }
+
+    /// <summary>
+    /// Wave 単体モードでは小節／拍情報がないため Next Bar / Next Beat を使わない
+    /// （Form1 UpdateWaveOnlyExitSourceOptionsEnabled 同等）。
+    /// </summary>
+    private void UpdateWaveOnlyExitSourceOptionsEnabled()
+    {
+        var waveOnly = _previewSession?.AllowsSessionMarkerEdit == true;
+        exitSourceNextBarRadio.IsEnabled = !waveOnly;
+        exitSourceNextBeatRadio.IsEnabled = !waveOnly;
+
+        if (waveOnly
+            && (exitSourceNextBarRadio.IsChecked == true || exitSourceNextBeatRadio.IsChecked == true))
+        {
+            var suppressed = _suppressProjectUiEvents;
+            _suppressProjectUiEvents = true;
+            try
+            {
+                SelectExitSourceRadio(ExitSourceRadios, PlaylistExitSourceMode.Immediate);
+            }
+            finally
+            {
+                _suppressProjectUiEvents = suppressed;
+            }
+
+            if (_selectedPlaylistPartNumber is int partNumber)
+            {
+                foreach (var number in EnumerateTransitionSettingsScope(partNumber))
+                {
+                    _partExitSourceModes[number] = PlaylistExitSourceMode.Immediate;
+                }
+            }
+        }
+
+        // Change Occurs At 側の wave-only 制約は Group 有効状態と合わせて更新する。
+        UpdateGroupFadeRadioEnabled();
+    }
+
+    /// <summary>
+    /// Fade In / Fade Out の保存値をラジオの選択肢（None / 0.5 / 1 / 3 / 6 秒）の最寄りへ丸める。
+    /// 旧バージョンで保存した 9.0 など、選択肢に無い値と UI 表示の食い違いを防ぐ。
+    /// Group Fade には適用しない。
+    /// </summary>
+    private static double NormalizeTransitionFadeSeconds(double seconds)
+    {
+        double[] choices = [0d, 0.5d, 1d, 3d, 6d];
+        var best = choices[0];
+        foreach (var choice in choices)
+        {
+            if (Math.Abs(choice - seconds) < Math.Abs(best - seconds))
+            {
+                best = choice;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>セッション復元後などに全グループの遷移設定をリーダー値で揃える（Form1 同等）。</summary>
+    private void SyncTransitionSettingsAcrossAllGroups()
+    {
+        foreach (var groupId in _partGroupIds.Values.Distinct().ToArray())
+        {
+            SyncTransitionSettingsForGroup(groupId);
+        }
     }
 
     private void SyncTransitionSettingsForGroup(int groupId)
@@ -852,11 +950,7 @@ public partial class MainWindow
 
         if (disabled)
         {
-            if (_pendingOverlayPartNumber == partNumber)
-            {
-                ClearPendingOverlay();
-            }
-
+            CancelPlaybackForDisabledPart(partNumber);
             RemovePlaylistPartFromGroup(partNumber);
         }
 
@@ -866,6 +960,39 @@ public partial class MainWindow
         {
             AutosaveCurrentProject();
             SaveLastWaveSessionIfLoaded();
+        }
+    }
+
+    /// <summary>
+    /// 再生中・予約中のパートを無効化されたら、そのパートの再生／遷移予約を止める（Form1 同等）。
+    /// </summary>
+    private void CancelPlaybackForDisabledPart(int partNumber)
+    {
+        if (_pendingOverlayPartNumber == partNumber)
+        {
+            ClearPendingOverlay();
+        }
+
+        if (_requestedPlaylistPartNumber == partNumber)
+        {
+            _audioPlayer.CancelPlaylistTransition();
+            ClearPendingPlaylistUiTransition();
+            _requestedPlaylistPartNumber = null;
+        }
+
+        if (_activeAutomaticPlaylistPartNumber == partNumber
+            || _manualPlaylistPartNumber == partNumber)
+        {
+            _audioPlayer.CancelPlaylistTransition();
+            ClearPendingPlaylistUiTransition();
+            if (_audioPlayer.IsPlaying)
+            {
+                _audioPlayer.Stop();
+                UpdateTransportPlaybackState();
+                _playheadTimer.Stop();
+            }
+
+            ClearPlaylistPlaybackSelection();
         }
     }
 

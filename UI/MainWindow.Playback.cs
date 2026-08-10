@@ -1,4 +1,5 @@
-﻿using System.Windows;
+using System.Runtime.InteropServices;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -8,11 +9,26 @@ namespace MgaWwiseIMImporter.UI;
 /// <summary>再生・トランスポート・メトロノーム・ショートカット。</summary>
 public partial class MainWindow
 {
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+    private const int VkLeft = 0x25;
+    private const int VkRight = 0x27;
+    private const int VkShift = 0x10;
+    private const int VkControl = 0x11;
+    private const int VkMenu = 0x12;
+
     private readonly WaveAudioPlayer _audioPlayer = new();
     private readonly MetronomePlayer? _metronomePlayer = MetronomePlayer.TryCreate();
+    private readonly object _metronomeVolumeTipSource = new();
+    private readonly DispatcherTimer _metronomeVolumeTipTimer = new() { Interval = TimeSpan.FromMilliseconds(1000) };
     private readonly DispatcherTimer _playheadTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private readonly DispatcherTimer _markerNudgeTimer = new();
+    private Key _markerNudgeDirection = Key.None;
+    private bool _markerNudgeRepeatStarted;
     private double? _lastPlaybackStartProgress;
     private bool _resumePlaybackAfterBackwardSeek;
+    private int? _lastJumpedBarNumber;
     private TransportCommand? _activeTransportShortcutCommand;
     private Key _activeTransportShortcutKey = Key.None;
 
@@ -24,6 +40,7 @@ public partial class MainWindow
         {
             OnPlaybackEndedForPlaylistUi();
             UpdateTransportPlaybackState();
+            UpdateSourceLevelMeter();
         });
         // Diagnostic は ASIO コールバック等の非 UI スレッドから来る。IsChecked を触らない。
         _audioPlayer.Diagnostic += (_, message) =>
@@ -40,8 +57,15 @@ public partial class MainWindow
         projectSpectrumView.Player = _audioPlayer;
 
         transportBar.MetronomeInvoked += (_, _) => TryToggleMetronome();
+        _metronomeVolumeTipTimer.Tick += (_, _) =>
+        {
+            _metronomeVolumeTipTimer.Stop();
+            TipService.Clear(_metronomeVolumeTipSource);
+            transportBar.RestoreMetronomeTipIfHovered();
+        };
         _playheadTimer.Tick += (_, _) => OnPlayheadTick();
         _playheadTimer.Start();
+        _markerNudgeTimer.Tick += (_, _) => TickWaveOnlyMarkerNudgeHold();
         InitializePlaylistPlaybackTimers();
     }
 
@@ -281,24 +305,58 @@ public partial class MainWindow
 
     private void SeekPlayback(double progress, bool ensureVisible = false)
     {
-        var clamped = Math.Clamp(progress, 0d, 1d);
-        _audioPlayer.Seek(clamped);
-        AnchorPlayhead(clamped);
-        if (!_automaticPlaylistPlayback && _audioPlayer.IsPlaying)
+        if (!_audioPlayer.HasSource)
         {
-            SetManualPlaylistHighlight(clamped);
+            return;
         }
 
-        waveformView.SetPlayhead(clamped, recordTrail: _audioPlayer.IsPlaying, ensureVisible: ensureVisible);
+        // 多重波形 + Additive 重ね中はレイヤー相対シークを優先
+        if (TrySeekPreservingAdditiveLayers(progress, ensureVisible))
+        {
+            return;
+        }
+
+        var clamped = Math.Clamp(progress, 0d, 1d);
+        _audioPlayer.CancelPlaylistTransition();
+        ClearPendingPlaylistUiTransition();
+        ClearPlaylistOverlayState();
+        SetManualPlaylistHighlight(clamped);
+        _audioPlayer.Seek(clamped);
+        // ジャンプ先が -L 内ならその区間に付け替え、外ならループ解除
+        _audioPlayer.ArmLoopAtProgress(clamped);
+        AnchorPlayhead(clamped);
+        waveformView.SetPlayhead(clamped, recordTrail: false, ensureVisible: ensureVisible);
+        waveformView.SetExitPlayhead(null);
+        waveformView.SetFadeOutPlayhead(null);
+        UpdateSourceLevelMeter();
     }
 
     private void StartPlaybackAt(double progress)
     {
-        SeekPlayback(progress);
-        _lastPlaybackStartProgress = progress;
-        if (!_audioPlayer.IsPlaying)
+        _resumePlaybackAfterBackwardSeek = false;
+        var wasPlaying = _audioPlayer.IsPlaying;
+        var clamped = Math.Clamp(progress, 0d, 1d);
+        SeekPlayback(clamped);
+        _lastPlaybackStartProgress = clamped;
+        ApplyPlayExitLayerForCurrentPlayback();
+
+        if (!wasPlaying)
         {
             _audioPlayer.Play();
+        }
+
+        AnchorPlayhead(clamped);
+        _audioPlayer.ArmLoopAtProgress(clamped);
+        _playheadTimer.Start();
+        OnPlayheadTick();
+
+        if (!wasPlaying && _audioPlayer.IsPlaying)
+        {
+            StartPlaylistTransitionGlow();
+        }
+        else
+        {
+            ApplyPlaylistButtonColors();
         }
 
         UpdateTransportPlaybackState();
@@ -311,7 +369,7 @@ public partial class MainWindow
             return;
         }
 
-        StartPlaybackAt(_lastPlaybackStartProgress ?? _audioPlayer.Progress);
+        StartPlaybackAt(_lastPlaybackStartProgress ?? _smoothProgress);
     }
 
     private void StartPrerollPlayback(double prerollSeconds = 3d)
@@ -327,7 +385,7 @@ public partial class MainWindow
             return;
         }
 
-        var start = Math.Max(0d, _audioPlayer.Progress - (prerollSeconds / durationSec));
+        var start = Math.Max(0d, _smoothProgress - (prerollSeconds / durationSec));
         StartPlaybackAt(start);
     }
 
@@ -338,10 +396,20 @@ public partial class MainWindow
             return;
         }
 
+        // タイマー基準の現在位置を確定してから止める
+        var durationSec = _audioPlayer.Duration.TotalSeconds;
+        if (durationSec > 0)
+        {
+            var elapsedSec = (Environment.TickCount64 - _anchorTickMs) / 1000d;
+            _smoothProgress = Math.Clamp(_anchorProgress + elapsedSec / durationSec, 0d, 1d);
+        }
+
+        _playheadTimer.Stop();
         _audioPlayer.Pause();
         UpdateTransportPlaybackState();
-        SeekPlayback(_audioPlayer.Progress);
+        SeekPlayback(_smoothProgress);
         _resumePlaybackAfterBackwardSeek = true;
+        OnPlayheadTick();
     }
 
     private void ResumePlaybackAfterBackwardSeek()
@@ -357,29 +425,62 @@ public partial class MainWindow
             return;
         }
 
-        SeekPlayback(_audioPlayer.Progress);
+        SeekPlayback(_smoothProgress);
         _audioPlayer.Play();
+        AnchorPlayhead(_smoothProgress);
+        _playheadTimer.Start();
+        OnPlayheadTick();
         UpdateTransportPlaybackState();
     }
 
     private void ShowBarJumpDialog()
     {
-        var currentBar = ResolveBarNumberFromProgress(_audioPlayer.Progress);
-        var dialog = new BarJumpDialogWindow(currentBar) { Owner = this };
-        if (dialog.ShowDialog() == true && dialog.BarNumber is { } target)
+        if (!HasTransportBarNavigation())
         {
-            waveformView.TrySeekToBarNumber(target);
+            return;
+        }
+
+        // 初回は現在位置の最近傍小節。一度ジャンプしたあとはその値を初期表示する。
+        var dialog = new BarJumpDialogWindow(
+            _lastJumpedBarNumber ?? waveformView.GetNearestBarNumber())
+        {
+            Owner = this,
+        };
+        if (dialog.ShowDialog() != true || dialog.BarNumber is not int barNumber)
+        {
+            return;
+        }
+
+        _lastJumpedBarNumber = barNumber;
+        if (!waveformView.TrySeekToBarNumber(barNumber))
+        {
+            AppendReport(
+                $"{UiStrings.LogGoToMeasureHeader}{Environment.NewLine}"
+                + UiStrings.LogBarNotFound(barNumber)
+                + Environment.NewLine
+                + Environment.NewLine);
         }
     }
 
-    private void TryToggleMetronome()
+    private bool TryToggleMetronome()
     {
-        var enabled = !transportBar.IsMetronomeEnabled;
-        transportBar.IsMetronomeEnabled = enabled;
-        _audioPlayer.SetMetronomeEnabled(enabled);
+        if (_uiInteractionLocks != UiInteractionLock.None
+            || _metronomePlayer is null
+            || !HasTransportBarNavigation())
+        {
+            return false;
+        }
+
+        transportBar.IsMetronomeEnabled = !transportBar.IsMetronomeEnabled;
+        _audioPlayer.SetMetronomeEnabled(transportBar.IsMetronomeEnabled);
         transportBar.PulseMetronomeFeedback();
+        ReleaseFocusToWaveform();
+        return true;
     }
 
+    /// <summary>
+    /// 音符＋テンポ上のホイールでメトロノーム音量を変える（下限 10%〜最大、10% 刻み。アプリ設定に保存）。
+    /// </summary>
     private bool TryAdjustMetronomeVolume(int wheelDelta)
     {
         if (_uiInteractionLocks != UiInteractionLock.None
@@ -391,18 +492,65 @@ public partial class MainWindow
 
         if (!_metronomePlayer.TryAdjustVolume(wheelDelta))
         {
+            ShowMetronomeVolumeTip();
             return true;
         }
 
         _appSettings.SaveMetronomeVolume(_metronomePlayer.Volume);
         _audioPlayer.SetMetronomeVolume(_metronomePlayer.Volume);
         transportBar.PulseMetronomeFeedback();
+        ShowMetronomeVolumeTip();
         return true;
+    }
+
+    private void ShowMetronomeVolumeTip()
+    {
+        if (_metronomePlayer is null)
+        {
+            return;
+        }
+
+        var percent = (int)Math.Round(_metronomePlayer.Volume * 100d);
+        TipService.Show(
+            UiStrings.TipMetronomeVolume(percent),
+            _metronomeVolumeTipSource);
+        _metronomeVolumeTipTimer.Stop();
+        _metronomeVolumeTipTimer.Start();
+    }
+
+    /// <summary>
+    /// 小節情報のない波形ではメトロノームを止めて OFF に戻す（Form1 同等）。
+    /// </summary>
+    private void ApplyMetronomeBarsFromPreview(WaveformPreviewData? preview)
+    {
+        if (preview is { Bars.Count: > 0 })
+        {
+            _audioPlayer.SetMetronomeBars(preview.Bars);
+            return;
+        }
+
+        _audioPlayer.SetMetronomeBars([]);
+        if (transportBar.IsMetronomeEnabled)
+        {
+            transportBar.IsMetronomeEnabled = false;
+        }
+
+        _audioPlayer.SetMetronomeEnabled(false);
     }
 
     private void UpdateTransportPlaybackState()
     {
         transportBar.IsPlaying = _audioPlayer.IsPlaying;
+    }
+
+    private void UpdateSourceLevelMeter()
+    {
+        // 停止中はピークを 0・減衰なしで即リセット（タイマー停止後もメーターが残らないようにする）。
+        var peak = _audioPlayer.IsPlaying ? _audioPlayer.OutputPeak : 0f;
+        var targetLevel = peak <= 0.001f
+            ? 0f
+            : (float)Math.Clamp((20d * Math.Log10(peak) + 60d) / 60d, 0d, 1d);
+        waveformView.SetOutputLevel(targetLevel, decay: _audioPlayer.IsPlaying);
     }
 
     private void UpdateNavigationAvailability()
@@ -425,6 +573,17 @@ public partial class MainWindow
         if (_audioPlayer.TryCompletePlaybackIfEnded())
         {
             UpdateTransportPlaybackState();
+            UpdateSourceLevelMeter();
+            return;
+        }
+
+        if (!_audioPlayer.HasSource)
+        {
+            waveformView.SetPlayhead(null);
+            waveformView.SetFadeOutPlayhead(null);
+            waveformView.SetExitPlayhead(null);
+            UpdateSourceLevelMeter();
+            transportBar.SetPosition(null);
             return;
         }
 
@@ -436,8 +595,58 @@ public partial class MainWindow
         }
 
         UpdatePlaylistPlaybackOnPlayheadTick(ref progress, isPlaying);
-        waveformView.SetPlayhead(progress, recordTrail: isPlaying, ensureVisible: isPlaying);
-        waveformView.SetOutputLevel(_audioPlayer.OutputPeak, decay: true);
+
+        if (isPlaying)
+        {
+            // Form1 同等: クロック FO 中は主シークを消し、白いフェードアウトヘッド＋軌跡にする。
+            var clockFadeOutActive = _audioPlayer.TryGetClockFadeOutPlaybackProgress(
+                out var clockFadeProgress);
+            if (clockFadeOutActive)
+            {
+                waveformView.SetPlayhead(null);
+                waveformView.SetFadeOutPlayhead(
+                    clockFadeProgress,
+                    recordTrail: true,
+                    isExit: false);
+            }
+            else
+            {
+                waveformView.SetPlayhead(progress, recordTrail: true, ensureVisible: true);
+            }
+
+            double? targetExitProgress = null;
+            if (_audioPlayer.TryGetExitPlaybackProgress(out var exitProgress))
+            {
+                targetExitProgress = exitProgress;
+            }
+
+            if (!clockFadeOutActive
+                && _audioPlayer.TryGetPlaylistFadePlaybackProgress(
+                    out var fadeProgress,
+                    out var fadeReachedExit))
+            {
+                waveformView.SetFadeOutPlayhead(
+                    fadeProgress,
+                    recordTrail: true,
+                    isExit: fadeReachedExit);
+            }
+            else if (!clockFadeOutActive)
+            {
+                waveformView.SetFadeOutPlayhead(null);
+            }
+
+            waveformView.SetExitPlayhead(
+                targetExitProgress,
+                recordTrail: targetExitProgress is not null);
+        }
+        else
+        {
+            waveformView.SetPlayhead(progress, recordTrail: false, ensureVisible: false);
+            waveformView.SetExitPlayhead(null);
+            waveformView.SetFadeOutPlayhead(null);
+        }
+
+        UpdateSourceLevelMeter();
         transportBar.SetPosition(ResolvePositionInfo(progress));
     }
 
@@ -568,6 +777,7 @@ public partial class MainWindow
         }
 
         StorePlayPostExitForSelectedPart(playMinusECheckBox.IsChecked == true);
+        ApplyPlayExitLayerForCurrentPlayback();
         AutosaveCurrentProject();
         SaveLastWaveSessionIfLoaded();
     }
@@ -586,12 +796,24 @@ public partial class MainWindow
 
     private void TogglePlayPostExitForCurrentPlaylist()
     {
-        if (_loadedPreview is null || playMinusECheckBox.IsEnabled != true)
+        if (_loadedPreview is null)
         {
             return;
         }
 
-        playMinusECheckBox.IsChecked = playMinusECheckBox.IsChecked != true;
+        // 選択中ではなく、実際に再生中／シーク位置の Playlist のみ対象。
+        var partNumber = ResolveClockPlaylistPart()?.Number
+            ?? TryGetOutputPartAtProgress(_smoothProgress)?.Number;
+        if (partNumber is not int number)
+        {
+            return;
+        }
+
+        var enabled = !ResolvePlayPostExit(number);
+        StorePlayPostExit(number, enabled);
+        SaveLastWaveSessionIfLoaded();
+        SelectPlaylistPart(number, seekAndPlay: false);
+        ApplyPlayExitLayerForCurrentPlayback();
     }
 
     private void ConfirmAndExit()
@@ -617,19 +839,26 @@ public partial class MainWindow
             return;
         }
 
-        // ログ欄フォーカス中は再生／波形ショートカットを無効（Form1 と同じ）。
-        if (editorTextBox.IsKeyboardFocusWithin)
-        {
-            return;
-        }
-
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
 
+        // Esc はログ欄フォーカス中でも終了確認を出す（Form1 と同じ）。
+        // プロジェクト名編集中はコンボ側の編集キャンセルに委ねる。
         if (key == Key.Escape)
         {
+            if (projectNameComboBox.IsKeyboardFocusWithin)
+            {
+                return;
+            }
+
             ConfirmAndExit();
             e.Handled = true;
+            return;
+        }
+
+        // ログ欄フォーカス中は再生／波形ショートカットを無効（Form1 と同じ）。
+        if (editorTextBox.IsKeyboardFocusWithin)
+        {
             return;
         }
 
@@ -651,8 +880,23 @@ public partial class MainWindow
             return;
         }
 
-        if (key == Key.Delete && modifiers == ModifierKeys.Control && TryDeleteSelectedWaveOnlyMarker())
+        if (key == Key.R
+            && modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+            && TryRenameWaveOnlyMarkerAtPlayhead())
         {
+            e.Handled = true;
+            return;
+        }
+
+        if (key == Key.Delete && modifiers == ModifierKeys.Control && TryDeleteWaveOnlyMarkerAtPlayhead())
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (key == Key.W && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+        {
+            waapiStatusBar.TryInvokeProjectNameClick();
             e.Handled = true;
             return;
         }
@@ -675,9 +919,34 @@ public partial class MainWindow
             return;
         }
 
+        // Alt+←/→ は押下中をタイマーで扱う（途中で Shift を足してもオートリピートが途切れない）。
+        if (key is Key.Left or Key.Right
+            && modifiers.HasFlag(ModifierKeys.Alt)
+            && TryBeginWaveOnlyMarkerNudgeHold(key))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (key is Key.Left or Key.Right
             && (modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) == 0
             && TryNudgeSeekByArrowKey(key))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (key == Key.Z
+            && modifiers == ModifierKeys.Control
+            && (TryUndoRegionEdgeFade() || TryUndoWaveOnlyMarkerEdit()))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (((key == Key.Z && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+                || (key == Key.Y && modifiers == ModifierKeys.Control))
+            && (TryRedoRegionEdgeFade() || TryRedoWaveOnlyMarkerEdit()))
         {
             e.Handled = true;
             return;
@@ -702,7 +971,26 @@ public partial class MainWindow
             EndActiveTransportShortcutFeedback();
             e.Handled = true;
         }
+
+        if (_resumePlaybackAfterBackwardSeek && IsBackwardSeekKey(key))
+        {
+            ResumePlaybackAfterBackwardSeek();
+            e.Handled = true;
+        }
+
+        if (key is Key.Left or Key.Right or Key.LeftAlt or Key.RightAlt)
+        {
+            // Shift 追加などで OS が一時的に KeyUp を出しても、実キーが押されていれば継続する。
+            if ((!IsAsyncKeyDown(VkLeft) && !IsAsyncKeyDown(VkRight))
+                || !IsAsyncKeyDown(VkMenu))
+            {
+                StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+            }
+        }
     }
+
+    private static bool IsBackwardSeekKey(Key key) =>
+        key is Key.Home or Key.Left or Key.PageUp or Key.L;
 
     private bool HasTransportBarNavigation() =>
         _loadedPreview is { Bars.Count: > 0 };
@@ -781,11 +1069,11 @@ public partial class MainWindow
         }
 
         var timelineWidth = Math.Max(1, waveformView.TimelineContentWidth);
-        var progress = _audioPlayer.Progress;
+        // 表示中の再生ヘッド基準（エンジン Progress はバッファ遅れがあり、右キーが進まないように見える）
         var progressDelta = (key == Key.Left ? -1 : 1)
             * (waveformView.TimeViewSpan / timelineWidth);
-        var next = Math.Clamp(progress + progressDelta, 0d, 1d);
-        if (Math.Abs(next - progress) < 1e-15)
+        var next = Math.Clamp(_smoothProgress + progressDelta, 0d, 1d);
+        if (Math.Abs(next - _smoothProgress) < 1e-15)
         {
             return true;
         }
@@ -803,27 +1091,33 @@ public partial class MainWindow
             return false;
         }
 
-        if (!_audioPlayer.TryGetActiveLoopSamples(out var loopStartSample, out var loopEndSample)
-            && !_audioPlayer.TryGetLoopSamples(_audioPlayer.Progress, out loopStartSample, out loopEndSample))
-        {
-            return false;
-        }
-
-        if (loopEndSample <= loopStartSample)
+        if (!TryResolveLoopEndSamples(out var loopStartSample, out var loopEndSample)
+            || loopEndSample <= loopStartSample)
         {
             return false;
         }
 
         var frameCount = preview.WavInfo.FrameCount;
         var sampleRate = preview.WavInfo.SampleRate;
+
+        // (1) 小節管理あり → ループエンドの 1 小節前
+        // (2) 小節管理なし／小節に届かない → ループエンドの 3 秒前
+        long? oneBarBefore = HasTransportBarNavigation()
+            ? FindSampleOneBarBefore(preview.Bars, loopEndSample, sampleRate)
+            : null;
         long targetSample;
-        if (sampleRate > 0)
+        if (oneBarBefore is long barSample)
         {
-            targetSample = loopEndSample - (3L * sampleRate);
+            targetSample = barSample;
         }
         else
         {
-            return false;
+            if (sampleRate <= 0)
+            {
+                return false;
+            }
+
+            targetSample = loopEndSample - (3L * sampleRate);
         }
 
         targetSample = Math.Clamp(
@@ -831,7 +1125,7 @@ public partial class MainWindow
             loopStartSample,
             Math.Max(loopStartSample, loopEndSample - 1));
         var targetProgress = Math.Clamp(targetSample / (double)frameCount, 0d, 1d);
-        if (targetProgress < _audioPlayer.Progress)
+        if (targetProgress < _smoothProgress)
         {
             PauseForBackwardSeekHold();
         }
@@ -840,9 +1134,171 @@ public partial class MainWindow
         return true;
     }
 
+    /// <summary>
+    /// ジャンプ先のループ範囲（-L の折り返し）を解決する。
+    /// Playlist オール（-E 含む）ではなく、実際にループする -L エンドを使う。
+    /// </summary>
+    private bool TryResolveLoopEndSamples(out long loopStartSample, out long loopEndSample)
+    {
+        loopStartSample = 0;
+        loopEndSample = 0;
+
+        if (_audioPlayer.TryGetActiveLoopSamples(out loopStartSample, out loopEndSample)
+            || _audioPlayer.TryGetLoopSamples(_smoothProgress, out loopStartSample, out loopEndSample))
+        {
+            return true;
+        }
+
+        if (ResolveClockPlaylistPart() is { } part
+            && TryFindLoopSamplesInRange(
+                part.StartSampleOffset,
+                part.EndSampleOffset,
+                out loopStartSample,
+                out loopEndSample))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryFindLoopSamplesInRange(
+        long rangeStart,
+        long rangeEnd,
+        out long loopStartSample,
+        out long loopEndSample)
+    {
+        loopStartSample = 0;
+        loopEndSample = 0;
+        if (_loadedPreview is not { } preview || rangeEnd <= rangeStart)
+        {
+            return false;
+        }
+
+        var plans = WaveAudioPlayer.BuildLoopPlans(GetEffectiveRegions());
+        if (plans.Length == 0)
+        {
+            return false;
+        }
+
+        var frameCount = preview.WavInfo.FrameCount;
+        var playheadSample = frameCount > 0
+            ? (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount)
+            : rangeStart;
+
+        LoopPlaybackPlan? best = null;
+        var bestDistance = long.MaxValue;
+        foreach (var plan in plans)
+        {
+            if (plan.LoopEndSample <= plan.LoopStartSample
+                || plan.LoopStartSample < rangeStart
+                || plan.LoopEndSample > rangeEnd)
+            {
+                continue;
+            }
+
+            var distance = playheadSample < plan.LoopStartSample
+                ? plan.LoopStartSample - playheadSample
+                : playheadSample >= plan.LoopEndSample
+                    ? playheadSample - plan.LoopEndSample
+                    : 0L;
+            if (best is null
+                || distance < bestDistance
+                || (distance == bestDistance && plan.LoopEndSample > best.Value.LoopEndSample))
+            {
+                best = plan;
+                bestDistance = distance;
+            }
+        }
+
+        if (best is not { } chosen)
+        {
+            return false;
+        }
+
+        loopStartSample = chosen.LoopStartSample;
+        loopEndSample = chosen.LoopEndSample;
+        return true;
+    }
+
+    /// <summary>
+    /// <paramref name="loopEndSample"/> の 1 小節前の小節線。無ければ null（呼び出し側は 3 秒前へ）。
+    /// </summary>
+    private static long? FindSampleOneBarBefore(
+        IReadOnlyList<WaveformBarMark> bars,
+        long loopEndSample,
+        uint sampleRate)
+    {
+        var endTolerance = sampleRate > 0
+            ? Math.Max(2L, sampleRate / 100L)
+            : 2L;
+        var endThreshold = loopEndSample - endTolerance;
+
+        long? previous = null;
+        foreach (var mark in bars)
+        {
+            if (mark.IsTempoChangeOnly)
+            {
+                continue;
+            }
+
+            if (mark.SampleOffset >= endThreshold)
+            {
+                break;
+            }
+
+            previous = mark.SampleOffset;
+        }
+
+        return previous;
+    }
+
     private bool TryDeleteSelectedWaveOnlyMarker()
     {
         if (waveformView.SelectedMarkerSampleOffset is not { } sampleOffset)
+        {
+            return false;
+        }
+
+        return TryDeleteWaveOnlyMarker(sampleOffset);
+    }
+
+    private bool TryRenameWaveOnlyMarkerAtPlayhead()
+    {
+        if (_previewSession is not { AllowsSessionMarkerEdit: true }
+            || _loadedPreview is null)
+        {
+            return false;
+        }
+
+        var frameCount = _loadedPreview.WavInfo.FrameCount;
+        if (frameCount <= 0)
+        {
+            return false;
+        }
+
+        var sampleOffset = (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount);
+        sampleOffset = Math.Clamp(sampleOffset, 0L, frameCount - 1);
+        return waveformView.TryBeginMarkerCommentEditAtSample(sampleOffset);
+    }
+
+    private bool TryDeleteWaveOnlyMarkerAtPlayhead()
+    {
+        if (_previewSession is not { AllowsSessionMarkerEdit: true } session
+            || _loadedPreview is null)
+        {
+            return false;
+        }
+
+        var frameCount = _loadedPreview.WavInfo.FrameCount;
+        if (frameCount <= 0)
+        {
+            return false;
+        }
+
+        var sampleOffset = (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount);
+        sampleOffset = Math.Clamp(sampleOffset, 0L, frameCount - 1);
+        if (!session.HasWaveOnlyMarkerAt(sampleOffset))
         {
             return false;
         }
@@ -864,7 +1320,7 @@ public partial class MainWindow
             return false;
         }
 
-        var sampleOffset = (long)Math.Round(Math.Clamp(_audioPlayer.Progress, 0d, 1d) * frameCount);
+        var sampleOffset = (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount);
         sampleOffset = Math.Clamp(sampleOffset, 0L, frameCount - 1);
 
         if (session.HasWaveOnlyMarkerAt(sampleOffset))
@@ -873,16 +1329,224 @@ public partial class MainWindow
             return true;
         }
 
-        if (!session.TryAddWaveOnlyMarker(sampleOffset, comment: string.Empty))
+        if (!TryMutateWaveOnlyMarkers(
+                current => current.TryAddWaveOnlyMarker(sampleOffset, comment: string.Empty)))
         {
             return false;
         }
 
-        RefreshMarkersOnWaveform();
         waveformView.SetSelectedMarkerSampleOffset(sampleOffset);
-        SaveLastWaveSessionIfLoaded();
         return true;
     }
+
+    /// <summary>
+    /// 再生ヘッド位置のマーカーを 1 ピクセル相当（Shift で 3 ピクセル）だけ左右へ動かす。
+    /// Ctrl（shiftPrevious）で直前マーカーとペア移動。
+    /// </summary>
+    private bool TryNudgeWaveOnlyMarkerAtPlayheadByPixel(
+        Key keyCode,
+        bool shiftPrevious = false,
+        int pixelStep = 1)
+    {
+        if (keyCode is not (Key.Left or Key.Right))
+        {
+            return false;
+        }
+
+        if (pixelStep < 1)
+        {
+            pixelStep = 1;
+        }
+
+        if (_uiInteractionLocks != UiInteractionLock.None
+            || _previewSession is not { AllowsSessionMarkerEdit: true } session
+            || _loadedPreview is null
+            || !_audioPlayer.HasSource)
+        {
+            return false;
+        }
+
+        var frameCount = _loadedPreview.WavInfo.FrameCount;
+        if (frameCount <= 0)
+        {
+            return false;
+        }
+
+        var fromSample = (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount);
+        fromSample = Math.Clamp(fromSample, 0L, frameCount - 1);
+        if (!session.HasWaveOnlyMarkerAt(fromSample))
+        {
+            return false;
+        }
+
+        var timelineWidth = Math.Max(1, waveformView.TimelineContentWidth);
+        var progressDelta = (keyCode == Key.Left ? -1 : 1)
+            * pixelStep
+            * (waveformView.TimeViewSpan / timelineWidth);
+        var nextProgress = Math.Clamp(_smoothProgress + progressDelta, 0d, 1d);
+        var toSample = (long)Math.Round(nextProgress * frameCount);
+        toSample = Math.Clamp(toSample, 0L, frameCount - 1);
+
+        // ズームインで 1 ステップが 1 サンプル未満のときは最低 pixelStep サンプル動かす。
+        if (toSample == fromSample)
+        {
+            var step = (keyCode == Key.Left ? -1L : 1L) * pixelStep;
+            toSample = Math.Clamp(fromSample + step, 0L, frameCount - 1);
+            if (toSample == fromSample)
+            {
+                return true;
+            }
+        }
+
+        if (shiftPrevious)
+        {
+            toSample = session.ClampWaveOnlyMarkerMoveWithPrevious(fromSample, toSample);
+            if (toSample == fromSample)
+            {
+                return true;
+            }
+
+            if (!TryMutateWaveOnlyMarkers(
+                    current => current.TryMoveWaveOnlyMarkerWithPrevious(fromSample, toSample),
+                    persistSession: false))
+            {
+                if (session.HasWaveOnlyMarkerAt(toSample))
+                {
+                    AppendReport(UiStrings.LogWaveOnlyMarkerDuplicate + Environment.NewLine);
+                }
+
+                return true;
+            }
+        }
+        else
+        {
+            toSample = session.ClampWaveOnlyMarkerMove(fromSample, toSample);
+            if (toSample == fromSample)
+            {
+                return true;
+            }
+
+            if (session.HasWaveOnlyMarkerAt(toSample))
+            {
+                AppendReport(UiStrings.LogWaveOnlyMarkerDuplicate + Environment.NewLine);
+                return true;
+            }
+
+            if (!TryMutateWaveOnlyMarkers(
+                    current => current.TryMoveWaveOnlyMarker(fromSample, toSample),
+                    persistSession: false))
+            {
+                return true;
+            }
+        }
+
+        _pendingWaveOnlySessionPersist = true;
+        waveformView.SetSelectedMarkerSampleOffset(toSample);
+        // 次のキー入力でも「ちょうどマーカー上」と判定できるようサンプル位置へ合わせる。
+        // -R 直後へ出たときも表示位置を追従させ、キーリピート中に位置が定まるようにする。
+        SeekPlayback((double)toSample / frameCount, ensureVisible: true);
+        waveformView.InvalidateVisual();
+        return true;
+    }
+
+    /// <summary>
+    /// Alt+←/→ 押しっぱなし開始。OS のキーリピートに頼らずタイマーで連続移動し、
+    /// 途中の Shift／Ctrl 追加でも途切れず倍速・ペア移動を切り替える。
+    /// </summary>
+    private bool TryBeginWaveOnlyMarkerNudgeHold(Key keyCode)
+    {
+        if (keyCode is not (Key.Left or Key.Right))
+        {
+            return false;
+        }
+
+        if (_markerNudgeTimer.IsEnabled && _markerNudgeDirection == keyCode)
+        {
+            // OS からのリピートは握りつぶし、タイマー側の間隔だけ使う。
+            return true;
+        }
+
+        if (_uiInteractionLocks != UiInteractionLock.None
+            || _previewSession is not { AllowsSessionMarkerEdit: true }
+            || _loadedPreview is null
+            || !_audioPlayer.HasSource)
+        {
+            return false;
+        }
+
+        StopWaveOnlyMarkerNudgeHold(flushPersist: false);
+        _markerNudgeDirection = keyCode;
+        _markerNudgeRepeatStarted = false;
+        _markerNudgeTimer.Interval =
+            TimeSpan.FromMilliseconds((SystemParameters.KeyboardDelay + 1) * 250);
+
+        if (!TryNudgeWaveOnlyMarkerAtPlayheadFromHeldKeys())
+        {
+            _markerNudgeDirection = Key.None;
+            return false;
+        }
+
+        _markerNudgeTimer.Start();
+        return true;
+    }
+
+    private void TickWaveOnlyMarkerNudgeHold()
+    {
+        if (_markerNudgeDirection is not (Key.Left or Key.Right))
+        {
+            StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+            return;
+        }
+
+        var directionVk = _markerNudgeDirection == Key.Left ? VkLeft : VkRight;
+        if (!IsAsyncKeyDown(directionVk) || !IsAsyncKeyDown(VkMenu))
+        {
+            StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+            return;
+        }
+
+        if (!_markerNudgeRepeatStarted)
+        {
+            _markerNudgeRepeatStarted = true;
+            // Windows の KeyboardSpeed: 0=約2.5回/秒、31=約30回/秒。
+            var repeatsPerSecond =
+                2.5d + SystemParameters.KeyboardSpeed * (30d - 2.5d) / 31d;
+            _markerNudgeTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(
+                20,
+                (int)Math.Round(1000d / repeatsPerSecond)));
+        }
+
+        TryNudgeWaveOnlyMarkerAtPlayheadFromHeldKeys();
+    }
+
+    private bool TryNudgeWaveOnlyMarkerAtPlayheadFromHeldKeys()
+    {
+        if (_markerNudgeDirection is not (Key.Left or Key.Right))
+        {
+            return false;
+        }
+
+        var shiftPrevious = IsAsyncKeyDown(VkControl);
+        var pixelStep = IsAsyncKeyDown(VkShift) ? 3 : 1;
+        return TryNudgeWaveOnlyMarkerAtPlayheadByPixel(
+            _markerNudgeDirection,
+            shiftPrevious,
+            pixelStep);
+    }
+
+    private void StopWaveOnlyMarkerNudgeHold(bool flushPersist)
+    {
+        _markerNudgeTimer.Stop();
+        _markerNudgeDirection = Key.None;
+        _markerNudgeRepeatStarted = false;
+        if (flushPersist)
+        {
+            FlushPendingWaveOnlySessionPersist();
+        }
+    }
+
+    private static bool IsAsyncKeyDown(int vKey) =>
+        (GetAsyncKeyState(vKey) & 0x8000) != 0;
 
     private bool IsTextEntryFocusActive()
     {

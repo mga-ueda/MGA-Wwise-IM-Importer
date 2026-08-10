@@ -206,7 +206,6 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         PrefixLabel.Foreground = optionFore;
         SuffixLabel.Foreground = optionFore;
         JoinerLabel.Foreground = optionFore;
-        PreviewLabel.Foreground = optionFore;
         ApplyHeaderColors(StreamHeader, UiColors.PlaylistDefaultFore);
         ApplyHeaderColors(LoudnessHeader, UiColors.PlaylistDefaultFore);
         ApplyHeaderColors(GridHeader, UiColors.PlaylistDefaultFore);
@@ -354,6 +353,8 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         SuffixTextBox.IsReadOnly = !placementEnabled;
         JoinerTextBox.IsReadOnly = !placementEnabled;
         ApplyDependentColors();
+        // 有効／無効の切替後も e.g. 行のミュート色を保つ
+        UpdatePreview();
     }
 
     private void ApplyDependentColors()
@@ -368,7 +369,8 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         ApplyHeaderColors(LoudnessHeader, layerMusicEnabled ? headerFore : disabledFore);
         ApplyHeaderColors(GridHeader, placementEnabled ? headerFore : disabledFore);
         ApplyHeaderColors(CommentHeader, placementEnabled ? headerFore : disabledFore);
-        PreviewLabel.Foreground = UiColors.Brush(placementEnabled ? optionFore : disabledFore);
+        // PreviewLabel（e.g. …）の色は UpdatePreview が PlaylistDefaultFore / エラー色を担当する。
+        // ここで optionFore（Primary）を当てると e.g. 行だけ白っぽくなってしまう。
 
         ApplyInputAppearance(LookAheadTextBox, _streamEnabled, optionFore, disabledFore, inputBack);
         ApplyInputAppearance(PrefetchTextBox, _streamEnabled, optionFore, disabledFore, inputBack);
@@ -552,15 +554,19 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         var rule = _settings.ToCommentRule();
         var example = rule.Format(1);
         var validationError = ValidateWwiseCustomCueName(_settings, example);
+        var placementEnabled = _markerPlacementOptionsEnabled;
         if (validationError is null)
         {
             PreviewLabel.Text = UiStrings.LabelPreviewExample(example);
-            PreviewLabel.Foreground = UiColors.Brush(UiColors.PlaylistDefaultFore);
+            // 見出し帯と同じミュート色（他の入力ラベルの PrimaryFore とは別）
+            PreviewLabel.Foreground = UiColors.Brush(
+                placementEnabled ? UiColors.PlaylistDefaultFore : UiColors.OptionGlyphDisabled);
         }
         else
         {
             PreviewLabel.Text = validationError;
-            PreviewLabel.Foreground = UiColors.Brush(UiColors.MarkerCommentErrorFore);
+            PreviewLabel.Foreground = UiColors.Brush(
+                placementEnabled ? UiColors.MarkerCommentErrorFore : UiColors.OptionGlyphDisabled);
         }
     }
 

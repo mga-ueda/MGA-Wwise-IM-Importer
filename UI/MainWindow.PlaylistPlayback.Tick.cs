@@ -1,4 +1,4 @@
-﻿using System.Windows.Media;
+using System.Windows.Media;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wave;
 
@@ -301,17 +301,32 @@ public partial class MainWindow
         }
 
         var span = end - start;
-        if (span <= 1e-15)
+        if (span <= 1e-12)
         {
             return progress;
         }
 
-        while (progress > end + 1e-12)
+        // ループ開始より前なら、そこに至るまで通常再生
+        if (progress < start)
         {
-            progress -= span;
+            return progress;
         }
 
-        return Math.Clamp(progress, 0d, 1d);
+        var relative = progress - start;
+        var wrapped = start + (relative - Math.Floor(relative / span) * span);
+        if (wrapped >= end)
+        {
+            wrapped = start;
+        }
+
+        // 折り返しで滑らかアンカーを付け替える。
+        if (Math.Abs(wrapped - progress) > 1e-9)
+        {
+            _anchorProgress = wrapped;
+            _anchorTickMs = Environment.TickCount64;
+        }
+
+        return wrapped;
     }
 
     private double WrapProgressForLoop(double progress)
@@ -404,6 +419,11 @@ public partial class MainWindow
                         _pendingSourceLoopEnd);
                 }
 
+                if (progress + 1e-12 < _smoothProgress)
+                {
+                    waveformView.ClearPlayheadTrail();
+                }
+
                 _smoothProgress = Math.Clamp(progress, 0d, 1d);
                 progress = _smoothProgress;
             }
@@ -436,6 +456,8 @@ public partial class MainWindow
 
     private void OnPlaybackEndedForPlaylistUi()
     {
+        _resumePlaybackAfterBackwardSeek = false;
+        _playheadTimer.Stop();
         ClearPendingPlaylistUiTransition();
         ClearPlaylistTransitionGlow();
         ClearPlaylistPlaybackSelection();
@@ -451,6 +473,8 @@ public partial class MainWindow
         waveformView.SetExitPlayhead(null);
         waveformView.SetFadeOutPlayhead(null);
         waveformView.SetAnacrusisPlayhead(null);
+        waveformView.SetOverlayFadeOutPlayheads([]);
         ApplyPlaylistButtonColors();
+        UpdateSourceLevelMeter();
     }
 }

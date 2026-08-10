@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -186,6 +186,7 @@ public partial class MainWindow
             TipService.Resume();
             ApplyPlaylistGroupMarkerSharing();
             ApplyPlaylistGroupColorsOnly();
+            UpdateGroupFadeRadioEnabled();
             PersistPlaylistGroupsToSession();
             AutosaveCurrentProject();
             SaveLastWaveSessionIfLoaded();

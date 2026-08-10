@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -9,6 +9,9 @@ public partial class MainWindow
 {
     private WaveformPreviewData? _loadedPreview;
     private WaveformPreviewSession? _previewSession;
+    private readonly WaveOnlyMarkerHistory _waveOnlyMarkerHistory = new();
+    private readonly RegionEdgeFadeHistory _regionEdgeFadeHistory = new();
+    private bool _pendingWaveOnlySessionPersist;
     private IReadOnlyList<string> _lastInputFiles = [];
     private string? _sourceBaseNameOverride;
     private int _nextGroupId = 1;
@@ -37,30 +40,41 @@ public partial class MainWindow
         waveformView.TransportFeedbackRequested += (_, command) =>
             transportBar.PulseCommandFeedback(command);
         waveformView.InfoLaneWidthChanged += (_, _) => SyncProjectNameComboWidthToInfoLane();
+        waveformView.SizeChanged += (_, _) => SyncProjectNameComboWidthToInfoLane();
         waveformView.TimeViewChanged += (_, _) => UpdateWaveformHorizontalScrollBar();
         waveformHorizontalScrollBar.ScrollRequested += (_, viewStart) => waveformView.SetTimeViewStart(viewStart);
     }
 
-    /// <summary>Info レーン幅に合わせてプロジェクト名コンボ幅を揃える（Form1 同等）。</summary>
+    /// <summary>
+    /// Info レーン（Measure 列）右端にプロジェクト名コンボ右端を揃える（Form1 同等）。
+    /// 波形名でレーン幅が変わるたびに追従する。
+    /// </summary>
     private void SyncProjectNameComboWidthToInfoLane()
     {
-        if (!IsLoaded || !waveformView.IsLoaded)
+        if (!IsLoaded || !waveformView.IsLoaded || !projectNameComboBox.IsLoaded)
         {
             return;
         }
 
-        // InfoLaneRightX はデバイス px → DIP にしてから画面座標へ。
         var dpi = VisualTreeHelper.GetDpi(waveformView).PixelsPerDip;
         if (dpi <= 0.01)
         {
             dpi = 1d;
         }
 
-        var infoRightDip = waveformView.InfoLaneRightX / dpi;
-        var infoRightScreen = waveformView.PointToScreen(new Point(infoRightDip, 0d)).X;
-        var comboLeftScreen = projectNameComboBox.PointToScreen(new Point(0d, 0d)).X;
+        // InfoLaneRightX は WaveformView クライアント原点からのデバイス px。
+        // TranslatePoint は DIP なので、差分をそのまま列幅（DIP）に使える。
+        // （PointToScreen 差をそのまま渡すとデバイス px を DIP 扱いして高 DPI で広がりすぎる）
+        var infoRightInWaveformDip = waveformView.InfoLaneRightX / dpi;
+        var infoRightInWindow = waveformView.TranslatePoint(new Point(infoRightInWaveformDip, 0d), this);
+        var comboLeftInWindow = projectNameComboBox.TranslatePoint(new Point(0d, 0d), this);
         var minWidth = DesignMetrics.From96(48);
-        var widthDip = Math.Max(minWidth, infoRightScreen - comboLeftScreen);
+        var widthDip = Math.Max(minWidth, infoRightInWindow.X - comboLeftInWindow.X);
+        if (widthDip < minWidth || double.IsNaN(widthDip) || double.IsInfinity(widthDip))
+        {
+            return;
+        }
+
         if (Math.Abs(projectNameColumn.Width.Value - widthDip) < 0.5)
         {
             return;
@@ -164,25 +178,105 @@ public partial class MainWindow
 
     private void ClearButton_Click(object? sender, RoutedEventArgs e)
     {
-        ClearWaveformState();
-        ClearLogText();
-        ProjectSettingsStore.DeleteLastWaveSessionFile(_loadedProjectName);
+        if (_uiInteractionLocks != UiInteractionLock.None)
+        {
+            return;
+        }
+
+        ClearCurrentProjectToDefaults();
+        ReleaseFocusToWaveform();
     }
 
+    /// <summary>
+    /// 波形・セッションを卸し、選択中プロジェクトの設定をアプリ既定へ戻して保存する。
+    /// Always on Top（アプリ設定）、書き出し先フォルダ、WAAPI Keep Target は変更しない。
+    /// プロジェクト名／一覧は消さない。
+    /// </summary>
+    private void ClearCurrentProjectToDefaults()
+    {
+        ClearWaveformState();
+
+        var name = _creatingNewProject || string.IsNullOrWhiteSpace(_loadedProjectName)
+            ? _projectStore.ActiveName
+            : _loadedProjectName;
+        _creatingNewProject = false;
+
+        // CLEAR でもパス系は現状を維持する（既定の空文字で潰さない）。
+        var preservedOutputDirectory = _projectOutputDirectory;
+        var preservedKeepTarget = _keepTarget;
+        var preservedKeptTargetPath = _keptTargetPath;
+        var preservedKeptTargetProjectFilePath = _keptTargetProjectFilePath;
+        // More Options の開閉はユーザー操作のまま残す（既定の展開で上書きしない）。
+        var preservedMoreOptionsExpanded = markerOptionsPanel.MoreOptionsExpanded;
+
+        var profile = ProjectSettingsStore.CreateAppDefaults(name);
+        profile.OutputDirectory = preservedOutputDirectory;
+        profile.KeepTarget = preservedKeepTarget;
+        profile.KeptTargetPath = preservedKeptTargetPath;
+        profile.KeptTargetProjectFilePath = preservedKeptTargetProjectFilePath;
+        profile.MoreOptionsExpanded = preservedMoreOptionsExpanded;
+
+        if (_projectStore.ContainsName(name))
+        {
+            try
+            {
+                _projectStore.SaveProfile(name, name, profile, creatingNew: false);
+                ProjectSettingsStore.DeleteLastWaveSessionFile(name);
+            }
+            catch (Exception ex)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    ex.Message,
+                    UiStrings.DialogClearProjectFailedTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                ApplyProjectProfile(_projectStore.GetActive(), applyLastSession: false);
+                RefreshProjectComboItems(_loadedProjectName);
+                return;
+            }
+        }
+
+        ApplyProjectProfile(profile, applyLastSession: false);
+        RefreshProjectComboItems(name);
+        ClearLogText();
+        AppendReport(UiStrings.LogProjectCleared(name));
+    }
+
+    /// <summary>
+    /// 読み込み中の波形・再生・Playlist／セッション状態をすべて卸す
+    /// （Form1 ClearLoadedWaveAndSession 相当）。
+    /// </summary>
     private void ClearWaveformState()
     {
+        _exportGeneration++;
         StopPlaybackForExport();
         _audioPlayer.Clear();
+        ApplyMetronomeBarsFromPreview(null);
         _loadedPreview = null;
         _previewSession = null;
+        _waveOnlyMarkerHistory.Clear();
+        _regionEdgeFadeHistory.Clear();
+        _pendingWaveOnlySessionPersist = false;
+        _sourceBaseNameOverride = null;
+        _lastPlaybackStartProgress = null;
+        _lastJumpedBarNumber = null;
         _lastInputFiles = [];
         waveformView.SetPreview(WavPeakData.Empty, string.Empty);
         waveformView.SetMarkers([]);
         waveformView.SetRegions([]);
         waveformView.SetOutputParts([]);
-        ClearPlaylistChoices();
-        exportButton.IsEnabled = false;
         reloadButton.IsEnabled = false;
+        markerOptionsPanel.SetMarkerPlacementOptionsEnabled(true);
+        UpdateWaveOnlyExitSourceOptionsEnabled();
+        ClearPendingPlaylistUiTransition();
+        ClearPlaylistChoices(UiStrings.PlaylistNone);
+        transportBar.SetPosition(null);
+        UpdateNavigationAvailability();
+        UpdateTransportPlaybackState();
+        UpdateSourceLevelMeter();
+        UpdateWaveformHorizontalScrollBar();
+        UpdateExportEnabled();
     }
 
     /// <summary>読み込んだ波形をアプリ全体（波形ビュー・プレイリスト・トランスポート）へ反映する。</summary>
@@ -191,6 +285,10 @@ public partial class MainWindow
         _loadedPreview = preview;
         _previewSession = new WaveformPreviewSession(preview);
         _previewSession.SetCommentRule(_markerSettings.ToCommentRule());
+        waveformView.MarkerGridOverride = _markerSettings.GridOverride;
+        _waveOnlyMarkerHistory.Clear();
+        _regionEdgeFadeHistory.Clear();
+        _pendingWaveOnlySessionPersist = false;
         RememberLoadedWavePaths(preview);
 
         if (capturedSession is not null)
@@ -233,9 +331,10 @@ public partial class MainWindow
             _audioPlayer.Load(preview.SourcePath);
         }
 
-        _audioPlayer.SetLoopPlans(WaveAudioPlayer.BuildLoopPlans(_previewSession.EffectiveRegions));
-        _audioPlayer.SetMetronomeBars(preview.Bars);
+        SyncPlaybackRegionsToPlayer(_previewSession.EffectiveRegions);
+        ApplyMetronomeBarsFromPreview(preview);
         ApplyWaveformFadeCurveDefaults();
+        UpdateWaveOnlyExitSourceOptionsEnabled();
         RefreshPlaylistButtons();
         UpdateNavigationAvailability();
         UpdateExportEnabled();
@@ -267,62 +366,194 @@ public partial class MainWindow
 
     private void WaveformView_MarkerEditRequested(object? sender, MarkerEditRequestedEventArgs e)
     {
-        if (_previewSession is null)
-        {
-            return;
-        }
-
-        var changed = e.Mode == MarkerEditMode.Add
-            ? _previewSession.AddMarkers(e.SampleOffsets)
-            : _previewSession.RemoveMarkers(e.SampleOffsets);
-
-        if (changed)
-        {
-            RefreshMarkersOnWaveform();
-            SaveLastWaveSessionIfLoaded();
-        }
+        TryMutateWaveOnlyMarkers(session => e.Mode == MarkerEditMode.Add
+            ? session.AddMarkers(e.SampleOffsets)
+            : session.RemoveMarkers(e.SampleOffsets));
     }
 
-    private bool TryDeleteWaveOnlyMarker(long sampleOffset)
-    {
-        if (_previewSession is null || !_previewSession.TryRemoveWaveOnlyMarker(sampleOffset))
-        {
-            return false;
-        }
+    private bool TryDeleteWaveOnlyMarker(long sampleOffset) =>
+        TryMutateWaveOnlyMarkers(session => session.TryRemoveWaveOnlyMarker(sampleOffset));
 
-        RefreshMarkersOnWaveform();
-        SaveLastWaveSessionIfLoaded();
-        return true;
-    }
-
-    private bool TryMoveWaveOnlyMarker(long fromSampleOffset, long toSampleOffset, bool shiftPreviousMarker)
-    {
-        if (_previewSession is null)
-        {
-            return false;
-        }
-
-        var moved = shiftPreviousMarker
-            ? _previewSession.TryMoveWaveOnlyMarkerWithPrevious(fromSampleOffset, toSampleOffset)
-            : _previewSession.TryMoveWaveOnlyMarker(fromSampleOffset, toSampleOffset);
-        if (!moved)
-        {
-            return false;
-        }
-
-        RefreshMarkersOnWaveform();
-        SaveLastWaveSessionIfLoaded();
-        return true;
-    }
+    private bool TryMoveWaveOnlyMarker(long fromSampleOffset, long toSampleOffset, bool shiftPreviousMarker) =>
+        TryMutateWaveOnlyMarkers(session => shiftPreviousMarker
+            ? session.TryMoveWaveOnlyMarkerWithPrevious(fromSampleOffset, toSampleOffset)
+            : session.TryMoveWaveOnlyMarker(fromSampleOffset, toSampleOffset));
 
     private void CommitMarkerComment(long sampleOffset, string comment)
     {
-        if (_previewSession is null || !_previewSession.TrySetWaveOnlyMarkerComment(sampleOffset, comment))
+        TryMutateWaveOnlyMarkers(session => session.TrySetWaveOnlyMarkerComment(sampleOffset, comment));
+    }
+
+    /// <summary>
+    /// Wave 単体マーカーを変更し、成功したら Undo 履歴へ積む（Form1 同等）。
+    /// パート構成が変わったときだけ Playlist UI を作り直す。
+    /// </summary>
+    private bool TryMutateWaveOnlyMarkers(
+        Func<WaveformPreviewSession, bool> mutate,
+        bool persistSession = true)
+    {
+        if (_previewSession is not { AllowsSessionMarkerEdit: true } session)
+        {
+            return false;
+        }
+
+        var before = session.GetWaveOnlySessionMarkers();
+        if (before is null)
+        {
+            return false;
+        }
+
+        var beforeParts = session.EffectiveOutputParts.ToArray();
+        if (!mutate(session))
+        {
+            return false;
+        }
+
+        _waveOnlyMarkerHistory.PushBeforeChange(before);
+        ApplyWaveOnlySessionPresentation(
+            session,
+            refreshPlaylists: !AreOutputPartsEquivalent(beforeParts, session.EffectiveOutputParts));
+        if (persistSession)
+        {
+            SaveLastWaveSessionIfLoaded();
+        }
+
+        return true;
+    }
+
+    private bool TryUndoWaveOnlyMarkerEdit()
+    {
+        if (_previewSession is not { AllowsSessionMarkerEdit: true } session)
+        {
+            return false;
+        }
+
+        var current = session.GetWaveOnlySessionMarkers();
+        if (current is null
+            || !_waveOnlyMarkerHistory.TryUndo(current, out var restored))
+        {
+            return false;
+        }
+
+        var beforeParts = session.EffectiveOutputParts.ToArray();
+        if (!session.TryReplaceWaveOnlySessionMarkers(restored))
+        {
+            return false;
+        }
+
+        ApplyWaveOnlySessionPresentation(
+            session,
+            refreshPlaylists: !AreOutputPartsEquivalent(beforeParts, session.EffectiveOutputParts));
+        waveformView.SetSelectedMarkerSampleOffset(null);
+        SaveLastWaveSessionIfLoaded();
+        return true;
+    }
+
+    private bool TryRedoWaveOnlyMarkerEdit()
+    {
+        if (_previewSession is not { AllowsSessionMarkerEdit: true } session)
+        {
+            return false;
+        }
+
+        var current = session.GetWaveOnlySessionMarkers();
+        if (current is null
+            || !_waveOnlyMarkerHistory.TryRedo(current, out var restored))
+        {
+            return false;
+        }
+
+        var beforeParts = session.EffectiveOutputParts.ToArray();
+        if (!session.TryReplaceWaveOnlySessionMarkers(restored))
+        {
+            return false;
+        }
+
+        ApplyWaveOnlySessionPresentation(
+            session,
+            refreshPlaylists: !AreOutputPartsEquivalent(beforeParts, session.EffectiveOutputParts));
+        waveformView.SetSelectedMarkerSampleOffset(null);
+        SaveLastWaveSessionIfLoaded();
+        return true;
+    }
+
+    /// <summary>セッションの現在状態を波形・エンジン・Playlist UI へ一括反映する（Form1 同等）。</summary>
+    private void ApplyWaveOnlySessionPresentation(
+        WaveformPreviewSession session,
+        bool refreshPlaylists = true)
+    {
+        waveformView.SuspendPresentationRebuild();
+        try
+        {
+            waveformView.SetMarkers(session.EffectiveMarkers);
+            waveformView.SetRegions(session.EffectiveRegions);
+            waveformView.SetOutputParts(session.EffectiveOutputParts);
+            waveformView.SetRegionEdgeFades(session.RegionEdgeFades);
+        }
+        finally
+        {
+            waveformView.ResumePresentationRebuild();
+        }
+
+        if (_audioPlayer.HasSource)
+        {
+            _audioPlayer.SetRegionEdgeFades(session.RegionEdgeFades);
+        }
+
+        SyncPlaybackRegionsToPlayer(session.EffectiveRegions);
+        if (refreshPlaylists)
+        {
+            RefreshPlaylistButtons();
+        }
+
+        UpdateExportEnabled();
+        UpdateNavigationAvailability();
+        AppendPendingWaveOnlyMarkerRenameLogs(session);
+    }
+
+    private static bool AreOutputPartsEquivalent(
+        IReadOnlyList<WaveformOutputPart> left,
+        IReadOnlyList<WaveformOutputPart> right)
+    {
+        if (left.Count != right.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < left.Count; i++)
+        {
+            if (left[i].Number != right[i].Number
+                || left[i].StartSampleOffset != right[i].StartSampleOffset
+                || left[i].EndSampleOffset != right[i].EndSampleOffset)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Loop→-L の 2 マーカー化状態や -L/-E 系の可視化など、埋め込みマーカーの自動リネームをログへ出す。
+    /// </summary>
+    private void AppendPendingWaveOnlyMarkerRenameLogs(WaveformPreviewSession session)
+    {
+        foreach (var rename in session.TakePendingWaveMarkerRenames())
+        {
+            AppendReport(
+                UiStrings.LogWaveOnlyMarkerRenamed(rename.FromComment, rename.ToComment)
+                + Environment.NewLine);
+        }
+    }
+
+    private void FlushPendingWaveOnlySessionPersist()
+    {
+        if (!_pendingWaveOnlySessionPersist)
         {
             return;
         }
 
-        RefreshMarkersOnWaveform();
+        _pendingWaveOnlySessionPersist = false;
         SaveLastWaveSessionIfLoaded();
     }
 
@@ -334,26 +565,86 @@ public partial class MainWindow
         }
 
         waveformView.SetMarkers(_previewSession.EffectiveMarkers);
+        waveformView.SetRegions(_previewSession.EffectiveRegions);
+        SyncPlaybackRegionsToPlayer(_previewSession.EffectiveRegions);
+    }
+
+    /// <summary>-L プランと -R 無音区間を再生エンジンへ反映する。</summary>
+    private void SyncPlaybackRegionsToPlayer(IReadOnlyList<WaveformRegionMark> regions)
+    {
+        _audioPlayer.SetLoopPlans(WaveAudioPlayer.BuildLoopPlans(regions));
+        _audioPlayer.SetExcludedRegions(regions);
     }
 
     private void UpsertRegionEdgeFade(RegionEdgeFade fade)
     {
-        _previewSession?.UpsertRegionEdgeFade(fade);
         if (_previewSession is null)
         {
             return;
         }
 
+        _regionEdgeFadeHistory.PushBeforeChange(_previewSession.RegionEdgeFades);
+        _previewSession.UpsertRegionEdgeFade(fade);
         waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
         _audioPlayer.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
         SaveLastWaveSessionIfLoaded();
     }
 
+    private bool TryUndoRegionEdgeFade()
+    {
+        if (_previewSession is null)
+        {
+            return false;
+        }
+
+        var current = _previewSession.RegionEdgeFades;
+        if (!_regionEdgeFadeHistory.TryUndo(current, out var restored))
+        {
+            return false;
+        }
+
+        _previewSession.SetRegionEdgeFades(restored);
+        waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
+        _audioPlayer.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
+        SaveLastWaveSessionIfLoaded();
+        return true;
+    }
+
+    private bool TryRedoRegionEdgeFade()
+    {
+        if (_previewSession is null)
+        {
+            return false;
+        }
+
+        var current = _previewSession.RegionEdgeFades;
+        if (!_regionEdgeFadeHistory.TryRedo(current, out var restored))
+        {
+            return false;
+        }
+
+        _previewSession.SetRegionEdgeFades(restored);
+        waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
+        _audioPlayer.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
+        SaveLastWaveSessionIfLoaded();
+        return true;
+    }
+
     private void MarkerOptionsPanel_SettingsChanged(object? sender, EventArgs e)
     {
-        markerOptionsPanel.Bind(_markerSettings);
-        _previewSession?.SetCommentRule(_markerSettings.ToCommentRule());
+        ApplyMarkerSettings();
         AutosaveCurrentProject();
+    }
+
+    /// <summary>マーカーオプションの変更をメモリへ反映する（永続化はプロジェクトへ自動保存）。</summary>
+    private void ApplyMarkerSettings()
+    {
+        waveformView.MarkerGridOverride = _markerSettings.GridOverride;
+        if (_previewSession is { } session)
+        {
+            session.SetCommentRule(_markerSettings.ToCommentRule());
+            waveformView.SetMarkers(session.EffectiveMarkers);
+        }
     }
 
     private void ApplyWaveformFadeCurveDefaults()
@@ -443,10 +734,22 @@ public partial class MainWindow
         icon.Stretch = System.Windows.Media.Stretch.None;
     }
 
+    /// <summary>
+    /// EXPORT ボタン活性を事前検証（Preflight）で常時評価し、結果が変わったときだけログへ出す
+    /// （Form1 UpdateExportButtonState 同等）。
+    /// </summary>
     private void UpdateExportEnabled()
     {
-        exportButton.IsEnabled = _loadedPreview is not null
-            && _previewSession is not null
-            && _previewSession.EffectiveOutputParts.Any(p => !_disabledPartNumbers.Contains(p.Number));
+        var preflight = EvaluateExportPreflight();
+        exportButton.IsEnabled = !_exportBusy
+            && !_uiInteractionLocks.HasFlag(UiInteractionLock.Export)
+            && !_uiInteractionLocks.HasFlag(UiInteractionLock.Load)
+            && preflight.CanExport;
+
+        // 読み込み済みのときだけ事前検証の変化をログ（起動直後の空状態は黙る）
+        if (_loadedPreview is not null)
+        {
+            LogExportPreflightIfChanged(preflight);
+        }
     }
 }

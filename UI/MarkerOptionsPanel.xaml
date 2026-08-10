@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="MgaWwiseIMImporter.UI.MarkerOptionsPanel"
+<UserControl x:Class="MgaWwiseIMImporter.UI.MarkerOptionsPanel"
              x:ClassModifier="internal"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -30,8 +30,10 @@
         <ColumnDefinition Width="*" MinWidth="180" />
       </Grid.ColumnDefinitions>
 
-      <!-- Row 1 left: Stream -->
-      <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,8">
+      <!-- Row 1 left: Stream
+           列間の帯ギャップは SectionHeaderLabel の BarMargin(左右 3+3)のみ。
+           Fade In／Fade Out と同じ開き方にする（旧 Margin Right=8 だと広すぎた）。 -->
+      <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
         <ui:SectionHeaderLabel x:Name="StreamHeader"
                                Height="{x:Static ui:DesignMetrics.SectionHeaderHeight}"
                                Padding="{x:Static ui:DesignMetrics.MarkerOptionsHeaderPadding}"
@@ -90,7 +92,7 @@
       </StackPanel>
 
       <!-- Row 2 left: Marker Comment（帯は Digits + Prefix 列全体にまたがる・WinForms leftColW 相当） -->
-      <Grid Grid.Row="1" Grid.Column="0" Margin="0,0,8,0">
+      <Grid Grid.Row="1" Grid.Column="0">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />

@@ -1,4 +1,5 @@
-﻿using System.Windows;
+using System.Runtime.InteropServices;
+using System.Windows;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -76,7 +77,7 @@ internal sealed class WindowSettings
         }
 
         var bounds = new Rect(X, Y, Width, Height);
-        if (!IsVisibleOnVirtualScreen(bounds))
+        if (!IsVisibleOnAnyScreen(bounds))
         {
             return false;
         }
@@ -90,7 +91,12 @@ internal sealed class WindowSettings
         return true;
     }
 
-    private static bool IsVisibleOnVirtualScreen(Rect bounds)
+    /// <summary>
+    /// いずれかのモニターの作業領域と重なるか（WinForms Screen.AllScreens 相当）。
+    /// 仮想スクリーンの外接矩形だけで判定すると、L 字配置などでモニターの無い
+    /// 空白域に復元してしまうため、モニター単位で判定する。
+    /// </summary>
+    private static bool IsVisibleOnAnyScreen(Rect bounds)
     {
         const int margin = 40;
         var visibleArea = new Rect(
@@ -99,12 +105,75 @@ internal sealed class WindowSettings
             Math.Max(1, bounds.Width - margin * 2),
             Math.Max(1, bounds.Height - margin * 2));
 
-        var virtualScreen = new Rect(
-            SystemParameters.VirtualScreenLeft,
-            SystemParameters.VirtualScreenTop,
-            SystemParameters.VirtualScreenWidth,
-            SystemParameters.VirtualScreenHeight);
+        // Window.Left/Top は DIP、モニター矩形は物理 px。プライマリ DPI 比で換算する。
+        var scale = GetPrimaryScreenScale();
+        var pixelArea = new Rect(
+            visibleArea.X * scale,
+            visibleArea.Y * scale,
+            Math.Max(1, visibleArea.Width * scale),
+            Math.Max(1, visibleArea.Height * scale));
 
-        return virtualScreen.IntersectsWith(visibleArea);
+        var intersects = false;
+        _ = EnumDisplayMonitors(
+            IntPtr.Zero,
+            IntPtr.Zero,
+            (IntPtr monitor, IntPtr _, ref NativeRect _, IntPtr _) =>
+            {
+                var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+                if (GetMonitorInfo(monitor, ref info))
+                {
+                    var work = new Rect(
+                        info.Work.Left,
+                        info.Work.Top,
+                        Math.Max(1, info.Work.Right - info.Work.Left),
+                        Math.Max(1, info.Work.Bottom - info.Work.Top));
+                    if (work.IntersectsWith(pixelArea))
+                    {
+                        intersects = true;
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+        return intersects;
     }
+
+    private static double GetPrimaryScreenScale()
+    {
+        const int SmCxScreen = 0;
+        var dipWidth = SystemParameters.PrimaryScreenWidth;
+        var pixelWidth = GetSystemMetrics(SmCxScreen);
+        return dipWidth > 0 && pixelWidth > 0 ? pixelWidth / dipWidth : 1d;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
+    }
+
+    private delegate bool MonitorEnumProc(IntPtr monitor, IntPtr hdc, ref NativeRect rect, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr clip, MonitorEnumProc callback, IntPtr data);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
 }

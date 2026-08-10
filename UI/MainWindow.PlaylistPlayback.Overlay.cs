@@ -1,4 +1,4 @@
-﻿using System.Windows.Media;
+using System.Windows.Media;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wave;
 
@@ -342,6 +342,61 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// 多重波形モードかつ Additive Layer 有効・重ね再生中に、
+    /// 再生中のいずれかの Playlist 区間へタイムラインクリックしたとき、
+    /// 重ねを崩さず同一相対オフセットへシークする。
+    /// </summary>
+    private bool TrySeekPreservingAdditiveLayers(double progress, bool ensureVisible)
+    {
+        if (_loadedPreview is not { IsMultiWaveOnly: true } preview
+            || preview.WavInfo.FrameCount <= 0
+            || !_audioPlayer.IsPlaying
+            || !_audioPlayer.HasClockPlaylistRange
+            || _audioPlayer.ActiveOverlayPlaylistVoiceCount <= 0)
+        {
+            return false;
+        }
+
+        var clockPartNumber = _audioPlayer.GetClockPlaylistVoiceId();
+        if (clockPartNumber == 0 || !ResolveAdditiveLayers(clockPartNumber))
+        {
+            return false;
+        }
+
+        if (TryGetOutputPartAtProgress(progress) is not { } clickedPart
+            || !IsPlaylistLayerVoiceActive(clickedPart.Number)
+            || clickedPart.EndSampleOffset <= clickedPart.StartSampleOffset)
+        {
+            return false;
+        }
+
+        var frameCount = preview.WavInfo.FrameCount;
+        var clickSample = (long)Math.Clamp(
+            Math.Floor(Math.Clamp(progress, 0d, 1d) * frameCount),
+            0d,
+            Math.Max(0L, frameCount - 1));
+        var relativeSample = Math.Max(0L, clickSample - clickedPart.StartSampleOffset);
+
+        _audioPlayer.CancelPlaylistTransition();
+        ClearPendingPlaylistUiTransition();
+        ClearPendingOverlay();
+
+        if (!_audioPlayer.TrySeekPlaylistLayersToRelative(relativeSample, out var clockProgress))
+        {
+            return false;
+        }
+
+        _audioPlayer.ArmLoopAtProgress(clockProgress);
+        AnchorPlayhead(clockProgress);
+        waveformView.SetPlayhead(clockProgress, recordTrail: false, ensureVisible: ensureVisible);
+        waveformView.SetExitPlayhead(null);
+        waveformView.SetFadeOutPlayhead(null);
+        UpdateOverlayPlayheads(recordTrail: false);
+        UpdateSourceLevelMeter();
+        return true;
+    }
+
+    /// <summary>
     /// 上乗せのためのクロック Playlist 範囲を確保する。
     /// 既に Provider にクロックがあればそれを使い、なければ Space 再生中パート等を adopt する。
     /// </summary>
@@ -447,41 +502,145 @@ public partial class MainWindow
             ApplyPlaylistButtonColors();
         }
 
-        FillOverlayProgressList(
-            _audioPlayer.CopyOverlayPlaylistVoiceProgresses(
-                _overlayProgressScratch,
-                _overlayVoiceIdScratch),
+        var durationSec = _audioPlayer.Duration.TotalSeconds;
+        var now = Environment.TickCount64;
+
+        var voiceCount = _audioPlayer.CopyOverlayPlaylistVoiceProgresses(
             _overlayProgressScratch,
-            _overlayPlayheadProgresses);
+            _overlayVoiceIdScratch);
+        FillSmoothedOverlayProgresses(
+            voiceCount,
+            _overlayVoiceIdScratch,
+            _overlayProgressScratch,
+            _overlayPlayheadProgresses,
+            _overlayPlayheadAnchors,
+            durationSec,
+            now,
+            recordTrail);
         waveformView.SetOverlayPlayheads(_overlayPlayheadProgresses, recordTrail);
 
-        FillOverlayProgressList(
-            _audioPlayer.CopyOverlayFadeOutProgresses(
-                _overlayFadeOutProgressScratch,
-                _overlayFadeOutVoiceIdScratch),
+        var fadeOutCount = _audioPlayer.CopyOverlayFadeOutProgresses(
             _overlayFadeOutProgressScratch,
-            _overlayFadeOutPlayheadProgresses);
+            _overlayFadeOutVoiceIdScratch);
+        FillSmoothedOverlayProgresses(
+            fadeOutCount,
+            _overlayFadeOutVoiceIdScratch,
+            _overlayFadeOutProgressScratch,
+            _overlayFadeOutPlayheadProgresses,
+            _overlayFadeOutPlayheadAnchors,
+            durationSec,
+            now,
+            recordTrail);
         waveformView.SetOverlayFadeOutPlayheads(_overlayFadeOutPlayheadProgresses, recordTrail);
 
-        FillOverlayProgressList(
-            _audioPlayer.CopyOverlayExitProgresses(
-                _overlayExitProgressScratch,
-                _overlayExitVoiceIdScratch),
+        var exitCount = _audioPlayer.CopyOverlayExitProgresses(
             _overlayExitProgressScratch,
-            _overlayExitPlayheadProgresses);
+            _overlayExitVoiceIdScratch);
+        FillSmoothedOverlayProgresses(
+            exitCount,
+            _overlayExitVoiceIdScratch,
+            _overlayExitProgressScratch,
+            _overlayExitPlayheadProgresses,
+            _overlayExitPlayheadAnchors,
+            durationSec,
+            now,
+            recordTrail);
         waveformView.SetOverlayExitPlayheads(_overlayExitPlayheadProgresses, recordTrail);
     }
 
-    private static void FillOverlayProgressList(
+    /// <summary>
+    /// 生バッファ位置を壁時計で滑らかにし、主シークと同じ進み方で残像が伸びるようにする。
+    /// ループ等で生位置が大きく飛んだらアンカーを張り直す。
+    /// </summary>
+    private void FillSmoothedOverlayProgresses(
         int count,
-        double[] source,
-        List<double> destination)
+        int[] voiceIds,
+        double[] rawProgresses,
+        List<double> destination,
+        Dictionary<int, (double AnchorProgress, long AnchorTickMs)> anchors,
+        double durationSec,
+        long now,
+        bool recordTrail)
     {
         destination.Clear();
+        _overlayAnchorLiveIdsScratch.Clear();
+        if (!recordTrail || count <= 0)
+        {
+            anchors.Clear();
+            for (var i = 0; i < count; i++)
+            {
+                destination.Add(Math.Clamp(rawProgresses[i], 0d, 1d));
+            }
+
+            return;
+        }
+
         for (var i = 0; i < count; i++)
         {
-            destination.Add(source[i]);
+            var voiceId = voiceIds[i];
+            var raw = Math.Clamp(rawProgresses[i], 0d, 1d);
+            _overlayAnchorLiveIdsScratch.Add(voiceId);
+            destination.Add(SmoothOverlayProgress(voiceId, raw, durationSec, now, anchors));
         }
+
+        if (anchors.Count == _overlayAnchorLiveIdsScratch.Count)
+        {
+            return;
+        }
+
+        List<int>? stale = null;
+        foreach (var id in anchors.Keys)
+        {
+            if (_overlayAnchorLiveIdsScratch.Contains(id))
+            {
+                continue;
+            }
+
+            stale ??= [];
+            stale.Add(id);
+        }
+
+        if (stale is null)
+        {
+            return;
+        }
+
+        foreach (var id in stale)
+        {
+            anchors.Remove(id);
+        }
+    }
+
+    private static double SmoothOverlayProgress(
+        int voiceId,
+        double rawProgress,
+        double durationSec,
+        long now,
+        Dictionary<int, (double AnchorProgress, long AnchorTickMs)> anchors)
+    {
+        if (durationSec <= 0d)
+        {
+            anchors[voiceId] = (rawProgress, now);
+            return rawProgress;
+        }
+
+        if (!anchors.TryGetValue(voiceId, out var anchor))
+        {
+            anchors[voiceId] = (rawProgress, now);
+            return rawProgress;
+        }
+
+        var elapsedSec = (now - anchor.AnchorTickMs) / 1000d;
+        var smooth = anchor.AnchorProgress + elapsedSec / durationSec;
+        var driftSec = Math.Abs(rawProgress - smooth) * durationSec;
+        // WaveformView の残像不連続許容（約 1.25s）に合わせ、ループ等で飛んだら張り直す
+        if (driftSec >= 1.25d)
+        {
+            anchors[voiceId] = (rawProgress, now);
+            return rawProgress;
+        }
+
+        return Math.Clamp(smooth, 0d, 1d);
     }
 
     private void RequestPlaylistPlayback(WaveformOutputPart target)
@@ -517,15 +676,12 @@ public partial class MainWindow
             _playingPlaylistPartNumbers.Add(target.Number);
             var progress = target.StartSampleOffset / (double)frameCount;
             _lastPlaybackStartProgress = progress;
+            // StartPlaylistRange が既に位置とループプランをセット済み。
+            // SeekPlayback は ClearPlaylistPlayback するためここでは呼ばない（Form1 と同じ）。
             AnchorPlayhead(progress);
-            SeekPlayback(progress, ensureVisible: true);
+            waveformView.SetPlayhead(progress, recordTrail: false, ensureVisible: true);
             waveformView.SetExitPlayhead(null);
             waveformView.SetFadeOutPlayhead(null);
-            if (!_audioPlayer.IsPlaying)
-            {
-                _audioPlayer.Play();
-            }
-
             _playheadTimer.Start();
             UpdateTransportPlaybackState();
             StartPlaylistTransitionGlow();

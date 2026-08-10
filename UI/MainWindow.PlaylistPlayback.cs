@@ -1,4 +1,4 @@
-﻿using System.Windows.Media;
+using System.Windows.Media;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wave;
 
@@ -28,6 +28,10 @@ public partial class MainWindow
     private readonly List<double> _overlayPlayheadProgresses = [];
     private readonly List<double> _overlayFadeOutPlayheadProgresses = [];
     private readonly List<double> _overlayExitPlayheadProgresses = [];
+    private readonly Dictionary<int, (double AnchorProgress, long AnchorTickMs)> _overlayPlayheadAnchors = [];
+    private readonly Dictionary<int, (double AnchorProgress, long AnchorTickMs)> _overlayFadeOutPlayheadAnchors = [];
+    private readonly Dictionary<int, (double AnchorProgress, long AnchorTickMs)> _overlayExitPlayheadAnchors = [];
+    private readonly HashSet<int> _overlayAnchorLiveIdsScratch = [];
     private readonly HashSet<int> _playingPlaylistPartNumbersSyncScratch = [];
     private readonly Dictionary<int, (long StartTickMs, double DurationMs, bool FadeIn)> _playlistHighlightFades = [];
 
@@ -251,11 +255,22 @@ public partial class MainWindow
         _pendingOverlayAtSample = 0;
     }
 
+    private void ClearPlaylistOverlayState()
+    {
+        ClearPendingOverlay();
+        _playingPlaylistPartNumbers.Clear();
+        _audioPlayer.ClearOverlayPlaylistVoices();
+        ClearOverlayPlayheadUi();
+    }
+
     private void ClearOverlayPlayheadUi()
     {
         _overlayPlayheadProgresses.Clear();
         _overlayFadeOutPlayheadProgresses.Clear();
         _overlayExitPlayheadProgresses.Clear();
+        _overlayPlayheadAnchors.Clear();
+        _overlayFadeOutPlayheadAnchors.Clear();
+        _overlayExitPlayheadAnchors.Clear();
         waveformView.SetOverlayPlayheads([]);
         waveformView.SetOverlayFadeOutPlayheads([]);
         waveformView.SetOverlayExitPlayheads([]);
@@ -437,6 +452,18 @@ public partial class MainWindow
 
     private double ResolveGroupFadeSeconds(int partNumber) =>
         _partGroupFadeSeconds.GetValueOrDefault(partNumber);
+
+    private double ResolveFadeInSeconds(int partNumber) =>
+        _partFadeInSeconds.GetValueOrDefault(partNumber);
+
+    private double ResolveFadeOutSeconds(int partNumber) =>
+        _partFadeOutSeconds.GetValueOrDefault(partNumber);
+
+    private RegionFadeCurveKind ResolveFadeInCurve(int partNumber) =>
+        _partFadeInCurves.GetValueOrDefault(partNumber, _appSettings.DefaultPlaylistFadeInCurve);
+
+    private RegionFadeCurveKind ResolveFadeOutCurve(int partNumber) =>
+        _partFadeOutCurves.GetValueOrDefault(partNumber, _appSettings.DefaultPlaylistFadeOutCurve);
 
     private (double FadeInSeconds, double FadeOutSeconds) ResolveTransitionFadeSeconds(
         int targetPartNumber,

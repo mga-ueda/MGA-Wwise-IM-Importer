@@ -39,10 +39,13 @@
       </StackPanel>
     </StackPanel>
 
-    <CheckBox x:Name="AutoActiveCheckBox"
-              Grid.Column="1"
-              VerticalAlignment="Center"
-              Checked="AutoActiveCheckBox_Changed"
-              Unchecked="AutoActiveCheckBox_Changed" />
+    <ui:FlatOptionCheckBox x:Name="AutoActiveCheckBox"
+                           Grid.Column="1"
+                           VerticalAlignment="Center"
+                           Margin="0"
+                           FontSize="12"
+                           Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                           Checked="AutoActiveCheckBox_Changed"
+                           Unchecked="AutoActiveCheckBox_Changed" />
   </Grid>
 </UserControl>

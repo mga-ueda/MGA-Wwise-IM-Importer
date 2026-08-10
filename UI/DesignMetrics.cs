@@ -91,8 +91,8 @@ public static class DesignMetrics
     /// <summary>FlatOption RowHeightDesign 30 → DIP 20。</summary>
     public static double FlatOptionRowHeight => Dip(30);
 
-    /// <summary>MarkerOptions HeaderHeightDesign 39 → DIP 26。</summary>
-    public static double MarkerHeaderHeight => Dip(39);
+    /// <summary>MarkerOptions HeaderHeightDesign 39 → DIP 26。見た目調整で −2px → Dip(36)。</summary>
+    public static double MarkerHeaderHeight => Dip(36);
 
     /// <summary>MarkerOptions RowPitchDesign 32 → DIP。</summary>
     public static double MarkerRowPitch => Dip(32);
@@ -101,10 +101,11 @@ public static class DesignMetrics
     public static GridLength MarkerRowPitchGrid => new(MarkerRowPitch);
 
     /// <summary>
-    /// Section header（Fade/Playlist 等）。Designer 26@96 は AutoScale 150% で 39px 相当 → Dip(39)。
+    /// Section header（Tips / Fade / Playlist 等）。
+    /// Designer 26@96 → Dip(39) 相当だったが、帯が 2px 高く見えるため Dip(36) に揃える。
     /// MarkerHeaderHeight と同じ。
     /// </summary>
-    public static double SectionHeaderHeight => Dip(39);
+    public static double SectionHeaderHeight => Dip(36);
 
     /// <summary>
     /// Tips/Log も他セクションと同じ帯高さに揃える（旧 Compact 22 は細く見えた）。

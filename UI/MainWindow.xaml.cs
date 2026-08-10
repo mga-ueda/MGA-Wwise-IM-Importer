@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -56,10 +56,20 @@ public partial class MainWindow : Window
 
         UiStrings.LanguageChanged += (_, _) => Dispatcher.BeginInvoke(RefreshLocalizedText);
 
-        SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        SourceInitialized += (_, _) =>
+        {
+            DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+            InstallAltKeyMenuSuppression();
+        };
+        StateChanged += (_, _) => RestoreTopMostAfterMinimizeIfNeeded();
         Loaded += OnLoaded;
         Closing += OnClosing;
-        Deactivated += (_, _) => ClearPlaylistGroupPaintStickyId();
+        Deactivated += (_, _) =>
+        {
+            ClearPlaylistGroupPaintStickyId();
+            EndActiveTransportShortcutFeedback();
+            StopWaveOnlyMarkerNudgeHold(flushPersist: true);
+        };
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         PreviewKeyUp += MainWindow_PreviewKeyUp;
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
@@ -74,6 +84,7 @@ public partial class MainWindow : Window
             RefreshFadeCurveIcons();
             PositionLogButtons();
             SyncBusyGlassOverlayBounds();
+            SyncProjectNameComboWidthToInfoLane();
         };
         logAreaPanel.SizeChanged += (_, _) => UpdatePlaylistSelectorWidth();
         fadeInHeaderPanel.SizeChanged += (_, _) => RefreshFadeCurveIcons();
@@ -592,6 +603,11 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (paths.Any(IsWaveOrXmlDropPath))
+            {
+                ActivateMainWindow();
+            }
+
             HandleDroppedFiles(paths);
         }
 
@@ -614,6 +630,68 @@ public partial class MainWindow : Window
             target.Drop += HandleDrop;
         }
     }
+
+    /// <summary>
+    /// Alt 単独でシステムメニューモードに入るとフォーカスが外れ、
+    /// 波形ショートカットや操作系の挙動が崩れるため握りつぶす。
+    /// LParam==0 が Alt 単独。Alt+Space（システムメニュー）は通す（Form1 WndProc と同じ）。
+    /// </summary>
+    private void InstallAltKeyMenuSuppression()
+    {
+        if (PresentationSource.FromVisual(this) is System.Windows.Interop.HwndSource source)
+        {
+            source.AddHook(SuppressAltKeyMenuHook);
+        }
+    }
+
+    private static IntPtr SuppressAltKeyMenuHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WmSysCommand = 0x0112;
+        const int ScKeyMenu = 0xF100;
+        if (msg == WmSysCommand
+            && (wParam.ToInt64() & 0xFFF0) == ScKeyMenu
+            && lParam == IntPtr.Zero)
+        {
+            handled = true;
+        }
+
+        return IntPtr.Zero;
+    }
+
+    private static bool IsWaveOrXmlDropPath(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension.Equals(".wav", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".xml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>他アプリからドロップされたときにメインウィンドウを前面アクティブにする。</summary>
+    private void ActivateMainWindow()
+    {
+        if (_closing)
+        {
+            return;
+        }
+
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        if (!IsVisible)
+        {
+            Show();
+        }
+
+        Activate();
+        if (PresentationSource.FromVisual(this) is System.Windows.Interop.HwndSource source)
+        {
+            _ = SetForegroundWindowNative(source.Handle);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetForegroundWindow")]
+    private static extern bool SetForegroundWindowNative(IntPtr hWnd);
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -640,7 +718,10 @@ public partial class MainWindow : Window
         RefreshFadeCurveIcons();
         UpdateMinimumWindowSize();
         PositionLogButtons();
-
+        // 初回レイアウト後に Measure 列右端へコンボ幅を合わせる
+        Dispatcher.BeginInvoke(
+            SyncProjectNameComboWidthToInfoLane,
+            System.Windows.Threading.DispatcherPriority.Loaded);
         Dispatcher.BeginInvoke(new Action(async () =>
         {
             // フォームが不透明になる前にすりガラスを載せ、素の UI が一瞬出ないようにする

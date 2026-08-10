@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wwise;
 
@@ -25,7 +25,16 @@ public partial class MainWindow
     private void InitializeWaapiEventWiring()
     {
         waapiStatusBar.KeepTargetChanged += WaapiStatusBar_KeepTargetChanged;
-        waapiStatusBar.AutoActiveChanged += (_, _) => AutosaveCurrentProject();
+        waapiStatusBar.AutoActiveChanged += (_, _) =>
+        {
+            if (_suppressProjectUiEvents)
+            {
+                return;
+            }
+
+            AutosaveCurrentProject();
+            ReleaseFocusToWaveform();
+        };
         waapiStatusBar.ProjectNameClick += (_, _) => _ = OpenOrFocusKeptWwiseProjectAsync();
         _waapiPollTimer.Tick += async (_, _) => await PollWaapiAsync().ConfigureAwait(true);
     }
@@ -67,15 +76,63 @@ public partial class MainWindow
         waapiStatusBar.SetResult(result);
         if (result.Ok)
         {
+            _waapiPollFailCount = 0;
             RememberLiveWwiseProject(result);
         }
 
-        if (logReport)
+        RefreshWaapiStatusDisplay();
+
+        if (logReport && !_exportBusy)
         {
-            AppendReport(result.FormatLogReport());
+            AppendReport(FormatWaapiLogReport(result));
+        }
+    }
+
+    /// <summary>
+    /// WAAPI 接続ログ。Keep Target がオンのときは記憶パスを Keep 表示で出す（Form1 同等）。
+    /// </summary>
+    private string FormatWaapiLogReport(WaapiProbeResult result)
+    {
+        if (!result.Ok)
+        {
+            return result.FormatLogReport();
         }
 
-        RefreshWaapiStatusDisplay();
+        var lines = new List<string>
+        {
+            UiStrings.LogWaapiHeader,
+            $"{UiStrings.KeyStatus} {UiStrings.LogStatusOk}",
+        };
+        if (result.WwiseVersion.Length > 0)
+        {
+            lines.Add($"{UiStrings.KeyWwise} {result.WwiseVersion}");
+        }
+
+        if (result.Project.Length > 0)
+        {
+            lines.Add($"{UiStrings.KeyProject} {result.Project}");
+        }
+
+        var displayPath = GetDisplayTargetPath();
+        if (_keepTarget)
+        {
+            lines.Add(displayPath.Length > 0
+                ? UiStrings.LogTargetKeepOn(displayPath)
+                : UiStrings.LogTargetKeepUnset);
+        }
+        else
+        {
+            lines.Add(displayPath.Length > 0
+                ? $"{UiStrings.KeyTarget} {displayPath}"
+                : UiStrings.LogTargetNoneSelected);
+            if (result.SelectedType.Length > 0)
+            {
+                lines.Add($"{UiStrings.KeyType} {result.SelectedType}");
+            }
+        }
+
+        lines.Add(string.Empty);
+        return string.Join(Environment.NewLine, lines) + Environment.NewLine;
     }
 
     private void RememberLiveWwiseProject(WaapiProbeResult result)
@@ -290,30 +347,64 @@ public partial class MainWindow
         try
         {
             var update = await GitHubUpdateChecker.TryGetNewerReleaseAsync().ConfigureAwait(true);
-            if (update is not { } info || string.Equals(info.RemoteSemVer, _appSettings.SkippedUpdateVersion, StringComparison.OrdinalIgnoreCase))
+            if (_closing || update is null)
             {
                 return;
             }
 
-            AppendColoredLine(UiStrings.LogUpdateAvailable(info.RemoteSemVer));
-            var result = OwnerCenteredMessageBox.Show(
-                this,
-                UiStrings.UpdateAvailableMessage(info.RemoteSemVer),
-                UiStrings.UpdateAvailableTitle,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-            if (result == MessageBoxResult.Yes)
+            var remoteSemVer = update.Value.RemoteSemVer;
+            var skipped = AppVersion.NormalizeTag(_appSettings.SkippedUpdateVersion);
+            if (skipped.Length > 0
+                && string.Equals(skipped, remoteSemVer, StringComparison.OrdinalIgnoreCase))
             {
-                TryOpenUrl(info.ReleaseUrl);
+                return;
+            }
+
+            AppendReport(
+                UiStrings.LogUpdateAvailable(
+                    AppVersion.Current,
+                    remoteSemVer)
+                + Environment.NewLine);
+
+            var answer = OwnerCenteredMessageBox.Show(
+                this,
+                UiStrings.DialogUpdateAvailableBody(
+                    AppVersion.Current,
+                    remoteSemVer,
+                    update.Value.IsPrerelease),
+                UiStrings.DialogUpdateAvailableTitle,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information,
+                MessageBoxResult.Yes);
+
+            if (answer == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(
+                        new System.Diagnostics.ProcessStartInfo(update.Value.ReleaseUrl)
+                        {
+                            UseShellExecute = true,
+                        });
+                }
+                catch (Exception ex)
+                {
+                    OwnerCenteredMessageBox.Show(
+                        this,
+                        ex.Message,
+                        UiStrings.DialogOpenGithubFailed,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
             else
             {
-                _appSettings.SaveSkippedUpdateVersion(info.RemoteSemVer);
+                _appSettings.SaveSkippedUpdateVersion(remoteSemVer);
             }
         }
         catch
         {
-            // 更新確認の失敗は無視する。
+            // オフライン・API 制限などは起動を妨げない。
         }
     }
 }

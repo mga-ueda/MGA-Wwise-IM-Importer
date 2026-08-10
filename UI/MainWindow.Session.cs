@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>Last Session（グループ・無効化・トランジション設定・マーカー）の保存と復元。</summary>
 public partial class MainWindow
@@ -163,16 +163,17 @@ public partial class MainWindow
 
         if (state.TryGetPartFadeSeconds(out var fadeIn, out var fadeOut, out var groupFade))
         {
+            // 保存値がラジオの選択肢に無い場合は最寄りへ丸める（Group Fade には適用しない）。
             _partFadeInSeconds.Clear();
             foreach (var pair in fadeIn)
             {
-                _partFadeInSeconds[pair.Key] = pair.Value;
+                _partFadeInSeconds[pair.Key] = NormalizeTransitionFadeSeconds(pair.Value);
             }
 
             _partFadeOutSeconds.Clear();
             foreach (var pair in fadeOut)
             {
-                _partFadeOutSeconds[pair.Key] = pair.Value;
+                _partFadeOutSeconds[pair.Key] = NormalizeTransitionFadeSeconds(pair.Value);
             }
 
             _partGroupFadeSeconds.Clear();
@@ -245,6 +246,9 @@ public partial class MainWindow
                 .ToList();
             _previewSession.SetRegionEdgeFades(fades);
         }
+
+        // グループ内の遷移設定はリーダー値で全メンバーへ揃える（Form1 同等）。
+        SyncTransitionSettingsAcrossAllGroups();
     }
 
     /// <summary>

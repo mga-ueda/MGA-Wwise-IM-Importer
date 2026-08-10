@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -360,7 +360,9 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             FontWeight = bold ? System.Windows.FontWeights.Bold : System.Windows.FontWeights.Normal,
             FontSize = GdiPointsToWpfFontSize(Font.SizeInPoints),
             TextAlignment = alignment,
-            Padding = new System.Windows.Thickness(2),
+            // 高さ余裕が少ないインライン編集でも字形が上下中央に収まるようにする。
+            VerticalContentAlignment = System.Windows.VerticalAlignment.Center,
+            Padding = new System.Windows.Thickness(2, 1, 2, 1),
             Visibility = System.Windows.Visibility.Collapsed,
         };
     }
@@ -978,7 +980,8 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     }
 
     /// <summary>
-    /// Playlist 遷移元のフェードアウトヘッド（グレー）。null で非表示。
+    /// Playlist 遷移元のフェードアウトヘッド（白）。null で非表示。
+    /// isExit 到達後は赤（SeekExit）へ切り替える。
     /// </summary>
     public void SetFadeOutPlayhead(
         double? progress,
@@ -2491,10 +2494,28 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             new SourceNameEditStateChangedEventArgs(isEditing: true));
     }
 
-    private static Rectangle GetSourceNameEditorBounds(Rectangle available, TextBox editor)
+    /// <summary>
+    /// 編集用 TextBox の矩形（デバイス px）。
+    /// FontSize／Padding／Border は DIP なので、必ず DpiScale で px に換算してから
+    /// available（GDI レイアウト＝デバイス px）と比較する。
+    /// </summary>
+    private Rectangle GetSourceNameEditorBounds(Rectangle available, TextBox editor)
     {
-        var preferredHeight = (int)Math.Ceiling(editor.FontSize * 1.6) + 6;
-        var height = Math.Min(available.Height, Math.Max(22, preferredHeight));
+        var scale = DpiScale;
+        // DIP: フォント＋枠＋余白。選択ハイライト／キャレット分に +2。
+        var preferredHeightDip =
+            editor.FontSize
+            + editor.Padding.Top + editor.Padding.Bottom
+            + editor.BorderThickness.Top + editor.BorderThickness.Bottom
+            + 2;
+        // Bold や Yu Gothic UI の実メトリクス余裕。
+        preferredHeightDip = Math.Max(preferredHeightDip, editor.FontSize * 1.45
+            + editor.Padding.Top + editor.Padding.Bottom
+            + editor.BorderThickness.Top + editor.BorderThickness.Bottom);
+
+        var preferredHeightPx = (int)Math.Ceiling(preferredHeightDip * scale);
+        var minHeightPx = (int)Math.Ceiling(22 * scale);
+        var height = Math.Min(available.Height, Math.Max(minHeightPx, preferredHeightPx));
         return new Rectangle(
             available.Left,
             available.Top + Math.Max(0, (available.Height - height) / 2),
@@ -2510,10 +2531,15 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             return GetSourceNameEditorBounds(available, editor);
         }
 
-        using var g = CreateMeasureGraphics();
-        using var font = new Font(Font, FontStyle.Bold);
-        var preferred = g.MeasureString("Ag", font).Height + 2;
-        var height = Math.Min(available.Height, Math.Max(22, (int)Math.Ceiling(preferred)));
+        // エディタ未生成時も GetSourceNameEditorBounds と同じ換算で揃える。
+        var scale = DpiScale;
+        var fontSizeDip = GdiPointsToWpfFontSize(Font.SizeInPoints);
+        const double paddingY = 1 + 1;
+        const double borderY = 1 + 1;
+        var preferredHeightDip = Math.Max(fontSizeDip + paddingY + borderY + 2, fontSizeDip * 1.45 + paddingY + borderY);
+        var preferredHeightPx = (int)Math.Ceiling(preferredHeightDip * scale);
+        var minHeightPx = (int)Math.Ceiling(22 * scale);
+        var height = Math.Min(available.Height, Math.Max(minHeightPx, preferredHeightPx));
         return new Rectangle(
             available.Left,
             available.Top + Math.Max(0, (available.Height - height) / 2),
@@ -2816,6 +2842,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
 
     private Rectangle GetMarkerCommentEditorBounds(MarkerHitRegion hit)
     {
+        var scale = DpiScale;
         var left = hit.CommentBounds.Width > 0
             ? (int)Math.Floor(hit.CommentBounds.Left)
             : (int)Math.Floor(hit.TriangleBounds.Right + 2f);
@@ -2825,11 +2852,14 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         var width = hit.CommentBounds.Width > 0
             ? Math.Max(80, (int)Math.Ceiling(hit.CommentBounds.Width) + 16)
             : 120;
-        var height = Math.Max(
-            22,
-            hit.CommentBounds.Width > 0
-                ? (int)Math.Ceiling(hit.CommentBounds.Height) + 4
-                : (int)Math.Ceiling(hit.TriangleBounds.Height) + 6);
+        // CommentBounds はデバイス px。WPF TextBox の枠・Padding 分を足し、
+        // 下限 22 も DIP→px 換算する（高 DPI で字形が欠けないように）。
+        var contentHeightPx = hit.CommentBounds.Width > 0
+            ? (int)Math.Ceiling(hit.CommentBounds.Height)
+            : (int)Math.Ceiling(hit.TriangleBounds.Height);
+        var chromePx = (int)Math.Ceiling((1 + 1 + 1 + 1) * scale); // Border+Padding 上下
+        var minHeightPx = (int)Math.Ceiling(22 * scale);
+        var height = Math.Max(minHeightPx, contentHeightPx + chromePx + (int)Math.Ceiling(2 * scale));
         width = Math.Min(width, Math.Max(40, ClientSize.Width - left - 4));
         return new Rectangle(left, top, width, height);
     }

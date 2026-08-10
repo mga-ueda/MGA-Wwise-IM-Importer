@@ -88,6 +88,9 @@ internal sealed partial class WaapiStatusBar : UserControl
         }
     }
 
+    private bool _suppressAutoActiveEvent;
+
+    /// <summary>プログラムからの設定では AutoActiveChanged を発火しない（WinForms 同等）。</summary>
     public bool AutoActiveChecked
     {
         get => AutoActiveCheckBox.IsChecked == true;
@@ -98,7 +101,15 @@ internal sealed partial class WaapiStatusBar : UserControl
                 return;
             }
 
-            AutoActiveCheckBox.IsChecked = value;
+            _suppressAutoActiveEvent = true;
+            try
+            {
+                AutoActiveCheckBox.IsChecked = value;
+            }
+            finally
+            {
+                _suppressAutoActiveEvent = false;
+            }
         }
     }
 
@@ -119,6 +130,7 @@ internal sealed partial class WaapiStatusBar : UserControl
         TitleLabel.Foreground = UiColors.Brush(UiColors.StatusBarTitleFore);
         KeepStateLabel.Foreground = UiColors.Brush(UiColors.StatusBarTitleFore);
         AutoActiveCheckBox.Foreground = UiColors.Brush(UiColors.ActionOptionFore);
+        AutoActiveCheckBox.ApplyColors();
         ApplyKeepLockColors();
         ApplyProjectNameColors();
 
@@ -533,8 +545,15 @@ internal sealed partial class WaapiStatusBar : UserControl
         return $"{wwise} v{text}";
     }
 
-    private void AutoActiveCheckBox_Changed(object sender, RoutedEventArgs e) =>
+    private void AutoActiveCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_suppressAutoActiveEvent)
+        {
+            return;
+        }
+
         AutoActiveChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private void KeepLockButton_Click(object sender, RoutedEventArgs e)
     {

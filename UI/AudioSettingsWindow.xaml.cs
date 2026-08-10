@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -46,7 +46,26 @@ internal partial class AudioSettingsWindow : Window
         InitializeComponent();
         WindowIconHelper.Apply(this);
         Title = UiStrings.DialogSettingsTitle;
-        SourceInitialized += (_, _) => DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+        SourceInitialized += (_, _) =>
+        {
+            DarkWindowChrome.ApplyImmersiveDarkTitleBar(this);
+            // メインが最前面でもダイアログが背面に回らないようにする（WinForms 同等）。
+            if (Owner is { Topmost: true })
+            {
+                Topmost = true;
+            }
+        };
+        // テキストボックス外をクリックしたらフォーカス（キャレット）を解放する（WinForms 同等）。
+        PreviewMouseDown += (_, e) =>
+        {
+            if (Keyboard.FocusedElement is TextBox
+                && e.OriginalSource is DependencyObject origin
+                && FindAncestorTextBox(origin) is null)
+            {
+                Keyboard.ClearFocus();
+                FocusManager.SetFocusedElement(this, this);
+            }
+        };
 
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.WaveOut, UiStrings.LabelAudioApiWaveOut));
         ApiCombo.Items.Add(new ApiItem(AudioOutputApi.Wasapi, UiStrings.LabelAudioApiWasapi));
@@ -79,6 +98,23 @@ internal partial class AudioSettingsWindow : Window
 
         SelectApi(current.Api);
         ReloadDevices(preserveSelection: true, preferredDeviceId: current.DeviceId);
+    }
+
+    private static TextBox? FindAncestorTextBox(DependencyObject origin)
+    {
+        for (var current = origin; current is not null;)
+        {
+            if (current is TextBox textBox)
+            {
+                return textBox;
+            }
+
+            current = current is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private FadeCurveRow CreateFadeRow(string labelText, RegionFadeCurveKind curve, bool isFadeIn)
