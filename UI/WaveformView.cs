@@ -23,6 +23,14 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private const float NameLaneFontScale = 0.16f;
     private static IReadOnlyList<string> InfoRowLabels => UiStrings.WaveformInfoRowLabels;
 
+    static WaveformView()
+    {
+        // 既定のフォーカス点線枠を消す（枠線は描かない）。
+        FocusVisualStyleProperty.OverrideMetadata(
+            typeof(WaveformView),
+            new System.Windows.FrameworkPropertyMetadata(null));
+    }
+
     // MGA-CineAudio-Reviewer (transport-timeline.js) と同じ残光パラメータ
     /// <summary>軌跡の目標長さ（画面ピクセル）。ズームによらず見た目を揃える。</summary>
     private const float TrailTargetLengthPx = 360f;
@@ -574,10 +582,10 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     {
         _playlistDisplayNames = new Dictionary<int, string>(names);
         _playlistPartGroupIds = partGroupIds is null
-            ? new Dictionary<int, int>()
+            ? []
             : new Dictionary<int, int>(partGroupIds);
         _playlistGroupColors = partGroupColors is null
-            ? new Dictionary<int, WpfColor>()
+            ? []
             : new Dictionary<int, WpfColor>(partGroupColors);
         RebuildSegmentNameMarks();
         RebuildPresentationLayers(clearDetailPeaks: false);
@@ -2592,7 +2600,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             var name = editor.Text.Trim();
             editor.Visibility = System.Windows.Visibility.Collapsed;
             // TextBox を隠すと次の TabStop（フッタの GitHub 等）へフォーカスが飛ぶため、
-            // 波形ビューへ戻して点線枠の表示を避ける。
+            // 波形ビューへ戻す（FocusVisual は無効・枠線なし）。
             if (IsHandleCreated && CanFocus)
             {
                 Focus();
@@ -3469,7 +3477,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         {
             MarkerEditRequested?.Invoke(
                 this,
-                new MarkerEditRequestedEventArgs(mode, samples.Order().ToArray()));
+                new MarkerEditRequestedEventArgs(mode, [.. samples.Order()]));
         }
     }
 
@@ -3615,11 +3623,10 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             }
         }
 
-        return points
+        return [.. points
             .GroupBy(point => point.SampleOffset)
             .Select(group => group.First())
-            .OrderBy(point => point.X)
-            .ToArray();
+            .OrderBy(point => point.X)];
     }
 
     private readonly record struct MarkerGridPoint(long SampleOffset, float X);
