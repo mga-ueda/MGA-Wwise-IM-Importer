@@ -151,8 +151,11 @@ public static class DesignMetrics
     /// <summary>Toolbar / project icon 正方形。Designer 24。</summary>
     public static double ToolbarButtonSide => From96(24);
 
-    /// <summary>AudioSettings fieldWidth D(450)。</summary>
-    public static double AudioFieldWidth => Dip(450);
+    /// <summary>
+    /// AudioSettings 内容幅の下限目安（実幅はデバイス名などに合わせて可変）。
+    /// ボタン行（D(162)×2+gap）相当。
+    /// </summary>
+    public static double AudioFieldWidth => Dip(336);
 
     /// <summary>AudioSettings expected box D(120)。</summary>
     public static double AudioExpectedBoxWidth => Dip(120);

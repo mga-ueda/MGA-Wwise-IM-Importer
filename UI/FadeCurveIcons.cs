@@ -11,7 +11,8 @@ namespace MgaWwiseIMImporter.UI;
 internal static class FadeCurveIcons
 {
     public const int IconSize = 18;
-    public const int LeftMargin = 6;
+    /// <summary>メニューアイコン左側の余白。やや広めだったため 6→3 に削減。</summary>
+    public const int LeftMargin = 3;
 
     /// <summary>描画幅（leftMargin は含めない）。メニューでは WidthFor+leftMargin を Image 幅にする。</summary>
     public static int WidthFor(int pixelSize) => Math.Max(8, pixelSize);
@@ -29,6 +30,12 @@ internal static class FadeCurveIcons
         var drawing = new DrawingGroup();
         using (var dc = drawing.Open())
         {
+            // 描画境界を size×width で固定し、Image 内で上寄せに見えないようにする。
+            dc.DrawRectangle(
+                Brushes.Transparent,
+                null,
+                new Rect(0, 0, margin + width, size));
+
             var pen = new Pen(new SolidColorBrush(Color.FromArgb(220, 220, 220, 220)), 1.4)
             {
                 StartLineCap = PenLineCap.Round,
@@ -40,6 +47,8 @@ internal static class FadeCurveIcons
                 pen.Freeze();
             }
 
+            // カーブ左右の内側余白もわずかに詰める（1.5→1）。
+            const double insetX = 1d;
             var points = new Point[17];
             for (var i = 0; i < points.Length; i++)
             {
@@ -47,7 +56,7 @@ internal static class FadeCurveIcons
                 var rising = IconRising(kind, t);
                 var yGain = isFadeIn ? rising : 1d - rising;
                 points[i] = new Point(
-                    margin + 1.5 + t * (width - 3),
+                    margin + insetX + t * (width - insetX * 2),
                     size - 2 - yGain * (size - 4));
             }
 
@@ -89,7 +98,7 @@ internal static class FadeCurveIcons
             Foreground = UiColors.Brush(UiColors.PrimaryFore),
             BorderBrush = UiColors.Brush(UiColors.ChromeBorder),
             BorderThickness = new Thickness(1),
-            Padding = new Thickness(2),
+            Padding = new Thickness(1),
         };
         return menu;
     }
@@ -119,9 +128,10 @@ internal static class FadeCurveIcons
                     Source = Create(kind, isFadeIn, selected: kind == current, iconSize, leftMargin),
                     Width = WidthFor(iconSize) + leftMargin,
                     Height = iconSize,
-                    Stretch = Stretch.None,
+                    Stretch = Stretch.Uniform,
                 },
-                Padding = new Thickness(2, 1, 2, 1),
+                // アイコン↔文言の左右余白を少し詰める
+                Padding = new Thickness(1, 1, 1, 1),
             };
             item.Click += (_, _) => onSelected(captured);
             items.Add(item);

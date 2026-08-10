@@ -229,11 +229,11 @@
                                            FontSize="11.333" />
                     <!-- 帯内に重ねる（WinForms LayoutPlaylistFadeCurveIcon 同等） -->
                     <Image x:Name="fadeInCurveIcon"
-                           Stretch="None"
+                           Stretch="Uniform"
                            SnapsToDevicePixels="True"
                            Cursor="Hand"
                            HorizontalAlignment="Left"
-                           VerticalAlignment="Top" />
+                           VerticalAlignment="Center" />
                   </Grid>
                   <StackPanel x:Name="fadeInChoicesPanel"
                               Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
@@ -263,11 +263,11 @@
                                            FontWeight="Bold"
                                            FontSize="11.333" />
                     <Image x:Name="fadeOutCurveIcon"
-                           Stretch="None"
+                           Stretch="Uniform"
                            SnapsToDevicePixels="True"
                            Cursor="Hand"
                            HorizontalAlignment="Left"
-                           VerticalAlignment="Top" />
+                           VerticalAlignment="Center" />
                   </Grid>
                   <StackPanel x:Name="transitionTimeChoicesPanel"
                               Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">

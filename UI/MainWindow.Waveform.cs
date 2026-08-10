@@ -714,7 +714,7 @@ public partial class MainWindow
         TipService.Set(fadeOutCurveIcon, UiStrings.LabelRegionFadeCurve(_appSettings.DefaultWaveformFadeOutCurve));
     }
 
-    /// <summary>WinForms LayoutPlaylistFadeCurveIcon 相当。見出し帯の内側右端へアイコンを置く。</summary>
+    /// <summary>WinForms LayoutPlaylistFadeCurveIcon 相当。見出し帯の内側右端・縦中央へアイコンを置く。</summary>
     private void LayoutPlaylistFadeCurveIcon(SectionHeaderLabel header, System.Windows.Controls.Image icon)
     {
         if (header.ActualWidth <= 0 || header.ActualHeight <= 0)
@@ -728,13 +728,16 @@ public partial class MainWindow
         var rightInset = Math.Max(DesignMetrics.Dip(4), DesignMetrics.From96(6));
         icon.Width = iconWidth;
         icon.Height = size;
+        icon.HorizontalAlignment = System.Windows.HorizontalAlignment.Left;
+        // Top+手計算だと描画内容の上寄りや丸めで上に寄って見える。帯と対称な余白になるよう中央揃え。
+        icon.VerticalAlignment = System.Windows.VerticalAlignment.Center;
+        icon.Stretch = System.Windows.Media.Stretch.Uniform;
         icon.Margin = new Thickness(
             Math.Max(bar.Left, bar.Right - rightInset - iconWidth),
-            bar.Top + Math.Max(0, (bar.Height - size) / 2),
+            0,
             0,
             0);
         Panel.SetZIndex(icon, 1);
-        icon.Stretch = System.Windows.Media.Stretch.None;
     }
 
     /// <summary>

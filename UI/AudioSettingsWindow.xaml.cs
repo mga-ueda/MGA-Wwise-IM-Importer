@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -93,11 +93,128 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(ExpectedBitDepthTextBox, UiStrings.TipExpectedWaveformFormat);
         TipService.Set(ExpectedChannelsTextBox, UiStrings.TipExpectedWaveformFormat);
 
-        ApplyDialogButtonColors(OkButton);
-        ApplyDialogButtonColors(CancelButton);
+        ApplyDialogButtonColors(
+            OkButton,
+            UiColors.ExportButtonFill,
+            UiColors.ExportButtonHoverFill,
+            UiColors.ExportButtonFore,
+            UiColors.ExportButtonBack,
+            UiColors.ExportButtonHoverBack,
+            UiColors.ExportButtonPressedBack);
+        ApplyDialogButtonColors(
+            CancelButton,
+            UiColors.ClearButtonFill,
+            UiColors.ClearButtonHoverFill,
+            UiColors.ClearButtonFore,
+            UiColors.ClearButtonBack,
+            UiColors.ClearButtonHoverBack,
+            UiColors.ClearButtonPressedBack);
 
         SelectApi(current.Api);
         ReloadDevices(preserveSelection: true, preferredDeviceId: current.DeviceId);
+        Loaded += (_, _) => FitContentWidth();
+        FitContentWidth();
+    }
+
+    /// <summary>
+    /// API/デバイス名の最長表示に合わせてフォーム幅を可変にする。
+    /// ドロップダウン項目も同じ計測で見切れない幅を確保する。
+    /// </summary>
+    private void FitContentWidth()
+    {
+        var comboWidth = Math.Max(
+            MeasureComboContentWidth(ApiCombo),
+            MeasureComboContentWidth(DeviceCombo));
+
+        var labelFontSize = FontSize > 0 ? FontSize : 12;
+        var iconSide = FadeCurveIcons.WidthFor((int)Math.Round(DesignMetrics.FlatOptionRowHeight));
+        const double fadeIconGap = 6;
+        var fadeLabelWidth = Math.Max(
+            MeasureText(UiStrings.LabelDefaultWaveformFadeIn, FontFamily, labelFontSize),
+            Math.Max(
+                MeasureText(UiStrings.LabelDefaultWaveformFadeOut, FontFamily, labelFontSize),
+                Math.Max(
+                    MeasureText(UiStrings.LabelDefaultPlaylistFadeIn, FontFamily, labelFontSize),
+                    MeasureText(UiStrings.LabelDefaultPlaylistFadeOut, FontFamily, labelFontSize))));
+        var fadeWidth = fadeLabelWidth + fadeIconGap + iconSide;
+
+        var expectedLabelWidth = Math.Max(
+            MeasureText(UiStrings.LabelExpectedSampleRateHz, FontFamily, labelFontSize),
+            Math.Max(
+                MeasureText(UiStrings.LabelExpectedBitDepth, FontFamily, labelFontSize),
+                MeasureText(UiStrings.LabelExpectedChannels, FontFamily, labelFontSize)));
+        var expectedWidth = expectedLabelWidth + 8 + DesignMetrics.AudioExpectedBoxWidth;
+
+        var buttonsWidth = DesignMetrics.AudioDialogButtonWidth * 2 + 12;
+
+        var desired = Math.Max(
+            comboWidth,
+            Math.Max(fadeWidth, Math.Max(expectedWidth, buttonsWidth)));
+        desired = Math.Ceiling(desired);
+
+        // 極端に長いデバイス名でも画面外に出さない（余白込み）
+        var pad = DesignMetrics.AudioPad.Left + DesignMetrics.AudioPad.Right;
+        var maxContent = Math.Max(
+            buttonsWidth,
+            SystemParameters.WorkArea.Width - pad - 48);
+        if (desired > maxContent)
+        {
+            desired = Math.Floor(maxContent);
+        }
+
+        ContentRoot.MinWidth = desired;
+        ContentRoot.Width = desired;
+    }
+
+    private double MeasureComboContentWidth(ComboBox combo)
+    {
+        const double arrowColumn = 22;
+        const double textMargin = 8; // 文字右のわずかな余白
+        const double dropDownItemPadX = 16; // DarkComboBoxItemStyle Padding L+R
+        var pad = combo.Padding;
+        var fontSize = combo.FontSize > 0 ? combo.FontSize : 12;
+        var maxText = 0d;
+        foreach (var item in combo.Items)
+        {
+            maxText = Math.Max(
+                maxText,
+                MeasureText(Convert.ToString(item) ?? string.Empty, combo.FontFamily, fontSize));
+        }
+
+        // 閉じたコンボ（本体）とドロップダウン項目の必要幅の大きい方
+        var closedWidth = pad.Left + maxText + textMargin + arrowColumn;
+        var dropDownWidth = dropDownItemPadX + maxText;
+        var width = Math.Max(closedWidth, dropDownWidth);
+
+        // 縦スクロールが出る場合はバー幅分を足して項目文字が押し出されないようにする
+        var itemHeight = Math.Max(DesignMetrics.AudioInputHeight, fontSize + 10);
+        var listHeight = combo.Items.Count * itemHeight;
+        if (listHeight > combo.MaxDropDownHeight)
+        {
+            width += SystemParameters.VerticalScrollBarWidth;
+        }
+
+        return width;
+    }
+
+    private double MeasureText(string text, FontFamily fontFamily, double fontSize)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 0;
+        }
+
+        var probe = new TextBlock
+        {
+            Text = text,
+            FontFamily = fontFamily,
+            FontSize = fontSize,
+            FontWeight = FontWeights.Normal,
+            FontStyle = FontStyles.Normal,
+            TextWrapping = TextWrapping.NoWrap,
+        };
+        probe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return probe.DesiredSize.Width;
     }
 
     private static TextBox? FindAncestorTextBox(DependencyObject origin)
@@ -196,24 +313,27 @@ internal partial class AudioSettingsWindow : Window
         TipService.Set(row.Label, UiStrings.LabelRegionFadeCurve(row.Curve));
     }
 
-    private static void ApplyDialogButtonColors(RoundedButton button)
+    private static void ApplyDialogButtonColors(
+        RoundedButton button,
+        Color fill,
+        Color hoverFill,
+        Color fore,
+        Color border,
+        Color hoverBorder,
+        Color pressedBorder)
     {
-        var fill = UiColors.ForControlBack(UiColors.ProjectBarInputBack);
-        var hover = UiColors.ForControlBack(UiColors.TransportHoverBack);
-        var pressed = UiColors.ForControlBack(UiColors.TransportPressedBack);
-        var border = UiColors.ForControlBack(UiColors.ChromeBorder);
-
+        // CLEAR / RELOAD / EXPORT と同じ塗り＋枠の配色パターン。
         button.Background = UiColors.Brush(fill);
-        button.Foreground = UiColors.Brush(UiColors.ProjectBarInputFore);
-        button.HoverBackColor = hover;
-        button.PressedBackColor = pressed;
-        button.DisabledBackColor = fill;
+        button.Foreground = UiColors.Brush(fore);
+        button.HoverBackColor = hoverFill;
+        button.PressedBackColor = hoverFill;
+        button.DisabledBackColor = UiColors.ActionButtonInnerBack;
         button.DisabledForeColor = UiColors.ActionButtonDisabledFore;
         button.BorderColor = border;
-        button.HoverBorderColor = border;
-        button.PressedBorderColor = border;
-        button.DisabledBorderColor = UiColors.ForControlBack(UiColors.ActionButtonDisabledBorder);
-        button.BorderSize = 1;
+        button.HoverBorderColor = hoverBorder;
+        button.PressedBorderColor = pressedBorder;
+        button.DisabledBorderColor = UiColors.ActionButtonDisabledBorder;
+        button.BorderSize = 2;
     }
 
     private void ApiCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -325,6 +445,7 @@ internal partial class AudioSettingsWindow : Window
 
         if (DeviceCombo.Items.Count == 0)
         {
+            FitContentWidth();
             return;
         }
 
@@ -343,6 +464,7 @@ internal partial class AudioSettingsWindow : Window
         }
 
         DeviceCombo.SelectedIndex = index;
+        FitContentWidth();
     }
 
     protected override void OnClosed(EventArgs e)
