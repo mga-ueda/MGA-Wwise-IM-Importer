@@ -22,7 +22,12 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
+    <DefaultItemExcludes>$(DefaultItemExcludes);MgaWwiseIMImporter.Tests\**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="MgaWwiseIMImporter.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">

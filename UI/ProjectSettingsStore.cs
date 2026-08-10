@@ -44,24 +44,22 @@ internal sealed class ProjectProfile
 
     public string OutputDirectory { get; set; } = string.Empty;
 
-    /// <summary>Music Track のストリーミング有効（既定オン）。</summary>
+    /// <summary>Music Track のストリーミング有効（互換用。正本はアプリ設定）。</summary>
     public bool StreamEnabled { get; set; } = true;
 
     /// <summary>EXPORT 完了時に Wwise を前面化するか（既定オン）。</summary>
     public bool AutoActive { get; set; } = true;
 
     /// <summary>
-    /// 2 番目以降のセグメントの Look-ahead time（ms）。
-    /// 先頭セグメント（Zero latency）は固定 50ms のため、この値は使わない。
+    /// 2 番目以降のセグメントの Look-ahead time（ms）。互換用。正本はアプリ設定。
     /// </summary>
     public int LookAheadMs { get; set; } = 500;
 
-    /// <summary>Playlist 先頭セグメント内全トラックの Prefetch Length（ms）。</summary>
+    /// <summary>Playlist 先頭セグメント内全トラックの Prefetch Length（ms）。互換用。正本はアプリ設定。</summary>
     public int PrefetchLengthMs { get; set; } = 500;
 
     /// <summary>
-    /// Layer Music Option / Keep Layer Balance（既定オフ）。
-    /// グループ内相対バランスを Music Track の Make-Up Gain で維持する。
+    /// Layer Music Option / Keep Layer Balance（互換用。正本はアプリ設定）。
     /// </summary>
     public bool LoudnessPreserveGroupBalance { get; set; }
 

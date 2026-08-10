@@ -1,4 +1,4 @@
-﻿using MgaWwiseIMImporter.UI;
+﻿using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wwise;
 
@@ -35,7 +35,7 @@ internal static class WaapiSelection
             TimeSpan.FromMilliseconds(settings.TimeoutMs));
 
         await client.CallAsync(
-                "ak.wwise.ui.commands.execute",
+                WaapiUris.UiCommandsExecute,
                 new Dictionary<string, object?>
                 {
                     ["command"] = FindInProjectExplorerCommand,

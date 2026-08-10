@@ -62,6 +62,7 @@ internal sealed class ExportGlassOverlay : FrameworkElement
         _paintOpacity = 1f;
 
         Visibility = Visibility.Visible;
+        IsHitTestVisible = true;
         InvalidateVisual();
         Panel.SetZIndex(this, int.MaxValue);
         _dotsTimer.Start();
@@ -132,6 +133,8 @@ internal sealed class ExportGlassOverlay : FrameworkElement
         }
 
         _dotsTimer.Stop();
+        // フェード待ち中もクリックを通し、波形へフォーカスを戻せるようにする。
+        IsHitTestVisible = false;
         _fadePending = true;
         _fadeDelayTimer.Start();
     }
@@ -260,6 +263,10 @@ internal sealed class ExportGlassOverlay : FrameworkElement
         _fadePending = false;
         _fading = false;
         _paintOpacity = 1f;
+        if (Visibility == Visibility.Visible)
+        {
+            IsHitTestVisible = true;
+        }
     }
 
     private void DrawMessage(DrawingContext dc, float opacity)

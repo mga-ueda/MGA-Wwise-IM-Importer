@@ -1,4 +1,4 @@
-﻿using MgaWwiseIMImporter.UI;
+﻿using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wwise;
 

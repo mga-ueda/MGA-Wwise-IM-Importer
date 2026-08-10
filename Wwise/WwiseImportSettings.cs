@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Wwise へのインポート設定（アプリ内固定。ユーザー設定には書かない）。
-/// LookAhead／Prefetch はプロジェクト設定（[Project.*]）。
+/// LookAhead／Prefetch／Stream はアプリ設定（UI → AppSettings）。
 /// </summary>
 internal sealed class WwiseImportSettings
 {

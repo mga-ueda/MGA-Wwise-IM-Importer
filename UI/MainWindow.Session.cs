@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.UI;
+﻿namespace MgaWwiseIMImporter.UI;
 
 /// <summary>Last Session（グループ・無効化・トランジション設定・マーカー）の保存と復元。</summary>
 public partial class MainWindow
@@ -32,24 +32,14 @@ public partial class MainWindow
     /// いま画面上の作業状態（グループ／無効化／トランジション／マーカー等）をキャプチャする。
     /// RELOAD で再解析後に再適用するためにも使う（ディスク保存はしない）。
     /// </summary>
-    private LastWaveSessionState? TryCaptureCurrentWaveSession()
-    {
-        if (_loadedPreview is null || _previewSession is null)
-        {
-            return null;
-        }
-
-        var wavePaths = _loadedPreview.IsMultiWaveOnly
-            ? _loadedPreview.SourceSpans.Select(s => s.Path).ToArray()
-            : null;
-        return LastWaveSessionState.Capture(
-            _loadedPreview.SourcePath,
-            _previewSession.EffectiveOutputParts,
+    private LastWaveSessionState? TryCaptureCurrentWaveSession() =>
+        Services.SessionCaptureService.TryCapture(
+            _loadedPreview,
+            _previewSession,
             _partGroupIds,
             _groupColorIndexes,
             _nextGroupId,
             _nextColorIndex,
-            _previewSession.GetUserMarkerSampleOffsets(),
             _disabledPartNumbers,
             _partExitSourceModes,
             _partChangeOccursAtModes,
@@ -60,11 +50,7 @@ public partial class MainWindow
             _partGroupFadeSeconds,
             _partPlayPostExit,
             _partAdditiveLayers,
-            _previewSession.GetWaveOnlySessionMarkers(),
-            _previewSession.RegionEdgeFades,
-            wavePaths,
             _sourceBaseNameOverride);
-    }
 
     /// <summary>読み込み済み波形パスを Keep Last Session 用フィールドへ反映する。</summary>
     private void RememberLoadedWavePaths(WaveformPreviewData preview)
@@ -264,7 +250,6 @@ public partial class MainWindow
             _previewSession.SetRegionEdgeFades(fades);
         }
 
-        // グループ内の遷移設定はリーダー値で全メンバーへ揃える（Form1 同等）。
         SyncTransitionSettingsAcrossAllGroups();
     }
 

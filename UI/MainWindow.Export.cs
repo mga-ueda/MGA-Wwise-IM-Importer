@@ -39,7 +39,7 @@ public partial class MainWindow
             ExportPreflightResult preflight;
             try
             {
-                var result = await WaapiStartupProbe.RunAsync(_waapiSettings).ConfigureAwait(true);
+                var result = await _waapiConnection.ProbeAsync().ConfigureAwait(true);
                 if (!_closing)
                 {
                     ApplyWaapiProbeResult(result, logReport: false);
@@ -283,16 +283,8 @@ public partial class MainWindow
 
     private static IReadOnlyDictionary<int, T> BuildExportValues<T>(
         IReadOnlySet<int> enabledNumbers,
-        Func<int, T> resolver)
-    {
-        var result = new Dictionary<int, T>();
-        foreach (var partNumber in enabledNumbers)
-        {
-            result[partNumber] = resolver(partNumber);
-        }
-
-        return result;
-    }
+        Func<int, T> resolver) =>
+        Services.ExportValueBuilder.Build(enabledNumbers, resolver);
 
     private static IReadOnlyDictionary<int, PlaylistExitSourceMode> BuildExportModes(
         IReadOnlySet<int> enabledNumbers,
@@ -610,6 +602,7 @@ public partial class MainWindow
             }
         }
 
+        var wasBusy = IsExportOrLoadBusy;
         var next = locked
             ? _uiInteractionLocks | reason
             : _uiInteractionLocks & ~reason;
@@ -630,6 +623,12 @@ public partial class MainWindow
 
         UpdateBusyGlassOverlay();
         RefreshUiInteractionEnabled();
+
+        // すりガラス解除後、無効化でログ等へ逃げたフォーカスを波形へ戻す。
+        if (wasBusy && !IsExportOrLoadBusy)
+        {
+            ReleaseFocusToWaveform(forceTextBoxRelease: true);
+        }
     }
 
     /// <summary>書き出し／読み込みロック中（すりガラス表示対象）。</summary>

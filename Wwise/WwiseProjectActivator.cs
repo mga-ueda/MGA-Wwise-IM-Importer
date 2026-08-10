@@ -2,7 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Xml;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wwise;
 
@@ -38,7 +38,7 @@ internal static class WwiseProjectActivator
                 settings.Url,
                 TimeSpan.FromMilliseconds(Math.Max(settings.TimeoutMs, 10000)));
 
-            var info = await client.CallAsync("ak.wwise.core.getInfo", cancellationToken: cancellationToken)
+            var info = await WaapiCoreCalls.GetInfoAsync(client, cancellationToken)
                 .ConfigureAwait(false);
             waapiReachable = true;
             if (TryGetProcessId(info, out var processId))
@@ -49,9 +49,7 @@ internal static class WwiseProjectActivator
             var currentPath = string.Empty;
             try
             {
-                var project = await client.CallAsync(
-                        "ak.wwise.core.getProjectInfo",
-                        cancellationToken: cancellationToken)
+                var project = await WaapiCoreCalls.GetProjectInfoAsync(client, cancellationToken)
                     .ConfigureAwait(false);
                 currentPath = WaapiJson.ReadProjectFilePath(project);
             }
@@ -62,15 +60,13 @@ internal static class WwiseProjectActivator
 
             if (PathsEqual(currentPath, path))
             {
-                await client.CallAsync(
-                        "ak.wwise.ui.bringToForeground",
-                        cancellationToken: cancellationToken)
+                await WaapiCoreCalls.BringToForegroundAsync(client, cancellationToken)
                     .ConfigureAwait(false);
                 return (true, UiStrings.LogWwiseProjectBroughtToFront(Path.GetFileNameWithoutExtension(path)));
             }
 
             await client.CallAsync(
-                    "ak.wwise.ui.project.open",
+                    WaapiUris.UiProjectOpen,
                     new Dictionary<string, object?> { ["path"] = path },
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -83,7 +79,7 @@ internal static class WwiseProjectActivator
             try
             {
                 await client.CallAsync(
-                        "ak.wwise.ui.bringToForeground",
+                        WaapiUris.UiBringToForeground,
                         cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -120,16 +116,14 @@ internal static class WwiseProjectActivator
                 settings.Url,
                 TimeSpan.FromMilliseconds(Math.Max(settings.TimeoutMs, 10000)));
 
-            var info = await client.CallAsync("ak.wwise.core.getInfo", cancellationToken: cancellationToken)
+            var info = await WaapiCoreCalls.GetInfoAsync(client, cancellationToken)
                 .ConfigureAwait(false);
             if (TryGetProcessId(info, out var processId))
             {
                 _ = AllowSetForegroundWindow(processId);
             }
 
-            await client.CallAsync(
-                    "ak.wwise.ui.bringToForeground",
-                    cancellationToken: cancellationToken)
+            await WaapiCoreCalls.BringToForegroundAsync(client, cancellationToken)
                 .ConfigureAwait(false);
             return (true, UiStrings.LogWwiseBroughtToFront);
         }

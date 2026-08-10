@@ -1,6 +1,7 @@
-﻿using NAudio.Wave;
+﻿using System.Reflection;
+using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wave;
 
@@ -10,6 +11,9 @@ namespace MgaWwiseIMImporter.Wave;
 /// </summary>
 internal sealed class MetronomePlayer : IDisposable
 {
+    private const string MetronomeHighName = "MgaWwiseIMImporter.Wave.High.wav";
+    private const string MetronomeLowName = "MgaWwiseIMImporter.Wave.Low.wav";
+
     private readonly float[] _highSamples;
     private readonly float[] _lowSamples;
     private readonly int _sampleRate;
@@ -42,8 +46,8 @@ internal sealed class MetronomePlayer : IDisposable
 
     public static MetronomePlayer? TryCreate()
     {
-        if (!TryLoadClick(AppEmbeddedResources.OpenMetronomeHigh(), out var high, out var highRate)
-            || !TryLoadClick(AppEmbeddedResources.OpenMetronomeLow(), out var low, out var lowRate))
+        if (!TryLoadClick(OpenEmbedded(MetronomeHighName), out var high, out var highRate)
+            || !TryLoadClick(OpenEmbedded(MetronomeLowName), out var low, out var lowRate))
         {
             return null;
         }
@@ -55,6 +59,9 @@ internal sealed class MetronomePlayer : IDisposable
 
         return new MetronomePlayer(high, low, highRate);
     }
+
+    private static Stream? OpenEmbedded(string name) =>
+        Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
 
     /// <summary>ホイール等で音量を一段変え、変更があれば true。</summary>
     public bool TryAdjustVolume(int wheelDelta)

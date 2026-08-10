@@ -1,5 +1,5 @@
 ﻿using System.Text;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wave;
 
@@ -317,39 +317,17 @@ internal static class LoudnessMeter
 
     private static long FindDataChunk(BinaryReader reader, Stream source, out uint dataSize)
     {
-        source.Position = 0;
-        if (WavRiff.ReadFourCc(reader) != "RIFF")
+        if (!WavRiff.TryFindDataChunk(
+                source,
+                reader,
+                out var dataStart,
+                out dataSize,
+                WavRiffOverrunPolicy.Throw))
         {
-            throw new InvalidDataException(UiStrings.ErrNotRiffHeader);
+            throw new InvalidDataException(UiStrings.ErrDataChunkMissing);
         }
 
-        _ = reader.ReadUInt32();
-        if (WavRiff.ReadFourCc(reader) != "WAVE")
-        {
-            throw new InvalidDataException(UiStrings.ErrNotWaveFormat);
-        }
-
-        while (source.Position + 8 <= source.Length)
-        {
-            var id = WavRiff.ReadFourCc(reader);
-            var size = reader.ReadUInt32();
-            var chunkDataStart = source.Position;
-            if (chunkDataStart + size > source.Length)
-            {
-                throw new InvalidDataException(UiStrings.ErrChunkSizeInvalid(id));
-            }
-
-            if (id == "data")
-            {
-                dataSize = size;
-                return chunkDataStart;
-            }
-
-            var paddedSize = size + (size & 1);
-            source.Position = chunkDataStart + paddedSize;
-        }
-
-        throw new InvalidDataException(UiStrings.ErrDataChunkMissing);
+        return dataStart;
     }
 
     private static PcmSampleFormat ResolvePcmFormat(WavFileInfo info)

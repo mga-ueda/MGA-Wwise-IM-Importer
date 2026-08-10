@@ -1,4 +1,4 @@
-﻿using MgaWwiseIMImporter.UI;
+﻿using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wwise;
 
@@ -6,7 +6,7 @@ namespace MgaWwiseIMImporter.Wwise;
 /// Music Switch Container のトランジション（WAAPI で設定可能な範囲）。
 /// <para>
 /// 既定の Any → Any（名前 <c>Transition</c>）は必ず先頭に明示する。
-/// <c>@TransitionRoot</c> を渡すと Wwise 側の既定ルールが消えることがあるため、
+/// <c>WaapiPropertyNames.TransitionRoot</c> を渡すと Wwise 側の既定ルールが消えることがあるため、
 /// Audiokinetic の object.set 例と同様に空の Any→Any を children 先頭へ含める
 /// （Exit Source At は Immediate。Wwise 既定の Exit Cue は使わない）。
 /// 続けて各 Playlist 向け Any → Object ルールを追加する（Exit Source At は遷移先の記憶値）。
@@ -50,7 +50,7 @@ internal static class WaapiMusicTransitionDefaults
         {
             ["type"] = "MusicTransition",
             ["name"] = string.Empty,
-            ["@IsFolder"] = true,
+            [WaapiPropertyNames.IsFolder] = true,
             ["children"] = children,
         };
     }
@@ -61,9 +61,9 @@ internal static class WaapiMusicTransitionDefaults
         {
             ["type"] = "MusicTransition",
             ["name"] = DefaultAnyToAnyName,
-            ["@SourceContextType"] = ContextAny,
-            ["@DestinationContextType"] = ContextAny,
-            ["@ExitSourceAt"] = ToWaapiExitSourceAt(PlaylistExitSourceMode.Immediate),
+            [WaapiPropertyNames.SourceContextType] = ContextAny,
+            [WaapiPropertyNames.DestinationContextType] = ContextAny,
+            [WaapiPropertyNames.ExitSourceAt] = ToWaapiExitSourceAt(PlaylistExitSourceMode.Immediate),
         };
 
     private static Dictionary<string, object?> BuildAnyToPlaylistRule(
@@ -74,13 +74,13 @@ internal static class WaapiMusicTransitionDefaults
             ["type"] = "MusicTransition",
             // Wwise 既定どおり名前は Transition（Playlist 名にはしない）。
             ["name"] = DefaultAnyToAnyName,
-            ["@SourceContextType"] = ContextAny,
-            ["@DestinationContextType"] = ContextObject,
-            ["@DestinationContextObject"] = $"{containerPath}\\{playlist.Name}",
-            ["@ExitSourceAt"] = ToWaapiExitSourceAt(playlist.ExitSourceAt),
-            ["@DestinationJumpPositionPreset"] = DestinationJumpPositionEntryCue,
-            ["@EnableSourceFadeOut"] = playlist.FadeOutSeconds > 0 ? 1 : 0,
-            ["@EnableDestinationFadeIn"] = playlist.FadeInSeconds > 0 ? 1 : 0,
+            [WaapiPropertyNames.SourceContextType] = ContextAny,
+            [WaapiPropertyNames.DestinationContextType] = ContextObject,
+            [WaapiPropertyNames.DestinationContextObject] = $"{containerPath}\\{playlist.Name}",
+            [WaapiPropertyNames.ExitSourceAt] = ToWaapiExitSourceAt(playlist.ExitSourceAt),
+            [WaapiPropertyNames.DestinationJumpPositionPreset] = DestinationJumpPositionEntryCue,
+            [WaapiPropertyNames.EnableSourceFadeOut] = playlist.FadeOutSeconds > 0 ? 1 : 0,
+            [WaapiPropertyNames.EnableDestinationFadeIn] = playlist.FadeInSeconds > 0 ? 1 : 0,
         };
 
     /// <summary>Wwise ExitSourceAt / MusicSyncType（Change Occurs At）列挙値へ変換する。</summary>

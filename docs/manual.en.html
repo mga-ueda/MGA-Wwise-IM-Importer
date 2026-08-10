@@ -475,8 +475,8 @@
       <h3 id="more-options">More Options</h3>
       <p>Top: <span class="ui">Stream</span> (left) | <span class="ui">Layer Music Option</span> (right). Bottom: <span class="ui">Marker Comment</span> (left) | <span class="ui">Marker Grid</span> (right).</p>
       <ul>
-        <li><span class="ui">Stream</span> … Prefetch Length / Look-ahead Time (ms). First Music Segment Look-ahead is fixed at <strong>50 ms</strong>; later segments use the UI value (default 500)</li>
-        <li><span class="ui">Keep Layer Balance</span> … default off; recommended with Wwise Loudness Normalization. Writes relative balance to Music Track Make-Up Gain</li>
+        <li><span class="ui">Stream</span> … Prefetch Length / Look-ahead Time (ms). First Music Segment Look-ahead is fixed at <strong>50 ms</strong>; later segments use the UI value (default 500). <strong>App setting</strong> (not reset by CLEAR)</li>
+        <li><span class="ui">Keep Layer Balance</span> … default off; recommended with Wwise Loudness Normalization. Writes relative balance to Music Track Make-Up Gain. <strong>App setting</strong> (not reset by CLEAR)</li>
       </ul>
       <div class="note">
         <p><strong>Why the first Music Segment's Look-ahead is fixed at 50 ms</strong>: when Wwise is told to play at a volume far below the source waveform's own level — whether via Loudness Normalization, Voice Volume, gain, or anything else — the volume apparently takes a few milliseconds to settle, and the very beginning of the waveform can be heard at its original level for an instant. The 50 ms is set as a safeguard against this. With Zero latency in use we would prefer 0, but this compromise is unavoidable for now. This measure is provisional and may change in the future.</p>
@@ -490,7 +490,7 @@
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
         <tbody>
-          <tr><td class="ui">CLEAR</td><td>Clear wave/session/log; reset project settings to app defaults. Keeps export path, Keep Target, Always on Top.</td></tr>
+          <tr><td class="ui">CLEAR</td><td>Clear wave/session/log; reset project settings to app defaults. Keeps export path, Keep Target, Always on Top, and Stream / Look-ahead / Prefetch / Keep Layer Balance (app settings).</td></tr>
           <tr><td class="ui">RELOAD</td><td>Re-read the last WAV/XML from disk. Picks up an updated wave while keeping current groups, fades, and related work when possible. If the content changed a lot, that may look wrong — drop the files again to start fresh.</td></tr>
           <tr><td class="ui">EXPORT</td><td>Write split WAVs and register in Wwise.</td></tr>
           <tr><td class="ui">Keep Target</td><td>Pin destination (WAAPI status bar). Project-name link or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> opens/focuses Wwise.</td></tr>

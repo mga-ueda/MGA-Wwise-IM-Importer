@@ -52,6 +52,15 @@ internal sealed class AppSettingsData
     public ushort ExpectedChannels { get; set; } = 2;
 
     public float MetronomeVolume { get; set; } = 0.3f;
+
+    /// <summary>null は未移行（プロジェクト設定から初回コピー）。</summary>
+    public bool? StreamEnabled { get; set; }
+
+    public int? LookAheadMs { get; set; }
+
+    public int? PrefetchLengthMs { get; set; }
+
+    public bool? LoudnessPreserveGroupBalance { get; set; }
 }
 
 internal sealed class WindowSettingsData

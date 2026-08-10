@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wwise;
 
@@ -20,7 +20,7 @@ internal static class WaapiStartupProbe
         try
         {
             using var client = new WaapiHttpClient(settings.Url, TimeSpan.FromMilliseconds(settings.TimeoutMs));
-            var info = await client.CallAsync("ak.wwise.core.getInfo", cancellationToken: cancellationToken)
+            var info = await WaapiCoreCalls.GetInfoAsync(client, cancellationToken)
                 .ConfigureAwait(false);
 
             var projectText = string.Empty;
@@ -28,7 +28,7 @@ internal static class WaapiStartupProbe
             var projectFilePath = string.Empty;
             try
             {
-                var project = await client.CallAsync("ak.wwise.core.getProjectInfo", cancellationToken: cancellationToken)
+                var project = await WaapiCoreCalls.GetProjectInfoAsync(client, cancellationToken)
                     .ConfigureAwait(false);
                 projectText = FormatProject(project);
                 if (WaapiJson.TryGetString(project, "name", out var name))
@@ -85,7 +85,7 @@ internal static class WaapiStartupProbe
         CancellationToken cancellationToken)
     {
         var selected = await client.CallAsync(
-                "ak.wwise.ui.getSelectedObjects",
+                WaapiUris.UiGetSelectedObjects,
                 options: SelectedReturnOptions,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);

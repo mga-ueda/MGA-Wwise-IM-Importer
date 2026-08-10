@@ -1,18 +1,6 @@
-﻿namespace MgaWwiseIMImporter.Wave;
+﻿using MgaWwiseIMImporter.Domain;
 
-/// <summary>リージョン端フェードのカーブ形状（Wwise MusicClip FadeIn/OutShape 相当）。</summary>
-internal enum RegionFadeCurveKind
-{
-    LogarithmicBase3,
-    SineConstantPowerFadeIn,
-    LogarithmicBase141,
-    InvertedSCurve,
-    Linear,
-    SCurve,
-    ExponentialBase141,
-    SineConstantPowerFadeOut,
-    ExponentialBase3,
-}
+namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
 /// 連続リージョン固まり（非除外ラン）のイン／アウト端フェード。

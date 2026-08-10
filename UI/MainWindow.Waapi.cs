@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wwise;
 
@@ -12,6 +12,7 @@ public partial class MainWindow
     private const int WaapiPollFailThreshold = 3;
 
     private readonly DispatcherTimer _waapiPollTimer = new() { Interval = TimeSpan.FromMilliseconds(WaapiConnectedPollMs) };
+    private Services.WaapiConnectionService _waapiConnection = null!;
     private WaapiProbeResult? _waapiLastResult;
     private bool _waapiPollBusy;
     private int _waapiPollFailCount;
@@ -24,6 +25,7 @@ public partial class MainWindow
 
     private void InitializeWaapiEventWiring()
     {
+        _waapiConnection = new Services.WaapiConnectionService(_waapiSettings);
         waapiStatusBar.KeepTargetChanged += WaapiStatusBar_KeepTargetChanged;
         waapiStatusBar.AutoActiveChanged += (_, _) =>
         {
@@ -45,7 +47,7 @@ public partial class MainWindow
         try
         {
             waapiStatusBar.SetPending();
-            _waapiLastResult = await WaapiStartupProbe.RunAsync(_waapiSettings).ConfigureAwait(true);
+            _waapiLastResult = await _waapiConnection.ProbeAsync().ConfigureAwait(true);
             ApplyWaapiProbeResult(_waapiLastResult, logReport: true);
 
             if (_keepTarget)
@@ -89,7 +91,6 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// WAAPI 接続ログ。Keep Target がオンのときは記憶パスを Keep 表示で出す（Form1 同等）。
     /// </summary>
     private string FormatWaapiLogReport(WaapiProbeResult result)
     {
@@ -290,7 +291,7 @@ public partial class MainWindow
     {
         try
         {
-            var (path, type) = await WaapiStartupProbe.RefreshSelectionAsync(_waapiSettings).ConfigureAwait(true);
+            var (path, type) = await _waapiConnection.RefreshSelectionAsync().ConfigureAwait(true);
             if (_waapiLastResult is { } previous)
             {
                 _waapiLastResult = new WaapiProbeResult
@@ -329,7 +330,7 @@ public partial class MainWindow
 
     private async Task PollWaapiWhileDisconnectedAsync()
     {
-        var result = await WaapiStartupProbe.RunAsync(_waapiSettings).ConfigureAwait(true);
+        var result = await _waapiConnection.ProbeAsync().ConfigureAwait(true);
         if (result.Ok)
         {
             _waapiPollFailCount = 0;

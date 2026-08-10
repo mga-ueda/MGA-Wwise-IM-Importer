@@ -1,13 +1,6 @@
-﻿namespace MgaWwiseIMImporter.UI;
+﻿using MgaWwiseIMImporter.Domain;
 
-internal enum PlaylistExitSourceMode
-{
-    Immediate,
-    NextBar,
-    NextBeat,
-    NextCue,
-    ExitCue,
-}
+namespace MgaWwiseIMImporter.UI;
 
 internal static class PlaylistUiNames
 {

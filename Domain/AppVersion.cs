@@ -2,7 +2,7 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.Domain;
 
 /// <summary>
 /// アプリ版の単一ソース。csproj の <c>Version</c>（SemVer）を表示・比較・GitHub タグ照合に共通利用する。

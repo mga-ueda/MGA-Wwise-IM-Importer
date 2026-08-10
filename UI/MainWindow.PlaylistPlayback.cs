@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wave;
 
@@ -97,7 +97,6 @@ public partial class MainWindow
 
         foreach (var (partNumber, button) in _playlistButtons)
         {
-            // 通常時は枠なし。遷移待ち点滅と遷移完了グローだけ枠を描く（Form1 同等）。
             button.ApplyIdleStyle();
 
             var isAutomatic = _automaticPlaylistPlayback
@@ -168,7 +167,6 @@ public partial class MainWindow
         EnsureHighlightedPlaylistVisible();
     }
 
-    /// <summary>波形レーン上の高速ホバーで色更新をまとめ、UI スレッドを詰まらせない（Form1 同等）。</summary>
     private void QueuePlaylistHoverColorRefresh()
     {
         if (_playlistHoverColorRefreshQueued || !IsLoaded)
@@ -431,15 +429,8 @@ public partial class MainWindow
 
     private static PlaylistExitSourceMode NormalizeExitSourceModeForCurrentWave(
         PlaylistExitSourceMode mode,
-        bool waveOnly)
-    {
-        if (waveOnly && mode is PlaylistExitSourceMode.NextBar or PlaylistExitSourceMode.NextBeat)
-        {
-            return PlaylistExitSourceMode.Immediate;
-        }
-
-        return mode;
-    }
+        bool waveOnly) =>
+        PlaylistExitSourceNormalization.NormalizeForWaveOnly(mode, waveOnly);
 
     private PlaylistExitSourceMode NormalizeExitSourceModeForCurrentWave(PlaylistExitSourceMode mode) =>
         NormalizeExitSourceModeForCurrentWave(mode, _previewSession?.AllowsSessionMarkerEdit == true);

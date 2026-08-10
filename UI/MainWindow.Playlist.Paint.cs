@@ -200,7 +200,6 @@ public partial class MainWindow
         _playlistDisablePaintLastPartNumber = null;
         if (wasActive)
         {
-            // Form1 同等: 各パート変更時に ApplyPlaylistDisableUi 済み。終了時は Tip 復帰と永続化のみ。
             TipService.Resume();
             ApplyPlaylistButtonColors();
             AutosaveCurrentProject();
@@ -438,7 +437,6 @@ public partial class MainWindow
 
         waveformView.SetPlaylistGroupColors(BuildPlaylistGroupColorMap());
 
-        // Form1 同等: グループ名の付け替えをリスト側へ即時反映（波形レイヤ再生成はしない）。
         if (_loadedPreview is not null && !_playlistDisablePaintActive)
         {
             UpdatePlaylistDisplayNames(GetEffectiveOutputParts(), updateWaveform: false);

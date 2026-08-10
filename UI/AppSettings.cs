@@ -58,6 +58,18 @@ internal sealed class AppSettings
     /// <summary>メトロノーム音量（0.1〜1.0。既定 0.3）。</summary>
     public float MetronomeVolume { get; set; } = MetronomePlayer.DefaultVolume;
 
+    /// <summary>Music Track ストリーミング有効（既定オン。CLEAR では戻さない）。</summary>
+    public bool StreamEnabled { get; set; } = true;
+
+    /// <summary>2 番目以降セグメントの Look-ahead（ms。既定 500）。</summary>
+    public int LookAheadMs { get; set; } = 500;
+
+    /// <summary>先頭セグメント Prefetch Length（ms。既定 500）。</summary>
+    public int PrefetchLengthMs { get; set; } = 500;
+
+    /// <summary>Keep Layer Balance（既定オフ。CLEAR では戻さない）。</summary>
+    public bool LoudnessPreserveGroupBalance { get; set; }
+
     public AudioOutputSettings ToAudioOutputSettings() => new(AudioApi, AudioDeviceId ?? string.Empty);
 
     public ExpectedWaveformFormat ToExpectedWaveformFormat() =>
@@ -66,7 +78,22 @@ internal sealed class AppSettings
             ExpectedBitsPerSample,
             ExpectedChannels);
 
-    public static AppSettings Load() => FromData(JsonSettingsStore.Document.App);
+    public static AppSettings Load()
+    {
+        var data = JsonSettingsStore.Document.App;
+        var needsStreamingMigrate = data.StreamEnabled is null
+            && data.LookAheadMs is null
+            && data.PrefetchLengthMs is null
+            && data.LoudnessPreserveGroupBalance is null;
+        var settings = FromData(data, migrateStreamingFromProjects: needsStreamingMigrate);
+        if (needsStreamingMigrate)
+        {
+            // 移行結果を app へ書き、次回以降はプロジェクト既定で上書きしない。
+            settings.Save();
+        }
+
+        return settings;
+    }
 
     public void Save()
     {
@@ -142,6 +169,19 @@ internal sealed class AppSettings
         Save();
     }
 
+    public void SaveStreamingOptions(
+        bool streamEnabled,
+        int lookAheadMs,
+        int prefetchLengthMs,
+        bool loudnessPreserveGroupBalance)
+    {
+        StreamEnabled = streamEnabled;
+        LookAheadMs = Math.Clamp(lookAheadMs, 0, 9999);
+        PrefetchLengthMs = Math.Clamp(prefetchLengthMs, 0, 9999);
+        LoudnessPreserveGroupBalance = loudnessPreserveGroupBalance;
+        Save();
+    }
+
     private AppSettingsData ToData() => new()
     {
         AlwaysOnTop = AlwaysOnTop,
@@ -159,9 +199,13 @@ internal sealed class AppSettings
         ExpectedBitsPerSample = ExpectedBitsPerSample,
         ExpectedChannels = ExpectedChannels,
         MetronomeVolume = MetronomeVolume,
+        StreamEnabled = StreamEnabled,
+        LookAheadMs = LookAheadMs,
+        PrefetchLengthMs = PrefetchLengthMs,
+        LoudnessPreserveGroupBalance = LoudnessPreserveGroupBalance,
     };
 
-    private static AppSettings FromData(AppSettingsData data)
+    private static AppSettings FromData(AppSettingsData data, bool migrateStreamingFromProjects)
     {
         var settings = new AppSettings
         {
@@ -194,7 +238,40 @@ internal sealed class AppSettings
         settings.ExpectedSampleRateHz = format.SampleRateHz;
         settings.ExpectedBitsPerSample = format.BitsPerSample;
         settings.ExpectedChannels = format.Channels;
+
+        if (migrateStreamingFromProjects)
+        {
+            TryMigrateStreamingFromProjects(settings);
+        }
+        else
+        {
+            settings.StreamEnabled = data.StreamEnabled ?? true;
+            settings.LookAheadMs = Math.Clamp(data.LookAheadMs ?? 500, 0, 9999);
+            settings.PrefetchLengthMs = Math.Clamp(data.PrefetchLengthMs ?? 500, 0, 9999);
+            settings.LoudnessPreserveGroupBalance = data.LoudnessPreserveGroupBalance ?? false;
+        }
+
         return settings;
+    }
+
+    private static void TryMigrateStreamingFromProjects(AppSettings settings)
+    {
+        var projects = JsonSettingsStore.Document.Projects;
+        if (projects?.Items is not { Count: > 0 })
+        {
+            return;
+        }
+
+        var active = projects.Active?.Trim() ?? string.Empty;
+        var source = projects.Items.FirstOrDefault(p =>
+                !string.IsNullOrWhiteSpace(active)
+                && string.Equals(p.Name, active, StringComparison.OrdinalIgnoreCase))
+            ?? projects.Items[0];
+
+        settings.StreamEnabled = source.StreamEnabled;
+        settings.LookAheadMs = Math.Clamp(source.LookAheadMs, 0, 9999);
+        settings.PrefetchLengthMs = Math.Clamp(source.PrefetchLengthMs, 0, 9999);
+        settings.LoudnessPreserveGroupBalance = source.LoudnessPreserveGroupBalance;
     }
 
     private static RegionFadeCurveKind ParseFadeCurve(string? text, RegionFadeCurveKind fallback) =>

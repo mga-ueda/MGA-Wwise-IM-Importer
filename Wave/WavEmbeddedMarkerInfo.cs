@@ -1,5 +1,5 @@
 ﻿using System.Text;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wave;
 

@@ -10,6 +10,7 @@
           Background="{StaticResource TransportBackBrush}">
     <StackPanel x:Name="GroupsHost"
                 Orientation="Horizontal"
+                HorizontalAlignment="Center"
                 VerticalAlignment="Center" />
   </Border>
 </UserControl>

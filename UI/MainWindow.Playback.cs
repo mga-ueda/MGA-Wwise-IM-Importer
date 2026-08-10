@@ -519,7 +519,6 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 小節情報のない波形ではメトロノームを止めて OFF に戻す（Form1 同等）。
     /// </summary>
     private void ApplyMetronomeBarsFromPreview(WaveformPreviewData? preview)
     {
@@ -598,7 +597,6 @@ public partial class MainWindow
 
         if (isPlaying)
         {
-            // Form1 同等: クロック FO 中は主シークを消し、白いフェードアウトヘッド＋軌跡にする。
             var clockFadeOutActive = _audioPlayer.TryGetClockFadeOutPlaybackProgress(
                 out var clockFadeProgress);
             if (clockFadeOutActive)

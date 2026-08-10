@@ -371,7 +371,6 @@ public partial class MainWindow
                     Margin = DesignMetrics.FlatOptionControlMargin,
                     ClipToBounds = false,
                     // 無効でもドラッグ塗りのヒット対象にするため IsEnabled は落とさない。
-                    // 無効表示は Opacity ではなく Foreground=LogError（Form1 同等）。
                 };
                 button.ApplyIdleStyle();
                 if (_disabledPartNumbers.Contains(part.Number))
@@ -425,7 +424,6 @@ public partial class MainWindow
     /// <summary>
     /// Compact Num. のチェック枠左端を、プレイリスト行のグループ枠
     /// （左マージン = <see cref="DesignMetrics.PlaylistItemIndent"/>）に揃える。
-    /// チェック枠は Padding.Left から約 From96(3) 内側に描かれるため差し引く（Form1 同等）。
     /// </summary>
     private void AlignCompactFileNumbersCheckBox()
     {
@@ -757,7 +755,6 @@ public partial class MainWindow
         }
 
         SyncTransitionSettingsForGroup(groupId);
-        // Form1 同等: 再生中パートがグループに入ったら Group / Chg Occ At を即有効化。
         UpdateGroupFadeRadioEnabled();
         if (!_playlistGroupPaintActive && !_playlistDisablePaintActive)
         {
@@ -792,7 +789,6 @@ public partial class MainWindow
 
     /// <summary>
     /// Wave 単体モードでは小節／拍情報がないため Next Bar / Next Beat を使わない
-    /// （Form1 UpdateWaveOnlyExitSourceOptionsEnabled 同等）。
     /// </summary>
     private void UpdateWaveOnlyExitSourceOptionsEnabled()
     {
@@ -847,7 +843,6 @@ public partial class MainWindow
         return best;
     }
 
-    /// <summary>セッション復元後などに全グループの遷移設定をリーダー値で揃える（Form1 同等）。</summary>
     private void SyncTransitionSettingsAcrossAllGroups()
     {
         foreach (var groupId in _partGroupIds.Values.Distinct().ToArray())
@@ -954,7 +949,6 @@ public partial class MainWindow
             RemovePlaylistPartFromGroup(partNumber);
         }
 
-        // Form1 同等: 無効化のたびに UI（赤文字・波形）を即時更新する。
         ApplyPlaylistDisableUi();
         if (!_playlistDisablePaintActive)
         {
@@ -964,7 +958,6 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// 再生中・予約中のパートを無効化されたら、そのパートの再生／遷移予約を止める（Form1 同等）。
     /// </summary>
     private void CancelPlaybackForDisabledPart(int partNumber)
     {

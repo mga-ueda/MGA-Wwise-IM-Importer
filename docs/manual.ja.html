@@ -475,8 +475,8 @@
       <h3 id="more-options">More Options</h3>
       <p>上段: <span class="ui">Stream</span>（左）｜<span class="ui">Layer Music Option</span>（右）。下段: <span class="ui">Marker Comment</span>（左）｜<span class="ui">Marker Grid</span>（右）。</p>
       <ul>
-        <li><span class="ui">Stream</span> … Prefetch Length／Look-ahead Time（ms）。先頭 Music Segment の Look-ahead は固定 <strong>50 ms</strong>。2 番目以降は UI 値（既定 500）</li>
-        <li><span class="ui">Keep Layer Balance</span> … 既定オフ。Loudness Normalization 利用時に推奨。グループ相対バランスを Music Track の Make-Up Gain へ非破壊設定</li>
+        <li><span class="ui">Stream</span> … Prefetch Length／Look-ahead Time（ms）。先頭 Music Segment の Look-ahead は固定 <strong>50 ms</strong>。2 番目以降は UI 値（既定 500）。<strong>アプリ設定</strong>（CLEAR では既定に戻さない）</li>
+        <li><span class="ui">Keep Layer Balance</span> … 既定オフ。Loudness Normalization 利用時に推奨。グループ相対バランスを Music Track の Make-Up Gain へ非破壊設定。<strong>アプリ設定</strong>（CLEAR では既定に戻さない）</li>
       </ul>
       <div class="note">
         <p><strong>先頭 Music Segment の Look-ahead を 50 ms 固定にしている理由</strong>: Loudness Normalization・Voice Volume・ゲインなど手段を問わず、元波形が持つ音量より極端に低い音量を Wwise 上で指定した場合、音量が確定するまでに数ミリ秒かかるようで、波形冒頭が一瞬元の音量のまま聴こえる挙動が確認されています。その安全策として 50 ms を設定しています。Zero latency を利用している場合は 0 にしたいところですが、致し方なくこの値にしています。この処置は現状暫定的なものであり、今後変更される可能性があります。</p>
@@ -490,7 +490,7 @@
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
         <tbody>
-          <tr><td class="ui">CLEAR</td><td>波形・セッション・ログをクリアし、プロジェクト設定をアプリ既定へ。書き出し先・Keep Target・Always on Top は維持。</td></tr>
+          <tr><td class="ui">CLEAR</td><td>波形・セッション・ログをクリアし、プロジェクト設定をアプリ既定へ。書き出し先・Keep Target・Always on Top・Stream／Look-ahead／Prefetch／Keep Layer Balance（アプリ設定）は維持。</td></tr>
           <tr><td class="ui">RELOAD</td><td>最後の WAV／XML をディスクから再読み込み。更新された波形を取り込みつつ、グループ／フェード等の現状作業を可能な範囲で維持。内容が大きく変わっている場合はおかしくなることがあるので、手動ドロップでやり直してください。</td></tr>
           <tr><td class="ui">EXPORT</td><td>分割 WAV 書き出し＋Wwise 登録。</td></tr>
           <tr><td class="ui">Keep Target</td><td>作成先固定（WAAPI ステータスバー）。プロジェクト名リンクまたは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面化。</td></tr>

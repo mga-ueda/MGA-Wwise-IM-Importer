@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MgaWwiseIMImporter.csproj" />
+  <Project Path="MgaWwiseIMImporter.Tests/MgaWwiseIMImporter.Tests.csproj" />
+</Solution>

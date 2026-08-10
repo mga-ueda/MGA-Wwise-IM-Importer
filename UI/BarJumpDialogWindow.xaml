@@ -3,7 +3,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:MgaWwiseIMImporter.UI"
-        Title="{x:Static ui:UiStrings.DialogBarJumpTitle}"
+        xmlns:domain="clr-namespace:MgaWwiseIMImporter.Domain"
+        Title="{x:Static domain:UiStrings.DialogBarJumpTitle}"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -27,7 +28,7 @@
                           Opacity="0.16" />
       </Border.Effect>
       <Grid>
-        <TextBlock Text="{x:Static ui:UiStrings.LabelGoToMeasure}"
+        <TextBlock Text="{x:Static domain:UiStrings.LabelGoToMeasure}"
                    Foreground="{StaticResource DialogForeBrush}"
                    FontFamily="Yu Gothic UI"
                    FontSize="12"

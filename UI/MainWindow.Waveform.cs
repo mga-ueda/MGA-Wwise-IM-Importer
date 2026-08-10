@@ -46,7 +46,6 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Info レーン（Measure 列）右端にプロジェクト名コンボ右端を揃える（Form1 同等）。
     /// 波形名でレーン幅が変わるたびに追従する。
     /// </summary>
     private void SyncProjectNameComboWidthToInfoLane()
@@ -205,7 +204,7 @@ public partial class MainWindow
 
     /// <summary>
     /// 波形・セッションを卸し、選択中プロジェクトの設定をアプリ既定へ戻して保存する。
-    /// Always on Top（アプリ設定）、書き出し先フォルダ、WAAPI Keep Target は変更しない。
+    /// Always on Top／Stream／Keep Layer Balance（アプリ設定）、書き出し先フォルダ、WAAPI Keep Target は変更しない。
     /// プロジェクト名／一覧は消さない。
     /// </summary>
     private void ClearCurrentProjectToDefaults()
@@ -231,6 +230,11 @@ public partial class MainWindow
         profile.KeptTargetPath = preservedKeptTargetPath;
         profile.KeptTargetProjectFilePath = preservedKeptTargetProjectFilePath;
         profile.MoreOptionsExpanded = preservedMoreOptionsExpanded;
+        // Stream／Keep Layer Balance はアプリ設定。プロファイル互換用に現状を残す。
+        profile.StreamEnabled = _appSettings.StreamEnabled;
+        profile.LookAheadMs = _appSettings.LookAheadMs;
+        profile.PrefetchLengthMs = _appSettings.PrefetchLengthMs;
+        profile.LoudnessPreserveGroupBalance = _appSettings.LoudnessPreserveGroupBalance;
 
         if (_projectStore.ContainsName(name))
         {
@@ -353,7 +357,6 @@ public partial class MainWindow
         UpdateWaveOnlyExitSourceOptionsEnabled();
         RefreshPlaylistButtons();
         UpdateNavigationAvailability();
-        // SetPreview が ClearPlayhead するため、読み込み直後は冒頭にシークバーを出す（Form1 同等）
         SeekPlayback(0);
         transportBar.SetPosition(ResolvePositionInfo(0));
         UpdateExportEnabled();
@@ -404,7 +407,6 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Wave 単体マーカーを変更し、成功したら Undo 履歴へ積む（Form1 同等）。
     /// パート構成が変わったときだけ Playlist UI を作り直す。
     /// </summary>
     private bool TryMutateWaveOnlyMarkers(
@@ -496,7 +498,6 @@ public partial class MainWindow
         return true;
     }
 
-    /// <summary>セッションの現在状態を波形・エンジン・Playlist UI へ一括反映する（Form1 同等）。</summary>
     private void ApplyWaveOnlySessionPresentation(
         WaveformPreviewSession session,
         bool refreshPlaylists = true)
@@ -652,6 +653,7 @@ public partial class MainWindow
     private void MarkerOptionsPanel_SettingsChanged(object? sender, EventArgs e)
     {
         ApplyMarkerSettings();
+        SaveStreamingOptionsFromUi();
         AutosaveCurrentProject();
     }
 
@@ -758,7 +760,6 @@ public partial class MainWindow
 
     /// <summary>
     /// EXPORT ボタン活性を事前検証（Preflight）で常時評価し、結果が変わったときだけログへ出す
-    /// （Form1 UpdateExportButtonState 同等）。
     /// </summary>
     private void UpdateExportEnabled()
     {

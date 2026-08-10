@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using System.Text;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wave;
 
@@ -461,42 +461,13 @@ internal static class WavPeakReader
         Stream stream,
         BinaryReader reader,
         out long dataStart,
-        out uint dataSize)
-    {
-        dataStart = 0;
-        dataSize = 0;
-
-        stream.Position = 0;
-        if (WavRiff.ReadFourCc(reader) != "RIFF")
-        {
-            return false;
-        }
-
-        _ = reader.ReadUInt32();
-        if (WavRiff.ReadFourCc(reader) != "WAVE")
-        {
-            return false;
-        }
-
-        while (stream.Position + 8 <= stream.Length)
-        {
-            var chunkId = WavRiff.ReadFourCc(reader);
-            var chunkSize = reader.ReadUInt32();
-            var chunkDataStart = stream.Position;
-
-            if (chunkId == "data")
-            {
-                dataStart = chunkDataStart;
-                dataSize = chunkSize;
-                return true;
-            }
-
-            var paddedSize = chunkSize + (chunkSize & 1);
-            stream.Position = chunkDataStart + paddedSize;
-        }
-
-        return false;
-    }
+        out uint dataSize) =>
+        WavRiff.TryFindDataChunk(
+            stream,
+            reader,
+            out dataStart,
+            out dataSize,
+            WavRiffOverrunPolicy.Ignore);
 
     /// <summary>複数ファイルの概要ピークを仮想タイムライン順に連結する。</summary>
     public static WavPeakData Concatenate(

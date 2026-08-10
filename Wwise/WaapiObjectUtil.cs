@@ -26,7 +26,7 @@ internal static class WaapiObjectUtil
         try
         {
             var result = await client.CallAsync(
-                    "ak.wwise.core.object.get",
+                    WaapiUris.CoreObjectGet,
                     new Dictionary<string, object?> { ["waql"] = $"$ \"{escaped}\"" },
                     new Dictionary<string, object?> { ["return"] = ReturnFieldsIdPath },
                     cancellationToken)
@@ -46,5 +46,5 @@ internal static class WaapiObjectUtil
     private static bool IsObjectNotFound(string message) =>
         message.Contains("Object not found", StringComparison.OrdinalIgnoreCase)
         || message.Contains("invalid_query", StringComparison.OrdinalIgnoreCase)
-        || message.Contains("ak.wwise.query.invalid_query", StringComparison.OrdinalIgnoreCase);
+        || message.Contains(WaapiUris.QueryInvalidQuery, StringComparison.OrdinalIgnoreCase);
 }

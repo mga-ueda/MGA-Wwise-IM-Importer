@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
@@ -316,8 +316,8 @@ public partial class MainWindow
             profile.CopyMarkerInto(_markerSettings);
             markerOptionsPanel.Bind(_markerSettings);
             ApplyMarkerSettings();
-            markerOptionsPanel.BindStreaming(profile.StreamEnabled, profile.LookAheadMs, profile.PrefetchLengthMs);
-            markerOptionsPanel.BindLoudness(profile.LoudnessPreserveGroupBalance);
+            // Stream／Keep Layer Balance はアプリ設定（プロジェクト切替・CLEAR でも維持）。
+            ApplyStreamingOptionsFromAppSettings();
             markerOptionsPanel.BindMoreOptions(profile.MoreOptionsExpanded);
 
             _keepTarget = profile.KeepTarget;
@@ -355,10 +355,11 @@ public partial class MainWindow
         profile.FadeOutSeconds = ResolveCheckedTag(TransitionTimeRadios) ?? profile.FadeOutSeconds;
         profile.ExitSourceAt = ResolveCheckedExitSource(ExitSourceRadios) ?? profile.ExitSourceAt;
         profile.PlayPostExit = playMinusECheckBox.IsChecked == true;
-        profile.StreamEnabled = markerOptionsPanel.StreamEnabled;
-        profile.LookAheadMs = markerOptionsPanel.LookAheadMs;
-        profile.PrefetchLengthMs = markerOptionsPanel.PrefetchLengthMs;
-        profile.LoudnessPreserveGroupBalance = markerOptionsPanel.LoudnessPreserveGroupBalance;
+        // Stream／Keep Layer Balance はアプリ設定が正。互換のためプロファイルにも現状を写す。
+        profile.StreamEnabled = _appSettings.StreamEnabled;
+        profile.LookAheadMs = _appSettings.LookAheadMs;
+        profile.PrefetchLengthMs = _appSettings.PrefetchLengthMs;
+        profile.LoudnessPreserveGroupBalance = _appSettings.LoudnessPreserveGroupBalance;
         profile.MoreOptionsExpanded = markerOptionsPanel.MoreOptionsExpanded;
         profile.CopyMarkerFrom(_markerSettings);
         profile.KeepTarget = _keepTarget;
@@ -386,5 +387,23 @@ public partial class MainWindow
         {
             // オートセーブ失敗は作業を止めない。
         }
+    }
+
+    private void ApplyStreamingOptionsFromAppSettings()
+    {
+        markerOptionsPanel.BindStreaming(
+            _appSettings.StreamEnabled,
+            _appSettings.LookAheadMs,
+            _appSettings.PrefetchLengthMs);
+        markerOptionsPanel.BindLoudness(_appSettings.LoudnessPreserveGroupBalance);
+    }
+
+    private void SaveStreamingOptionsFromUi()
+    {
+        _appSettings.SaveStreamingOptions(
+            markerOptionsPanel.StreamEnabled,
+            markerOptionsPanel.LookAheadMs,
+            markerOptionsPanel.PrefetchLengthMs,
+            markerOptionsPanel.LoudnessPreserveGroupBalance);
     }
 }

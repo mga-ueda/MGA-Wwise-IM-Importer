@@ -1,7 +1,7 @@
 ﻿using System.Globalization;
 using System.Text;
 using System.Xml.Linq;
-using MgaWwiseIMImporter.UI;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Nuendo;
 
