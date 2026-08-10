@@ -1,4 +1,4 @@
-﻿namespace MgaWwiseIMImporter.UI;
+namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
 /// ユーザーに見えるすべての表示テキスト（Tips・ダイアログ・ログ・ラベル・ボタン・
@@ -715,15 +715,19 @@ internal static class UiStrings
         "Rules for Wwise Custom Cue names generated from added markers.");
 
     public static string TipCommentDigits => Get(
-        "連番の桁数を 1～6 で指定します。空欄または 0 の場合は連番自体を付けません。"
+        "連番の桁数を 0～6 で指定します（+/- で変更、既定 3）。"
+        + " 0 の場合は連番自体を付けません。"
         + " 1 以上のときは、その桁で表せる最大値までしかマーカーを追加できません（例: 3 → 999 件）。",
-        "Digit count 1–6. Empty or 0 disables numbering."
+        "Digit count 0–6 (+/−, default 3)."
+        + " 0 disables numbering."
         + " When 1+, you can only add as many markers as that digit width allows (e.g. 3 → 999).");
 
     public static string TipCommentDigitsBox => Get(
-        "連番の桁数です。空欄または 0 で連番なし、1～6 で連番ありになります。"
+        "連番の桁数です。+/- で 0～6 を選べます（既定 3）。"
+        + " 0 で連番なし、1～6 で連番ありになります。"
         + " 桁数を超える連番は追加できません。",
-        "Digit count. Empty or 0 = no number; 1–6 enables numbering."
+        "Digit count. Use +/− for 0–6 (default 3)."
+        + " 0 = no number; 1–6 enables numbering."
         + " Numbers beyond the digit width cannot be added.");
 
     public static string TipCommentZeroPad => Get(
@@ -738,14 +742,14 @@ internal static class UiStrings
         "When on, reset the serial number to 1 for each Music Playlist part (export file).");
 
     public static string TipCommentPrefix => Get(
-        "入力がある場合、連番の前に接頭語を追加します。Digits が空欄または 0 のときは必須です。",
-        "Optional prefix before the number. Required when Digits is empty or 0.");
+        "入力がある場合、連番の前に接頭語を追加します。Digits が 0 のときは必須です。",
+        "Optional prefix before the number. Required when Digits is 0.");
 
     public static string TipCommentPrefixBox => Get(
         "Custom Cue 名の先頭に付ける文字列を入力します。空欄なら接頭語なし。"
-        + " Digits が空欄または 0 のときは必須です。",
+        + " Digits が 0 のときは必須です。",
         "Text prepended to the Custom Cue name. Empty = no prefix."
-        + " Required when Digits is empty or 0.");
+        + " Required when Digits is 0.");
 
     public static string TipCommentSuffix => Get(
         "入力がある場合、連番の後ろに接尾語を追加します。",

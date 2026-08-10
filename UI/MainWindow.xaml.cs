@@ -1,6 +1,7 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -10,6 +11,14 @@ namespace MgaWwiseIMImporter.UI;
 
 public partial class MainWindow : Window
 {
+    /// <summary>DarkScrollBarStyle Width fallback.</summary>
+    private const double LogScrollBarFallbackWidth = 8;
+
+    /// <summary>ログ本文下端とボタン行の間隔。</summary>
+    private const double LogButtonPanelBottomGap = 0;
+
+    private ScrollBar? _logVerticalScrollBar;
+
     // --- Code-created controls (no default ctor / ctor args in XAML) ---
     private TransportIconButton projectFolderButton = null!;
     private TransportIconButton projectDeleteButton = null!;
@@ -34,6 +43,7 @@ public partial class MainWindow : Window
     private readonly MarkerSettings _markerSettings = new();
 
     private LogColorSection _logColorSection;
+    private bool _logLastLineWasBlank;
     private UiInteractionLock _uiInteractionLocks;
 
     private bool _closing;
@@ -86,19 +96,85 @@ public partial class MainWindow : Window
             SyncBusyGlassOverlayBounds();
             SyncProjectNameComboWidthToInfoLane();
         };
-        logAreaPanel.SizeChanged += (_, _) => UpdatePlaylistSelectorWidth();
+        logAreaPanel.SizeChanged += (_, _) =>
+        {
+            UpdatePlaylistSelectorWidth();
+            PositionLogButtons();
+        };
+        tipsPanel.SizeChanged += (_, _) => PositionLogButtons();
         fadeInHeaderPanel.SizeChanged += (_, _) => RefreshFadeCurveIcons();
         fadeOutHeaderPanel.SizeChanged += (_, _) => RefreshFadeCurveIcons();
         logEditorPanel.SizeChanged += (_, _) => PositionLogButtons();
         editorTextBox.SizeChanged += (_, _) => PositionLogButtons();
     }
 
-    /// <summary>WinForms PositionLogButtons 相当。縦スクロールバー幅を空けて右下へ。</summary>
+    private void LogEditorHost_SizeChanged(object sender, SizeChangedEventArgs e) => PositionLogButtons();
+
+    /// <summary>
+    /// ログ本文へ重ねたボタン行の右余白を、縦スクロールバー幅に合わせる（Form1 相当）。
+    /// 位置そのものは logEditorHost 内の右下寄せ（XAML）に任せる。
+    /// </summary>
     private void PositionLogButtons()
     {
-        var scrollbarWidth = SystemParameters.VerticalScrollBarWidth;
-        logButtonPanel.Margin = new Thickness(0, 0, scrollbarWidth, 0);
-        Panel.SetZIndex(logButtonPanel, 1);
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        var scrollBar = ResolveLogVerticalScrollBar();
+        var rightInset = scrollBar switch
+        {
+            { IsVisible: true, ActualWidth: > 0 } => scrollBar.ActualWidth,
+            not null when !double.IsNaN(scrollBar.Width) && scrollBar.Width > 0 => scrollBar.Width,
+            _ => LogScrollBarFallbackWidth,
+        };
+
+        logButtonPanel.Margin = new Thickness(0, 0, rightInset, LogButtonPanelBottomGap);
+    }
+
+    private ScrollBar? ResolveLogVerticalScrollBar()
+    {
+        if (_logVerticalScrollBar is not null)
+        {
+            return _logVerticalScrollBar;
+        }
+
+        editorTextBox.ApplyTemplate();
+        var scrollViewer = editorTextBox.Template?.FindName("PART_ContentHost", editorTextBox) as ScrollViewer
+            ?? FindVisualDescendant<ScrollViewer>(editorTextBox);
+        scrollViewer?.ApplyTemplate();
+        var scrollBar = scrollViewer?.Template?.FindName("PART_VerticalScrollBar", scrollViewer) as ScrollBar
+            ?? FindVisualDescendant<ScrollBar>(editorTextBox, sb => sb.Orientation == Orientation.Vertical);
+        if (scrollBar is null)
+        {
+            return null;
+        }
+
+        _logVerticalScrollBar = scrollBar;
+        scrollBar.IsVisibleChanged += (_, _) => PositionLogButtons();
+        scrollBar.SizeChanged += (_, _) => PositionLogButtons();
+        return scrollBar;
+    }
+
+    private static T? FindVisualDescendant<T>(DependencyObject root, Func<T, bool>? match = null)
+        where T : DependencyObject
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is T typed && (match is null || match(typed)))
+            {
+                return typed;
+            }
+
+            if (FindVisualDescendant(child, match) is T found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private void InitializeCodeCreatedControls()

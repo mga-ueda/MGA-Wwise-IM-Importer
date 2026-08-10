@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -242,7 +242,7 @@ internal sealed partial class WaveformView
                     WaveformGdiColors.ToDrawing(color)));
             }
 
-            DrawTimedNameLaneWithBackColors(g, wave, playlistLane, items, FontStyle.Bold);
+            DrawTimedNameLaneWithBackColors(g, wave, playlistLane, items, FontStyle.Regular);
         }
 
         if (segmentLane.Height > 0 && _segmentNames.Count > 0)
@@ -1569,7 +1569,7 @@ internal sealed partial class WaveformView
             items.Add(($"{name} (.wav)", part.StartSampleOffset, part.EndSampleOffset));
         }
 
-        DrawTimedNameLane(g, wave, playlistLane, items, FontStyle.Bold, WaveformGdiColors.MusicPlaylistLaneBg);
+        DrawTimedNameLane(g, wave, playlistLane, items, FontStyle.Regular, WaveformGdiColors.MusicPlaylistLaneBg);
     }
 
     /// <summary>

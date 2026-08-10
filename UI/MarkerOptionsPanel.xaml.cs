@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -29,7 +29,6 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         InitializeComponent();
         WireTextEditingFocus(LookAheadTextBox);
         WireTextEditingFocus(PrefetchTextBox);
-        WireTextEditingFocus(DigitsTextBox);
         WireTextEditingFocus(PrefixTextBox);
         WireTextEditingFocus(SuffixTextBox);
         WireTextEditingFocus(JoinerTextBox);
@@ -40,6 +39,8 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         ApplyLocalizedLabels();
         ApplyColors();
         ApplyMoreOptionsVisibility();
+        DigitsValueText.Text = "3";
+        RefreshDigitsStepButtons();
 
         _languageChangedHandler = (_, _) => ApplyLocalizedLabels();
         UiStrings.LanguageChanged += _languageChangedHandler;
@@ -125,12 +126,11 @@ internal sealed partial class MarkerOptionsPanel : UserControl
                 _ => GridDefaultRadio,
             };
             gridRadio.IsChecked = true;
-            DigitsTextBox.Text = settings.CommentDigits <= 0
-                ? string.Empty
-                : Math.Clamp(
+            DigitsValueText.Text = Math.Clamp(
                     settings.CommentDigits,
                     MarkerSettings.CommentDigitsMin,
-                    MarkerSettings.CommentDigitsMax).ToString();
+                    MarkerSettings.CommentDigitsMax)
+                .ToString(System.Globalization.CultureInfo.InvariantCulture);
             ZeroPadCheckBox.IsChecked = settings.CommentZeroPad;
             ResetPerPartCheckBox.IsChecked = settings.CommentResetPerPart;
             PrefixTextBox.Text = settings.CommentPrefix;
@@ -144,6 +144,7 @@ internal sealed partial class MarkerOptionsPanel : UserControl
 
         UpdateDependentStates();
         UpdatePreview();
+        RefreshDigitsStepButtons();
     }
 
     public void BindStreaming(bool streamEnabled, int lookAheadMs, int prefetchLengthMs)
@@ -345,7 +346,9 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         ZeroPadCheckBox.IsEnabled = placementEnabled;
         ResetPerPartCheckBox.IsEnabled = placementEnabled;
 
-        DigitsTextBox.IsReadOnly = !placementEnabled;
+        DigitsMinusButton.IsEnabled = placementEnabled;
+        DigitsPlusButton.IsEnabled = placementEnabled;
+        DigitsSpinner.IsEnabled = placementEnabled;
         LookAheadTextBox.IsReadOnly = !_streamEnabled;
         PrefetchTextBox.IsReadOnly = !_streamEnabled;
         LoudnessGroupBalanceCheckBox.IsEnabled = _layerMusicOptionEnabled;
@@ -374,7 +377,7 @@ internal sealed partial class MarkerOptionsPanel : UserControl
 
         ApplyInputAppearance(LookAheadTextBox, _streamEnabled, optionFore, disabledFore, inputBack);
         ApplyInputAppearance(PrefetchTextBox, _streamEnabled, optionFore, disabledFore, inputBack);
-        ApplyInputAppearance(DigitsTextBox, placementEnabled, optionFore, disabledFore, inputBack);
+        ApplyDigitsSpinnerAppearance(placementEnabled, optionFore, disabledFore, inputBack);
         ApplyInputAppearance(PrefixTextBox, placementEnabled, optionFore, disabledFore, inputBack);
         ApplyInputAppearance(SuffixTextBox, placementEnabled, optionFore, disabledFore, inputBack);
         ApplyInputAppearance(JoinerTextBox, placementEnabled, optionFore, disabledFore, inputBack);
@@ -401,11 +404,83 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         textBox.Cursor = enabled ? Cursors.IBeam : Cursors.Arrow;
     }
 
+    private void ApplyDigitsSpinnerAppearance(
+        bool enabled,
+        Color optionFore,
+        Color disabledFore,
+        Color inputBack)
+    {
+        var fore = UiColors.Brush(enabled ? optionFore : disabledFore);
+        var back = UiColors.Brush(inputBack);
+        var border = UiColors.Brush(UiColors.ForControlBack(UiColors.ChromeBorder));
+        DigitsValueHost.Background = back;
+        DigitsValueHost.BorderBrush = border;
+        DigitsValueText.Foreground = fore;
+        DigitsMinusButton.Background = back;
+        DigitsMinusButton.BorderBrush = border;
+        DigitsMinusGlyph.Foreground = fore;
+        DigitsPlusButton.Background = back;
+        DigitsPlusButton.BorderBrush = border;
+        DigitsPlusGlyph.Foreground = fore;
+        DigitsMinusButton.Cursor = enabled ? Cursors.Hand : Cursors.Arrow;
+        DigitsPlusButton.Cursor = enabled ? Cursors.Hand : Cursors.Arrow;
+        RefreshDigitsStepButtons();
+    }
+
+    private void DigitsMinus_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!_markerPlacementOptionsEnabled || _updating)
+        {
+            return;
+        }
+
+        AdjustDigits(-1);
+        e.Handled = true;
+    }
+
+    private void DigitsPlus_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!_markerPlacementOptionsEnabled || _updating)
+        {
+            return;
+        }
+
+        AdjustDigits(1);
+        e.Handled = true;
+    }
+
+    private void AdjustDigits(int delta)
+    {
+        if (!TryGetDigits(out var digits))
+        {
+            digits = 3;
+        }
+
+        var next = Math.Clamp(
+            digits + delta,
+            MarkerSettings.CommentDigitsMin,
+            MarkerSettings.CommentDigitsMax);
+        DigitsValueText.Text = next.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        RefreshDigitsStepButtons();
+        OnUiChanged();
+    }
+
+    private void RefreshDigitsStepButtons()
+    {
+        if (!TryGetDigits(out var digits))
+        {
+            digits = 3;
+        }
+
+        var enabled = _markerPlacementOptionsEnabled;
+        DigitsMinusButton.IsEnabled = enabled && digits > MarkerSettings.CommentDigitsMin;
+        DigitsPlusButton.IsEnabled = enabled && digits < MarkerSettings.CommentDigitsMax;
+        DigitsMinusButton.Opacity = DigitsMinusButton.IsEnabled ? 1d : 0.45d;
+        DigitsPlusButton.Opacity = DigitsPlusButton.IsEnabled ? 1d : 0.45d;
+    }
+
     private void StreamMsPreviewTextInput(object sender, TextCompositionEventArgs e) =>
         e.Handled = !DigitsOnlyRegex.IsMatch(e.Text);
-
-    private void DigitsPreviewTextInput(object sender, TextCompositionEventArgs e) =>
-        e.Handled = e.Text.Length > 0 && (e.Text[0] < '0' || e.Text[0] > '6');
 
     private void StreamMsTextBox_LostFocus(object sender, RoutedEventArgs e)
     {
@@ -495,22 +570,14 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         return false;
     }
 
-    private bool TryGetDigits(out int digits)
-    {
-        if (string.IsNullOrWhiteSpace(DigitsTextBox.Text))
-        {
-            digits = 0;
-            return true;
-        }
-
-        return int.TryParse(
-                DigitsTextBox.Text,
-                System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out digits)
-            && digits >= MarkerSettings.CommentDigitsMin
-            && digits <= MarkerSettings.CommentDigitsMax;
-    }
+    private bool TryGetDigits(out int digits) =>
+        int.TryParse(
+            DigitsValueText.Text,
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out digits)
+        && digits >= MarkerSettings.CommentDigitsMin
+        && digits <= MarkerSettings.CommentDigitsMax;
 
     private void ApplyTips()
     {
@@ -531,7 +598,10 @@ internal sealed partial class MarkerOptionsPanel : UserControl
         TipService.Set(GridBeatRadio, UiStrings.TipMarkerGridBeat);
         TipService.Set(CommentHeader, UiStrings.TipMarkerCommentHeader);
         TipService.Set(DigitsLabel, UiStrings.TipCommentDigits);
-        TipService.Set(DigitsTextBox, UiStrings.TipCommentDigitsBox);
+        TipService.Set(DigitsSpinner, UiStrings.TipCommentDigitsBox);
+        TipService.Set(DigitsMinusButton, UiStrings.TipCommentDigitsBox);
+        TipService.Set(DigitsPlusButton, UiStrings.TipCommentDigitsBox);
+        TipService.Set(DigitsValueHost, UiStrings.TipCommentDigitsBox);
         TipService.Set(ZeroPadCheckBox, UiStrings.TipCommentZeroPad);
         TipService.Set(ResetPerPartCheckBox, UiStrings.TipCommentResetPerPart);
         TipService.Set(PrefixLabel, UiStrings.TipCommentPrefix);
@@ -623,7 +693,6 @@ internal sealed partial class MarkerOptionsPanel : UserControl
     {
         yield return LookAheadTextBox;
         yield return PrefetchTextBox;
-        yield return DigitsTextBox;
         yield return PrefixTextBox;
         yield return SuffixTextBox;
         yield return JoinerTextBox;

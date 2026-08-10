@@ -367,7 +367,7 @@
                                    FontSize="11.333"
                                    Foreground="{StaticResource PlaylistDefaultForeBrush}" />
 
-            <Grid>
+            <Grid x:Name="logEditorHost" SizeChanged="LogEditorHost_SizeChanged">
               <ui:ShortcutForwardingRichTextBox x:Name="editorTextBox"
                                                 AllowDrop="True"
                                                 IsReadOnly="True"
@@ -376,18 +376,18 @@
                                                 Foreground="{StaticResource LogDefaultBrush}"
                                                 VerticalScrollBarVisibility="Auto"
                                                 HorizontalScrollBarVisibility="Disabled" />
+
+              <!-- ログ本文の上へ右下寄せで重ねる（rootDockPanel 内なのですりガラスの下に入る） -->
               <Border x:Name="logButtonPanel"
+                      Panel.ZIndex="1"
                       HorizontalAlignment="Right"
                       VerticalAlignment="Bottom"
-                      Height="30"
-                      Width="82"
-                      Padding="2,4,2,0"
+                      Padding="2,2,2,0"
+                      Margin="0,0,8,0"
                       Background="{StaticResource LogBackBrush}">
                 <StackPanel x:Name="logButtonHost"
                             Orientation="Horizontal"
-                            FlowDirection="RightToLeft">
-                  <!-- logClearButton, logCopyButton, logDownloadButton inserted in code-behind -->
-                </StackPanel>
+                            FlowDirection="RightToLeft" />
               </Border>
             </Grid>
           </DockPanel>

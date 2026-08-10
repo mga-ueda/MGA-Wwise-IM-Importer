@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -172,7 +172,7 @@ internal partial class AudioSettingsWindow : Window
         const double textMargin = 8; // 文字右のわずかな余白
         const double dropDownItemPadX = 16; // DarkComboBoxItemStyle Padding L+R
         var pad = combo.Padding;
-        var fontSize = combo.FontSize > 0 ? combo.FontSize : 12;
+        var fontSize = combo.FontSize > 0 ? combo.FontSize : 11.333;
         var maxText = 0d;
         foreach (var item in combo.Items)
         {
@@ -371,7 +371,8 @@ internal partial class AudioSettingsWindow : Window
     }
 
     private void ExpectedNumber_PreviewTextInput(object sender, TextCompositionEventArgs e) =>
-        e.Handled = !DigitsOnly.IsMatch(e.Text);
+        // DigitsOnly は非数字にマッチ。マッチしたら拒否（Handled）。判定を逆にすると数字が一切入らない。
+        e.Handled = e.Text.Length == 0 || DigitsOnly.IsMatch(e.Text);
 
     private void ExpectedNumber_LostFocus(object sender, RoutedEventArgs e)
     {

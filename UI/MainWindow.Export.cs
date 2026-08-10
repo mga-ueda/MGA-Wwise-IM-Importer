@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using MgaWwiseIMImporter.Wwise;
 
 namespace MgaWwiseIMImporter.UI;
@@ -632,28 +632,19 @@ public partial class MainWindow
         RefreshUiInteractionEnabled();
     }
 
-    /// <summary>WAAPI ステータスバーを除いたクライアント領域。</summary>
+    /// <summary>クライアント領域全体（WAAPI ステータスバー含む）。</summary>
     private Rect GetBusyGlassCoverBounds()
     {
         var host = rootChromeGrid;
-        var width = Math.Max(0, host.ActualWidth);
-        var statusHeight = waapiStatusBar.ActualHeight;
-        if (statusHeight <= 0)
-        {
-            statusHeight = waapiStatusBar.DesiredSize.Height;
-        }
-
-        var height = host.ActualHeight - statusHeight;
-        if (height <= 0)
-        {
-            height = Math.Max(0, host.ActualHeight);
-        }
-
-        return new Rect(0, 0, width, height);
+        return new Rect(
+            0,
+            0,
+            Math.Max(0, host.ActualWidth),
+            Math.Max(0, host.ActualHeight));
     }
 
     /// <summary>
-    /// 書き出し／読み込み中はコントロールを無効化し、WAAPI ステータスバーを除く全体を
+    /// 書き出し／読み込み中はコントロールを無効化し、クライアント全体（ステータスバー含む）を
     /// すりガラスで覆ってマウス操作を遮断する。解除は短いフェードで行う。
     /// </summary>
     private void UpdateBusyGlassOverlay()
@@ -677,7 +668,9 @@ public partial class MainWindow
             }
             else
             {
+                // ボタンは畳まず rootDockPanel 内に残し、フロストに含めてすりガラスの下に見せる
                 rootChromeGrid.UpdateLayout();
+                PositionLogButtons();
                 rootDockPanel.UpdateLayout();
                 _exportOverlay.ShowOverlay(
                     rootChromeGrid,
@@ -711,5 +704,12 @@ public partial class MainWindow
         clearButton.IsEnabled = !busy;
         projectNameComboBox.IsEnabled = !busy;
         transportBar.IsEnabled = !busy;
+        // ログボタンは常時表示（すりガラスより下のレイヤ）。ヒットはオーバーレイ側が受ける。
+        logButtonPanel.Visibility = Visibility.Visible;
+        logButtonPanel.IsHitTestVisible = !busy;
+        if (!busy)
+        {
+            PositionLogButtons();
+        }
     }
 }

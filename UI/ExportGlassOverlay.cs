@@ -7,7 +7,7 @@ using System.Windows.Threading;
 namespace MgaWwiseIMImporter.UI;
 
 /// <summary>
-/// 書き出し／読み込み中にフォームのクライアント領域（WAAPI ステータスバーを除く）を覆うすりガラス。
+/// 書き出し／読み込み中にフォームのクライアント領域（WAAPI ステータスバー含む）を覆うすりガラス。
 /// </summary>
 internal sealed class ExportGlassOverlay : FrameworkElement
 {
@@ -29,6 +29,9 @@ internal sealed class ExportGlassOverlay : FrameworkElement
     private float _fadeStartOpacity = 1f;
     private float _paintOpacity = 1f;
     private Panel? _host;
+
+    /// <summary>完全に非表示になったとき（フェード終了／即時 Hide）。</summary>
+    public event Action? Hidden;
 
     public ExportGlassOverlay()
     {
@@ -138,6 +141,7 @@ internal sealed class ExportGlassOverlay : FrameworkElement
 
     public void HideOverlay()
     {
+        var wasVisible = Visibility == Visibility.Visible;
         CancelFade();
         _dotsTimer.Stop();
         _paintOpacity = 1f;
@@ -150,6 +154,10 @@ internal sealed class ExportGlassOverlay : FrameworkElement
 
         _host = null;
         InvalidateVisual();
+        if (wasVisible)
+        {
+            Hidden?.Invoke();
+        }
     }
 
     protected override void OnRender(DrawingContext dc)
@@ -200,9 +208,16 @@ internal sealed class ExportGlassOverlay : FrameworkElement
         {
             _host?.Children.Remove(this);
             _host = host;
-            host.Children.Add(this);
         }
 
+        // 常に末尾へ載せ直し、他子より前面に描画する
+        if (host.Children.Contains(this))
+        {
+            host.Children.Remove(this);
+        }
+
+        host.Children.Add(this);
+        Panel.SetZIndex(this, int.MaxValue);
         ApplyBounds(coverBounds);
     }
 

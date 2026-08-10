@@ -104,77 +104,131 @@
                                FontWeight="Bold"
                                FontSize="11.333" />
         <Grid Grid.Row="1">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" MinWidth="120" />
-            <ColumnDefinition Width="*" />
-          </Grid.ColumnDefinitions>
-          <Grid Grid.Column="0" Margin="{x:Static ui:DesignMetrics.MarkerOptionsContentMargin}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+          </Grid.RowDefinitions>
+          <Grid Grid.Row="0">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" MinWidth="120" />
+              <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="DigitsLabel" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
-            <TextBox x:Name="DigitsTextBox" Grid.Row="0" Grid.Column="1" Width="46" MaxLength="1"
-                     Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
-                     Padding="2,0" FontSize="11.333"
-                     VerticalContentAlignment="Center"
-                     HorizontalContentAlignment="Center"
-                     TextChanged="MarkerUiChanged" PreviewTextInput="DigitsPreviewTextInput" />
-            <!-- 親 Grid が既に S(12) インデント済み。WinForms 同様追加 Margin は付けない -->
-            <ui:FlatOptionCheckBox x:Name="ZeroPadCheckBox"
-                                   Grid.Row="1"
-                                   Grid.ColumnSpan="2"
-                                   Margin="0"
-                                   FontSize="11.333"
-                                   Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
-                                   Checked="MarkerUiChanged"
-                                   Unchecked="MarkerUiChanged" />
-            <ui:FlatOptionCheckBox x:Name="ResetPerPartCheckBox"
-                                   Grid.Row="2"
-                                   Grid.ColumnSpan="2"
-                                   Margin="0"
-                                   FontSize="11.333"
-                                   Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
-                                   Checked="MarkerUiChanged"
-                                   Unchecked="MarkerUiChanged" />
-            <TextBlock x:Name="PreviewLabel" Grid.Row="3" Grid.ColumnSpan="2" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <Grid Grid.Column="0" Margin="{x:Static ui:DesignMetrics.MarkerOptionsContentMargin}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+                <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+                <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+              </Grid.RowDefinitions>
+              <TextBlock x:Name="DigitsLabel" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <!-- 0～6 を +/- で増減（既定 3）。手入力 TextBox はやめる -->
+              <StackPanel x:Name="DigitsSpinner"
+                          Grid.Row="0"
+                          Grid.Column="1"
+                          Orientation="Horizontal"
+                          VerticalAlignment="Center">
+                <Border x:Name="DigitsMinusButton"
+                        Width="20"
+                        Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                        Cursor="Hand"
+                        Background="{StaticResource DialogInputBackBrush}"
+                        BorderBrush="{StaticResource ChromeBorderBrush}"
+                        BorderThickness="1"
+                        Margin="0,0,2,0"
+                        MouseLeftButtonUp="DigitsMinus_Click">
+                  <TextBlock x:Name="DigitsMinusGlyph"
+                             Text="−"
+                             FontSize="12"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center" />
+                </Border>
+                <Border x:Name="DigitsValueHost"
+                        Width="28"
+                        Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                        Background="{StaticResource DialogInputBackBrush}"
+                        BorderBrush="{StaticResource ChromeBorderBrush}"
+                        BorderThickness="1">
+                  <TextBlock x:Name="DigitsValueText"
+                             Text="3"
+                             FontSize="11.333"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center" />
+                </Border>
+                <Border x:Name="DigitsPlusButton"
+                        Width="20"
+                        Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                        Cursor="Hand"
+                        Background="{StaticResource DialogInputBackBrush}"
+                        BorderBrush="{StaticResource ChromeBorderBrush}"
+                        BorderThickness="1"
+                        Margin="2,0,0,0"
+                        MouseLeftButtonUp="DigitsPlus_Click">
+                  <TextBlock x:Name="DigitsPlusGlyph"
+                             Text="+"
+                             FontSize="12"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center" />
+                </Border>
+              </StackPanel>
+              <!-- 親 Grid が既に S(12) インデント済み。WinForms 同様追加 Margin は付けない -->
+              <ui:FlatOptionCheckBox x:Name="ZeroPadCheckBox"
+                                     Grid.Row="1"
+                                     Grid.ColumnSpan="2"
+                                     Margin="0"
+                                     FontSize="11.333"
+                                     Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                                     Checked="MarkerUiChanged"
+                                     Unchecked="MarkerUiChanged" />
+              <ui:FlatOptionCheckBox x:Name="ResetPerPartCheckBox"
+                                     Grid.Row="2"
+                                     Grid.ColumnSpan="2"
+                                     Margin="0"
+                                     FontSize="11.333"
+                                     Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                                     Checked="MarkerUiChanged"
+                                     Unchecked="MarkerUiChanged" />
+            </Grid>
+            <!-- col3PadL = S(12)。帯下の Prefix 列 -->
+            <Grid Grid.Column="1" Margin="{x:Static ui:DesignMetrics.MarkerOptionsContentMargin}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+                <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+                <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
+              </Grid.RowDefinitions>
+              <TextBlock x:Name="PrefixLabel" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox x:Name="PrefixTextBox" Grid.Row="0" Grid.Column="1" Width="48"
+                       Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                       Padding="2,0" FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       HorizontalContentAlignment="Center" TextChanged="MarkerUiChanged" />
+              <TextBlock x:Name="SuffixLabel" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox x:Name="SuffixTextBox" Grid.Row="1" Grid.Column="1" Width="48"
+                       Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                       Padding="2,0" FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       HorizontalContentAlignment="Center" TextChanged="MarkerUiChanged" />
+              <TextBlock x:Name="JoinerLabel" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox x:Name="JoinerTextBox" Grid.Row="2" Grid.Column="1" Width="48"
+                       Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
+                       Padding="2,0" FontSize="11.333"
+                       VerticalContentAlignment="Center"
+                       HorizontalContentAlignment="Center" TextChanged="MarkerUiChanged" />
+            </Grid>
           </Grid>
-          <!-- col3PadL = S(12)。帯下の Prefix 列 -->
-          <Grid Grid.Column="1" Margin="{x:Static ui:DesignMetrics.MarkerOptionsContentMargin}">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-              <RowDefinition Height="{x:Static ui:DesignMetrics.MarkerRowPitchGrid}" />
-            </Grid.RowDefinitions>
-            <TextBlock x:Name="PrefixLabel" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <TextBox x:Name="PrefixTextBox" Grid.Row="0" Grid.Column="1" Width="48"
-                     Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
-                     Padding="2,0" FontSize="11.333"
-                     VerticalContentAlignment="Center"
-                     HorizontalContentAlignment="Center" TextChanged="MarkerUiChanged" />
-            <TextBlock x:Name="SuffixLabel" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <TextBox x:Name="SuffixTextBox" Grid.Row="1" Grid.Column="1" Width="48"
-                     Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
-                     Padding="2,0" FontSize="11.333"
-                     VerticalContentAlignment="Center"
-                     HorizontalContentAlignment="Center" TextChanged="MarkerUiChanged" />
-            <TextBlock x:Name="JoinerLabel" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <TextBox x:Name="JoinerTextBox" Grid.Row="2" Grid.Column="1" Width="48"
-                     Height="{x:Static ui:DesignMetrics.FlatOptionRowHeight}"
-                     Padding="2,0" FontSize="11.333"
-                     VerticalContentAlignment="Center"
-                     HorizontalContentAlignment="Center" TextChanged="MarkerUiChanged" />
-          </Grid>
+          <!-- 長いエラー文が左列 Auto 幅を押し広げないよう、Digits/Prefix 列の外（全幅）に置く -->
+          <TextBlock x:Name="PreviewLabel"
+                     Grid.Row="1"
+                     Margin="{x:Static ui:DesignMetrics.MarkerOptionsContentMargin}"
+                     VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis"
+                     TextWrapping="NoWrap" />
         </Grid>
       </Grid>
 

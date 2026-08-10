@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 
 namespace MgaWwiseIMImporter.UI;
 
@@ -157,8 +157,11 @@ public static class DesignMetrics
     /// </summary>
     public static double AudioFieldWidth => Dip(336);
 
-    /// <summary>AudioSettings expected box D(120)。</summary>
-    public static double AudioExpectedBoxWidth => Dip(120);
+    /// <summary>
+    /// AudioSettings 数値欄幅。本体 MarkerOptions の 48 系に近く、Sample Rate 6 桁＋余白。
+    /// 旧 D(120)(=80 DIP) は本体より明らかに広かった。
+    /// </summary>
+    public static double AudioExpectedBoxWidth => From96(56);
 
     /// <summary>ColumnDefinition 用（Width は GridLength）。</summary>
     public static GridLength AudioExpectedBoxWidthGrid => new(AudioExpectedBoxWidth);
@@ -171,9 +174,9 @@ public static class DesignMetrics
 
     /// <summary>
     /// 設定ダイアログの Combo / 数値欄の高さ。
-    /// FlatOptionRowHeight(20) だと Yu Gothic + Padding で文字が欠けるため 28@96 を使う。
+    /// 本体 FlatOption / MarkerOptions と同じ（WinForms も RowHeightDesign 30）。
     /// </summary>
-    public static double AudioInputHeight => From96(28);
+    public static double AudioInputHeight => FlatOptionRowHeight;
 
     public static GridLength AudioInputHeightGrid => new(AudioInputHeight);
 
