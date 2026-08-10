@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -337,6 +337,9 @@ public partial class MainWindow
         UpdateWaveOnlyExitSourceOptionsEnabled();
         RefreshPlaylistButtons();
         UpdateNavigationAvailability();
+        // SetPreview が ClearPlayhead するため、読み込み直後は冒頭にシークバーを出す（Form1 同等）
+        SeekPlayback(0);
+        transportBar.SetPosition(ResolvePositionInfo(0));
         UpdateExportEnabled();
         reloadButton.IsEnabled = _lastInputFiles.Count > 0 || _lastWavePaths.Count > 0;
         // パスとセッションをプロジェクト設定へ残す（Keep Last Session）

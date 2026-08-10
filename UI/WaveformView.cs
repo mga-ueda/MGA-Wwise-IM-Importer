@@ -1,4 +1,4 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -1589,13 +1589,16 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         AdjustAmpZoom(factor);
     }
 
+    /// <summary>
+    /// 上下キー／Ctrl+上下の時間ズーム基準。
+    /// 常にシーク（再生ヘッド）位置を使う。表示外でもビュー中央へ落とさない
+    /// （ホイールでマウス付近へ寄ったあとに上下キーすると、中央基準に見えてしまうため）。
+    /// </summary>
     private double AnchorProgressForKeyboardZoom()
     {
-        if (_playheadProgress is double playhead
-            && playhead >= _viewStart
-            && playhead <= ViewEnd)
+        if (_playheadProgress is double playhead)
         {
-            return playhead;
+            return Math.Clamp(playhead, 0d, 1d);
         }
 
         return _viewStart + ViewSpan * 0.5d;
@@ -1703,9 +1706,15 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
 
         zoom = Math.Clamp(zoom, TimeZoomMin, TimeZoomMax);
         var oldSpan = ViewSpan;
-        var rel = oldSpan > 1e-12
-            ? Math.Clamp((anchorAbsolute - _viewStart) / oldSpan, 0d, 1d)
-            : 0.5d;
+        // 表示内なら画面上の相対位置を維持。表示外（キーボードでシークが外にあるとき）は
+        // アンカーを中央に据えてから拡縮する。
+        var inView = anchorAbsolute >= _viewStart - 1e-12
+            && anchorAbsolute <= ViewEnd + 1e-12;
+        var rel = !inView
+            ? 0.5d
+            : oldSpan > 1e-12
+                ? Math.Clamp((anchorAbsolute - _viewStart) / oldSpan, 0d, 1d)
+                : 0.5d;
         _timeZoom = zoom;
         _viewStart = anchorAbsolute - rel * ViewSpan;
         ClampTimeViewWindow();
