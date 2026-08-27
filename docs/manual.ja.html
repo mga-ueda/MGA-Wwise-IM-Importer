@@ -116,8 +116,8 @@
         <p><strong>Nuendo／Cubase を使っていなくても大丈夫です。</strong> Logic などマーカーを付けられる DAW で書き出した WAV（埋め込みマーカー）でも十分な手間軽減になります。さらに本アプリ自体にマーカーの付与やループ用マーカーのペア移動機能があり、<strong>波形エディタすら必須ではありません</strong>。レイヤーミュージックでは、何レイヤーあっても、ループポイントの処理は 1 レイヤーに対して作業するだけで、自動的に他のレイヤーへ反映されます。</p>
         <p><strong>Nuendo／Cubase があると非常に強力です。</strong> マーカートラックをエクスポートした XML があれば、テンポ・小節・拍子情報を最大限に活かせます。マーカーやサイクルも波形上に「塗る」ように打つことができ、Entry／Exit／ループ設計を視覚的に進められます。</p>
         <p><strong>横方向と縦方向の推移を、混在したまま扱えます。</strong> インタラクティブミュージックの推移には、曲から曲へ切り替えるクロスフェードタイプ（横方向）と、レイヤーを重ねるタイプ（縦方向）があります。さらに縦方向には、再生位置を保ったままクロスフェードで曲を差し替えるレイヤー切替タイプと、鳴っている曲にパートを重ねていくアッドレイヤータイプの 2 種類があります。これらのアセットが 1 つのプロジェクトに混じっていても、分け隔てなく同時に推移をプレビューでき、そのまままとめて Wwise へ実装できます。</p>
-        <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立て、EXPORT では切り出しと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せる仕様です。ソース WAV へゲインやフェードは焼き込みません。</p>
-        <p><strong>実装は WAAPI ＋ 独自処理の組み合わせです。</strong> Wwise の遠隔操作（WAAPI）に加えて、WAV の切り出し・ラウドネス計測・フェードのプロパティ変換などをアプリ側の独自処理で補っているため、WAAPI を呼ぶだけの自動実装ツールでは実現できない実装まで踏み込めます。具体的には次のようなことができます。</p>
+        <p><strong>Wwise に実装したデータをマスター波形として扱う</strong>想定です。ワンショット部とループ部をあらかじめ別ファイルにセパレートせず、1 本のマスター上で構造を非破壊に組み立てます。EXPORT では元 WAV を Originals へコピーし、区間は MusicClip のトリムと Wwise プロパティ（MusicClip Fade／MusicFade／Make-Up Gain／Cue など）へ載せます。ソース WAV へゲインやフェードは焼き込みません。</p>
+        <p><strong>実装は WAAPI ＋ 独自処理の組み合わせです。</strong> Wwise の遠隔操作（WAAPI）に加えて、MusicClip トリム・ラウドネス計測・フェードのプロパティ変換などをアプリ側の独自処理で補っているため、WAAPI を呼ぶだけの自動実装ツールでは実現できない実装まで踏み込めます。具体的には次のようなことができます。</p>
         <ul>
           <li>曲から曲への切り替えを、抜けタイミングやフェードの入り／抜け、ループ後のワンショット有無などを変えながら、実際に聴いてプレビューできます</li>
           <li>複数の曲をグループにまとめて縦に重ね、上乗せ再生や、レイヤー同士をクロスフェードで差し替える切替も確認できます</li>
@@ -134,7 +134,7 @@
         <li><strong>素材を用意する</strong> …… 曲の WAV（必要なら XML やマーカーも）。→ <a href="#prepare">4 章</a></li>
         <li><strong>アプリへドロップする</strong> …… ファイルの組み合わせでモードは自動判定されます。切り替え操作は不要です。→ <a href="#load">5 章</a></li>
         <li><strong>聴きながら調整する</strong> …… ループ位置・曲間の遷移・フェード・縦レイヤーを波形上で確認します。</li>
-        <li><strong><span class="ui">EXPORT</span> を押す</strong> …… WAV の切り出しと Wwise 上の構造作成が自動で行われます。→ <a href="#wwise-prep">6 章</a></li>
+        <li><strong><span class="ui">EXPORT</span> を押す</strong> …… 元 WAV のコピーと Wwise 上の構造作成が自動で行われます。→ <a href="#wwise-prep">6 章</a></li>
       </ol>
       <p>本マニュアルには Wwise の用語がいくつか登場します。最低限、次だけ押さえれば読み進められます。</p>
       <table>
@@ -161,7 +161,7 @@
         <li><strong>WAV を 1 本ドラッグ＆ドロップする</strong><br />ログに <code>=== Wave 単体モード ===</code> と表示され、波形が出ます。<kbd>Space</kbd> で再生できます。</li>
         <li><strong>（ループさせたい場合）マーカーを 2 本打つ</strong><br />波形をクリックしてループ開始位置へシークし、<kbd>Insert</kbd> でマーカーを追加。ループ終了位置でも同様に追加します。<strong>マーカーがちょうど 2 本なら、その間が自動でループ区間になります</strong>（先頭〜1 本目はイントロ、2 本目〜末尾は余韻として扱われます）。マーカーは ▼ のドラッグで微調整できます。</li>
         <li><strong>聴いて確認する</strong><br /><kbd>Space</kbd> で再生するとループ区間は無限ループします。<kbd>L</kbd> でループエンドの少し手前（1 小節前。小節管理がないときは 3 秒前）へジャンプできるので、つなぎ目の確認に便利です。位置が気になったらマーカーを動かして詰めます。</li>
-        <li><strong><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）</strong><br />切り出した WAV が書き出しパスへ保存され、Wwise 側に Music Playlist Container 一式が自動生成されます。Wwise 側で再生して確認してみてください。</li>
+        <li><strong><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）</strong><br />元 WAV が書き出しパスへコピーされ、Wwise 側に Music Playlist Container 一式が自動生成されます。Wwise 側で再生して確認してみてください。</li>
       </ol>
       <div class="note">
         <p><span class="ui">EXPORT</span> ボタンが押せないときは、ログの <code>=== Export Preflight ===</code> に理由（未接続・作成先未選択・書き出し先が Originals 配下でない、など）が出ています。→ <a href="#troubleshooting">15 章</a></p>
@@ -202,7 +202,7 @@
         <li><strong>他の DAW を使っている</strong> → 方式 B。マーカー付き WAV を書き出すだけで、ループ設計を持ち込めます。</li>
         <li><strong>すでにループ加工済みの曲ファイルがたくさんある</strong> → 方式 C の複数波形モード。まとめてドロップして一括で Wwise に実装できます。</li>
       </ul>
-      <p>なお、マーカーが全く無い WAV でも読み込めます。その場合はアプリ内でループマーカーを打つことになり、手順としては波形エディタでループを打ち込む作業と大差なくなりますが、それでも切り出し・Wwise 実装は自動化され、ループ位置も取りやすい設計です。可能であれば、マーカーを含めた書き出し（方式 B）までは済ませておくことをおすすめします。</p>
+      <p>なお、マーカーが全く無い WAV でも読み込めます。その場合はアプリ内でループマーカーを打つことになり、手順としては波形エディタでループを打ち込む作業と大差なくなりますが、それでも Wwise 実装は自動化され、ループ位置も取りやすい設計です。可能であれば、マーカーを含めた書き出し（方式 B）までは済ませておくことをおすすめします。</p>
       <div class="note">
         <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）と <strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）は読み込みエラーになります。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
       </div>
@@ -380,7 +380,7 @@
       <h3>6-2. 作成先と書き出しパス</h3>
       <ul>
         <li><strong>作成先</strong> …… Wwise の Project Explorer で、生成物を置きたいオブジェクト（<span class="ui">Interactive Music Hierarchy</span> の Work Unit や Virtual Folder など）をクリックして選択します。本アプリは「Wwise 上でいま選択されているオブジェクト」を作成先として使います。毎回選び直すのが煩わしい場合は、WAAPI ステータスバーの <span class="ui">Keep Target</span> で固定できます。</li>
-        <li><strong>書き出しパス</strong> …… プロジェクトバーで、切り出した WAV の保存先を指定します。<strong>接続中の Wwise プロジェクトの <code>Originals</code> フォルダ配下</strong>である必要があります（例: <code>&lt;プロジェクト&gt;\Originals\Music\IM-Importer</code>）。Wwise がソース WAV を参照できる場所に置くためです。</li>
+        <li><strong>書き出しパス</strong> …… プロジェクトバーで、元 WAV のコピー先を指定します。<strong>接続中の Wwise プロジェクトの <code>Originals</code> フォルダ配下</strong>である必要があります（例: <code>&lt;プロジェクト&gt;\Originals\Music\IM-Importer</code>）。Wwise がソース WAV を参照できる場所に置くためです。</li>
       </ul>
 
       <h3>6-3. EXPORT の手順</h3>
@@ -413,7 +413,7 @@
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
         <tbody>
           <tr><td class="ui">プロジェクト名</td><td>選択と名前編集。末尾 <code>+ New Project</code> で新規。変更は自動保存。</td></tr>
-          <tr><td class="ui">書き出しパス／フォルダ</td><td>分割 WAV の書き出し先（Originals 配下）。</td></tr>
+          <tr><td class="ui">書き出しパス／フォルダ</td><td>元 WAV のコピー先（Originals 配下）。</td></tr>
           <tr><td class="ui">Keep Last Session</td><td>既定オン。起動時／プロジェクト復帰時に最後のセッションを復元。</td></tr>
           <tr><td class="ui">Always on Top</td><td>最前面固定（既定オフ）。</td></tr>
           <tr><td class="ui">JP／EN</td><td>表示言語。マニュアルもこの設定に合わせて開きます。</td></tr>
@@ -492,14 +492,14 @@
         <tbody>
           <tr><td class="ui">CLEAR</td><td>波形・セッション・ログをクリアし、プロジェクト設定をアプリ既定へ。書き出し先・Keep Target・Always on Top・Stream／Look-ahead／Prefetch／Keep Layer Balance（アプリ設定）は維持。</td></tr>
           <tr><td class="ui">RELOAD</td><td>最後の WAV／XML をディスクから再読み込み。更新された波形を取り込みつつ、グループ／フェード等の現状作業を可能な範囲で維持。内容が大きく変わっている場合はおかしくなることがあるので、手動ドロップでやり直してください。</td></tr>
-          <tr><td class="ui">EXPORT</td><td>分割 WAV 書き出し＋Wwise 登録。</td></tr>
+          <tr><td class="ui">EXPORT</td><td>元 WAV を Originals へコピーし、Wwise へ登録。</td></tr>
           <tr><td class="ui">Keep Target</td><td>作成先固定（WAAPI ステータスバー）。プロジェクト名リンクまたは <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> で Wwise を開く／前面化。</td></tr>
           <tr><td class="ui">Auto Active</td><td>既定オン（WAAPI ステータスバー）。EXPORT 後に Wwise を前面化。</td></tr>
         </tbody>
       </table>
 
       <h2 id="export">13. EXPORT と Wwise に作られるもの</h2>
-      <p><strong>Wwise 上の Interactive Music 実装をマスターとして扱う</strong>想定です。ワンショットとループをあらかじめ別 WAV に分けず、マスター波形上の構造を非破壊で組み立てます。書き出し WAV は範囲の<strong>切り出しのみ</strong>で、フェード・レイヤーバランス・Cue は Wwise プロパティへ設定します（ソースへ焼き込みません）。</p>
+      <p><strong>Wwise 上の Interactive Music 実装をマスターとして扱う</strong>想定です。ワンショットとループをあらかじめ別 WAV に分けず、マスター波形上の構造を非破壊で組み立てます。書き出しは元 WAV の<strong>コピーと MusicClip トリム</strong>のみで、フェード・レイヤーバランス・Cue は Wwise プロパティへ設定します（ソースへ焼き込みません）。</p>
       <ul>
         <li>パートまたはグループ 1 つ → Music Playlist Container 1 つ</li>
         <li>Playlist が 2 つ以上 → Music Switch Container ＋ 同名 State Group</li>

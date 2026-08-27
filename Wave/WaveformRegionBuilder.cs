@@ -340,7 +340,10 @@ internal static class WaveformRegionBuilder
                 number,
                 start,
                 runEnd,
-                $"{baseName}_{number}.wav"));
+                $"{baseName}_{number}.wav",
+                SourcePath: sourcePath,
+                LocalStartSample: start,
+                LocalEndSample: runEnd));
             number++;
             runStart = null;
         }
@@ -362,6 +365,17 @@ internal static class WaveformRegionBuilder
         }
 
         Flush();
+
+        // 1 パートならドロップ名を維持（複数波形と同じ。区間は Clip trim）。
+        if (parts.Count == 1)
+        {
+            var originalName = Path.GetFileName(sourcePath);
+            if (!string.IsNullOrEmpty(originalName))
+            {
+                parts[0] = parts[0] with { FileName = originalName };
+            }
+        }
+
         return parts;
     }
 

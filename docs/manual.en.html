@@ -116,8 +116,8 @@
         <p><strong>You do not need Nuendo / Cubase.</strong> A WAV with markers from Logic or another DAW that can place markers already saves a lot of work. This app can also add markers and move loop-marker pairs itself—so <strong>a dedicated waveform editor is often unnecessary</strong>. With layered music, no matter how many layers you have, you only need to work the loop points on one layer — the edits carry over to the other layers automatically.</p>
         <p><strong>With Nuendo / Cubase, it is especially powerful.</strong> Export a marker-track XML and you get the most out of tempo, bar, and time-signature data. Markers and cycles can be placed on the waveform as if painting them on, so Entry / Exit / loop design stays visual.</p>
         <p><strong>Horizontal and vertical transitions can be mixed freely.</strong> Interactive music transitions come in two directions: the crossfade type (horizontal — switching from one piece to another) and the layered type (vertical). The vertical kind further splits into layer switching — crossfading to another piece while keeping the playback position — and additive layering, which stacks extra parts on top of what is already playing. Even when these assets coexist in one project, you can preview their transitions together, with no distinction between them, and implement them into Wwise in one pass.</p>
-        <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
-        <p><strong>Implementation combines WAAPI with the app's own processing.</strong> On top of remote-controlling Wwise through WAAPI, the app handles WAV cutting, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:</p>
+        <p>The workflow assumes <strong>the Interactive Music data in Wwise is the master</strong>. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively. EXPORT copies the source WAV into Originals and maps ranges with MusicClip trim plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.</p>
+        <p><strong>Implementation combines WAAPI with the app's own processing.</strong> On top of remote-controlling Wwise through WAAPI, the app handles MusicClip trim, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:</p>
         <ul>
           <li>Preview switches from one piece to another by ear while trying exit timing, fade in/out, and whether a one-shot still plays after a loop</li>
           <li>Group pieces into vertical layers and check stacking parts on top of each other, as well as crossfading when swapping layers</li>
@@ -134,7 +134,7 @@
         <li><strong>Prepare your material</strong> — the WAV of your piece (plus an XML or markers if you have them). → <a href="#prepare">Chapter 4</a></li>
         <li><strong>Drop it onto the app</strong> — the mode is chosen automatically from the file combination; there is nothing to switch. → <a href="#load">Chapter 5</a></li>
         <li><strong>Listen and adjust</strong> — check loop points, transitions between pieces, fades, and vertical layers right on the waveform.</li>
-        <li><strong>Press <span class="ui">EXPORT</span></strong> — WAV cutting and the Wwise structure are created automatically. → <a href="#wwise-prep">Chapter 6</a></li>
+        <li><strong>Press <span class="ui">EXPORT</span></strong> — the source WAV is copied and the Wwise structure is created automatically. → <a href="#wwise-prep">Chapter 6</a></li>
       </ol>
       <p>This manual uses a few Wwise terms. Knowing just these is enough to follow along.</p>
       <table>
@@ -161,7 +161,7 @@
         <li><strong>Drag and drop one WAV</strong><br />The log shows <code>=== Wave-only mode ===</code> and the waveform appears. <kbd>Space</kbd> plays it.</li>
         <li><strong>(To loop it) place two markers</strong><br />Click the waveform to seek to the loop start and press <kbd>Insert</kbd> to add a marker; do the same at the loop end. <strong>With exactly two markers, the span between them automatically becomes the loop</strong> (before the first marker = intro, after the second = tail). Drag the ▼ handles to fine-tune.</li>
         <li><strong>Listen</strong><br />Press <kbd>Space</kbd>; the loop region repeats endlessly. Press <kbd>L</kbd> to jump just before the loop end (1 bar before, or 3 seconds before without bar data) — handy for checking the seam. Nudge the markers until it feels right.</li>
-        <li><strong><span class="ui">EXPORT</span> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>)</strong><br />The cut WAVs are saved to the export path and a full Music Playlist Container setup is generated in Wwise. Play it in Wwise to confirm.</li>
+        <li><strong><span class="ui">EXPORT</span> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>)</strong><br />The source WAV is copied to the export path and a full Music Playlist Container setup is generated in Wwise. Play it in Wwise to confirm.</li>
       </ol>
       <div class="note">
         <p>If the <span class="ui">EXPORT</span> button is disabled, the reason (not connected, no destination selected, export path not under Originals, etc.) is written in the log under <code>=== Export Preflight ===</code>. → <a href="#troubleshooting">Chapter 15</a></p>
@@ -202,7 +202,7 @@
         <li><strong>Using another DAW?</strong> → Method B. Just export a WAV with markers to bring in your loop design.</li>
         <li><strong>Lots of already-looped tracks?</strong> → Method C’s multi-wave mode. Drop them all at once for batch implementation into Wwise.</li>
       </ul>
-      <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the cutting and Wwise-side implementation are still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
+      <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the Wwise-side implementation is still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
       <div class="note">
         <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>) or are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, ...) are rejected at load. When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
       </div>
@@ -380,7 +380,7 @@
       <h3>6-2. Destination and export path</h3>
       <ul>
         <li><strong>Destination</strong> — in Wwise’s Project Explorer, click the object that should receive the generated content (a Work Unit or Virtual Folder under <span class="ui">Interactive Music Hierarchy</span>, etc.). The app uses “whatever is currently selected in Wwise” as the destination. If reselecting every time is tedious, pin it with <span class="ui">Keep Target</span> on the WAAPI status bar.</li>
-        <li><strong>Export path</strong> — set in the project bar; where the cut WAVs are saved. It must be <strong>under the connected Wwise project’s <code>Originals</code> folder</strong> (e.g. <code>&lt;project&gt;\Originals\Music\IM-Importer</code>) so Wwise can reference the source WAVs.</li>
+        <li><strong>Export path</strong> — set in the project bar; where the source WAV is copied. It must be <strong>under the connected Wwise project’s <code>Originals</code> folder</strong> (e.g. <code>&lt;project&gt;\Originals\Music\IM-Importer</code>) so Wwise can reference the source WAVs.</li>
       </ul>
 
       <h3>6-3. EXPORT procedure</h3>
@@ -413,7 +413,7 @@
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
         <tbody>
           <tr><td class="ui">Project name</td><td>Select/rename. <code>+ New Project</code> creates one. Auto-saved.</td></tr>
-          <tr><td class="ui">Export path</td><td>Split WAV destination under Originals.</td></tr>
+          <tr><td class="ui">Export path</td><td>Where the source WAV is copied (under Originals).</td></tr>
           <tr><td class="ui">Keep Last Session</td><td>Default on. Restores the last session when returning to the project.</td></tr>
           <tr><td class="ui">Always on Top</td><td>Keep the window topmost (default off).</td></tr>
           <tr><td class="ui">JP / EN</td><td>UI language. The manual opens in the matching language.</td></tr>
@@ -492,14 +492,14 @@
         <tbody>
           <tr><td class="ui">CLEAR</td><td>Clear wave/session/log; reset project settings to app defaults. Keeps export path, Keep Target, Always on Top, and Stream / Look-ahead / Prefetch / Keep Layer Balance (app settings).</td></tr>
           <tr><td class="ui">RELOAD</td><td>Re-read the last WAV/XML from disk. Picks up an updated wave while keeping current groups, fades, and related work when possible. If the content changed a lot, that may look wrong — drop the files again to start fresh.</td></tr>
-          <tr><td class="ui">EXPORT</td><td>Write split WAVs and register in Wwise.</td></tr>
+          <tr><td class="ui">EXPORT</td><td>Copy the source WAV into Originals and register in Wwise.</td></tr>
           <tr><td class="ui">Keep Target</td><td>Pin destination (WAAPI status bar). Project-name link or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>W</kbd> opens/focuses Wwise.</td></tr>
           <tr><td class="ui">Auto Active</td><td>Default on (WAAPI status bar). Bring Wwise to front after EXPORT.</td></tr>
         </tbody>
       </table>
 
       <h2 id="export">13. What EXPORT creates in Wwise</h2>
-      <p>Designed so <strong>the Interactive Music implementation in Wwise is the master</strong>. Keep one-shot and loop material on one master waveform instead of pre-separating files; build structure nondestructively. Split WAVs are <strong>cut-only</strong>; fades, layer balance, and cues become Wwise properties (nothing is baked into the source).</p>
+      <p>Designed so <strong>the Interactive Music implementation in Wwise is the master</strong>. Keep one-shot and loop material on one master waveform instead of pre-separating files; build structure nondestructively. EXPORT <strong>copies the source WAV and applies MusicClip trim</strong>; fades, layer balance, and cues become Wwise properties (nothing is baked into the source).</p>
       <ul>
         <li>One part or one group → one Music Playlist Container</li>
         <li>Two or more playlists → Music Switch Container + matching State Group</li>

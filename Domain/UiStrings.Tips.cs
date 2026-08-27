@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.Domain;
+﻿namespace MgaWwiseIMImporter.Domain;
 
 internal static partial class UiStrings
 {
@@ -50,10 +50,10 @@ internal static partial class UiStrings
         + "If the wave content changed substantially, that may look wrong — drop the files again to start fresh.");
 
     public static string TipExport => Get(
-        "[Ctrl+Shift+E] 分割 WAV を書き出し、続けて Wwise へインポートします。"
+        "[Ctrl+Shift+E] 元 WAV を Originals へコピーし、続けて Wwise へインポートします。"
         + Environment.NewLine
         + "無効化した Playlist は書き出し対象外です。",
-        "[Ctrl+Shift+E] Export split WAVs and import them into Wwise."
+        "[Ctrl+Shift+E] Copy the source WAV(s) into Originals and import them into Wwise."
         + Environment.NewLine
         + "Disabled playlists are excluded.");
 
@@ -70,8 +70,8 @@ internal static partial class UiStrings
         "Select or edit the project name. Use “+ New Project” at the end to create one.");
 
     public static string TipProjectOutputPath => Get(
-        "分割 WAV の書き出し先フォルダです。横のフォルダボタンで変更できます。",
-        "Folder for exported split WAVs. Change it with the folder button.");
+        "元 WAV のコピー先フォルダです。横のフォルダボタンで変更できます。",
+        "Folder where source WAV(s) are copied. Change it with the folder button.");
 
     public static string TipSpectrum => Get(
         "再生出力の簡易スペクトラム表示です。",

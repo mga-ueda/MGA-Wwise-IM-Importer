@@ -4,7 +4,7 @@ namespace MgaWwiseIMImporter.Wave;
 
 /// <summary>
 /// 連続リージョン固まり（非除外ラン）のイン／アウト端フェード。
-/// ソース WAV・EXPORT 分割 WAV とも非破壊。プレビュー表示・再生と MusicClip Fade に適用する。
+/// ソース WAV・EXPORT 後の MusicClip とも非破壊。プレビュー表示・再生と MusicClip Fade に適用する。
 /// Fade In は固まり先頭 Music Segment 内、Fade Out は末尾 Music Segment 内に制限する
 /// （<c>-A</c>／<c>-E</c> は隣接リージョンと同一セグメントのため、その範囲もフェード可能）。
 /// </summary>

@@ -21,9 +21,9 @@ Interactive Music in Wwise involves many building blocks — containers, transit
 
 **Horizontal and vertical transitions can be mixed freely.** Interactive music transitions come in two directions: the crossfade type (horizontal — switching from one piece to another) and the layered type (vertical). The vertical kind further splits into layer switching — crossfading to another piece while keeping the playback position — and additive layering, which stacks extra parts on top of what is already playing. Even when these assets coexist in one project, you can preview their transitions together, with no distinction between them, and implement them into Wwise in one pass.
 
-The workflow assumes **the Interactive Music data in Wwise is the master**. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively, then EXPORT cut ranges plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.
+The workflow assumes **the Interactive Music data in Wwise is the master**. Keep one-shot and loop material on a single master waveform instead of pre-separating files; build structure nondestructively. EXPORT copies the source WAV into Originals and maps ranges with MusicClip trim plus Wwise properties (MusicClip Fade / MusicFade / Make-Up Gain / Cue, and so on). Gains and fades are not baked into the source WAV.
 
-**Implementation combines WAAPI with the app's own processing.** On top of remote-controlling Wwise through WAAPI, the app handles WAV cutting, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:
+**Implementation combines WAAPI with the app's own processing.** On top of remote-controlling Wwise through WAAPI, the app handles MusicClip trim, loudness measurement, fade-to-property conversion, and more in its own processing — going further than auto-implementation tools that only call WAAPI. Concretely, you can:
 
 - Preview switches from one piece to another by ear while trying exit timing, fade in/out, and whether a one-shot still plays after a loop
 - Group pieces into vertical layers and check stacking parts on top of each other, as well as crossfading when swapping layers

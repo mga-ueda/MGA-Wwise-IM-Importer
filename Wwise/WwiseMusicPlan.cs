@@ -105,7 +105,7 @@ internal sealed class WwiseGroupStatePlan
 
 /// <summary>
 /// Music Segment 1 つ分。時間はセグメント代表タイムライン基準の絶対 ms（先頭トラックのパート先頭基準）。
-/// インポート時は各トラックを自身の Clip 範囲で切り出し、タイムライン先頭へ載せる。
+/// インポート時は各トラックを自身の Clip 範囲でトリムし、タイムライン先頭へ載せる。
 /// </summary>
 internal sealed class WwiseSegmentPlan
 {
@@ -137,7 +137,7 @@ internal sealed class WwiseSegmentPlan
     public required IReadOnlyList<WwiseTrackPlan> Tracks { get; init; }
 }
 
-/// <summary>Music Track 1 つ分（1 つのソースパート WAV からの切り出し）。</summary>
+/// <summary>Music Track 1 つ分（1 つのソースパート WAV からの範囲指定）。</summary>
 internal sealed class WwiseTrackPlan
 {
     public required string Name { get; init; }

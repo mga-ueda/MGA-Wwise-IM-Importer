@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.Domain;
+﻿namespace MgaWwiseIMImporter.Domain;
 
 internal static partial class UiStrings
 {
@@ -249,7 +249,7 @@ internal static partial class UiStrings
     public static string KeyBars => Get("Bars   :", "Bars   :");
     public static string KeyTimeline => Get("Timeline:", "Timeline:");
     public static string KeyPath => Get("Path    :", "Path    :");
-    public static string KeySlices => Get("Slices  :", "Slices  :");
+    public static string KeySlices => Get("Media   :", "Media   :");
     public static string KeyWavePpq => Get("WavePpq :", "WavePpq :");
 
     public static string LogDroppedFilesHeader(int count) => Format(

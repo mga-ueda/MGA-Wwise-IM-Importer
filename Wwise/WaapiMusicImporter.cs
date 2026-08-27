@@ -8,9 +8,9 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <summary>
 /// <see cref="WwiseMusicPlan"/> を WAAPI（WaapiUris.CoreObjectSet）で Wwise へ流し込む。
 /// <para>
-/// 1. 各 Music Segment 用の WAV を用意する。複数波形なら可能なら元ファイルを
-///    outputDirectory へコピーして共有し、MusicClip の Begin/End Offset で範囲を合わせる。
-///    それ以外はソースから範囲を切り出して書く（ゲインは焼き込まない）。
+/// 1. 各 Music Segment 用の WAV を用意する。元ファイルを outputDirectory へ
+///    コピーして共有し、区間は MusicClip の Begin/End Offset で合わせる（波形は切らない）。
+///    ソース範囲がファイルに収まらない場合のみ切り出しに落とす（ゲインは焼き込まない）。
 /// 2. 複数パート時は State Group／State を作成または更新し、Music Switch Container に割当。
 /// 3. object.set で Playlist／Segment／Track（＋WAV）と Cue を作成。
 ///    Layer Music Option（Keep Layer Balance）オン時は、グループ内の相対バランスを
@@ -143,7 +143,7 @@ internal static partial class WaapiMusicImporter
             && partGains is not null
             && partGains.Count > 0;
 
-        // 中間パート WAV は作らず、元 WAV から最終セグメント WAV を直接切り出す。
+        // 中間パート WAV は作らず、元 WAV を共有して MusicClip トリムで範囲を合わせる。
         // リージョン端フェードは WAV へ焼き込まず、後段で MusicClip 非破壊フェードとして設定する。
         // Layer Music Option は Make-Up Gain へ載せ、WAV ゲインは変えない。
         var fadesForClip = regionEdgeFades?
