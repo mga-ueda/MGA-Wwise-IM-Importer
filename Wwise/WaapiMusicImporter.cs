@@ -8,9 +8,10 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <summary>
 /// <see cref="WwiseMusicPlan"/> を WAAPI（WaapiUris.CoreObjectSet）で Wwise へ流し込む。
 /// <para>
-/// 1. 各 Music Segment 用の WAV を用意する。元ファイルを outputDirectory へ
-///    コピーして共有し、区間は MusicClip の Begin/End Offset で合わせる（波形は切らない）。
-///    ソース範囲がファイルに収まらない場合のみ切り出しに落とす（ゲインは焼き込まない）。
+/// 1. 各 Music Segment 用の WAV を用意する。
+///    出力パートがソース全長なら元ファイルをコピーして共有し、区間は MusicClip トリム。
+///    XML の複数曲マスターなど、パートがソースの一部分なら曲（パート）ごとに切り出す。
+///    ゲインは焼き込まない。
 /// 2. 複数パート時は State Group／State を作成または更新し、Music Switch Container に割当。
 /// 3. object.set で Playlist／Segment／Track（＋WAV）と Cue を作成。
 ///    Layer Music Option（Keep Layer Balance）オン時は、グループ内の相対バランスを
@@ -443,7 +444,7 @@ internal static partial class WaapiMusicImporter
                         + $"  src=[{media.SourceStartSample} .. {media.SourceEndSample})"
                         + $"  ({beginMs:0.###} .. {endMs:0.###} ms)"
                         + (media.ApplyClipTrim
-                            ? "  [copy+trim]"
+                            ? media.ReusedOriginal ? "  [copy+trim]" : "  [slice+trim]"
                             : media.ReusedOriginal
                                 ? "  [copy]"
                                 : "  [slice]"));

@@ -342,7 +342,9 @@ internal static partial class UiStrings
         fileName,
         localStart,
         localEnd,
-        applyClipTrim ? "copy+trim" : reusedOriginal ? "copy" : "slice");
+        applyClipTrim
+            ? reusedOriginal ? "copy+trim" : "slice+trim"
+            : reusedOriginal ? "copy" : "slice");
 
     public static string LogMusicClipCatalog(int count) => Format(
         "Message : MusicClip を {0} 件検出しました（トリム対象の検索用）。",

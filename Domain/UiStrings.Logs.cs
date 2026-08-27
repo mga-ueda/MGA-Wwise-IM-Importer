@@ -530,8 +530,8 @@ internal static partial class UiStrings
         message);
 
     public static string LogExportReady(int partCount) => Format(
-        "Message : 出力パート {0} 件。［EXPORT］で元 WAV を Originals へコピーし、Wwise へ登録できます。",
-        "Message : {0} output part(s). Use [EXPORT] to copy the source WAV(s) into Originals and register in Wwise.",
+        "Message : 出力パート {0} 件。［EXPORT］で Originals へ書き出し、Wwise へ登録できます。",
+        "Message : {0} output part(s). Use [EXPORT] to write into Originals and register in Wwise.",
         partCount);
 
     public static string LogExportBlocked(int partCount, string reason) => Format(

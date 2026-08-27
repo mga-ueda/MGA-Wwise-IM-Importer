@@ -50,10 +50,10 @@ internal static partial class UiStrings
         + "If the wave content changed substantially, that may look wrong — drop the files again to start fresh.");
 
     public static string TipExport => Get(
-        "[Ctrl+Shift+E] 元 WAV を Originals へコピーし、続けて Wwise へインポートします。"
+        "[Ctrl+Shift+E] 元 WAV を Originals へコピーし（XML の複数曲は曲ごとに切り出し）、続けて Wwise へインポートします。"
         + Environment.NewLine
         + "無効化した Playlist は書き出し対象外です。",
-        "[Ctrl+Shift+E] Copy the source WAV(s) into Originals and import them into Wwise."
+        "[Ctrl+Shift+E] Copy the source WAV(s) into Originals (XML multi-song masters are split per song) and import them into Wwise."
         + Environment.NewLine
         + "Disabled playlists are excluded.");
 

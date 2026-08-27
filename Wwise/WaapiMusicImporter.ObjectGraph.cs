@@ -275,7 +275,9 @@ internal static partial class WaapiMusicImporter
 
     /// <summary>
     /// 各トラックのメディアを用意する。返り値は TrackSliceKey → バインディング。
-    /// 元 WAV を outputDirectory へコピーして共有し、区間は MusicClip トリムで合わせる。
+    /// パートがソース全長なら元 WAV をコピーして共有する。
+    /// パートがソースの一部分（XML の曲ごとなど）なら、その範囲だけ切り出して共有する。
+    /// セグメント区間は MusicClip トリムで合わせる。
     /// </summary>
     internal static Dictionary<string, TrackMediaBinding> SliceSegmentWavs(
         WwiseMusicPlan plan,
@@ -299,6 +301,7 @@ internal static partial class WaapiMusicImporter
         var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var loggedReusePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var reusedDestBySource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var slicedPartDest = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var playlist in plan.Playlists)
         {
             foreach (var segment in playlist.Segments)
@@ -347,45 +350,27 @@ internal static partial class WaapiMusicImporter
                         ? sliceInfo.BlockAlign
                         : blockAlign;
 
-                    // 元 WAV を outputDirectory へコピーして共有する。
-                    // セグメントごとの範囲は MusicClip Begin/End Offset で合わせる（波形は切らない）。
-                    if (CanReuseSourceWav(sliceSourcePath, localStart, localEnd, sliceInfo))
+                    var partLocalStart = part.ResolveLocalStart();
+                    var partLocalEnd = part.ResolveLocalEnd();
+                    var partCoversSource = partLocalStart == 0
+                        && partLocalEnd == sliceInfo.FrameCount;
+                    var effectiveRate = sliceInfo.SampleRate != 0
+                        ? sliceInfo.SampleRate
+                        : sampleRate;
+
+                    // Wave 単体／複数波形: パート＝ソース全長なら元 WAV をコピーして共有。
+                    // セグメント範囲は MusicClip トリム（イントロ／ループで切らない）。
+                    if (partCoversSource
+                        && CanReuseSourceWav(sliceSourcePath, localStart, localEnd, sliceInfo))
                     {
-                        var sourceFull = Path.GetFullPath(sliceSourcePath);
-                        if (!reusedDestBySource.TryGetValue(sourceFull, out var dest))
-                        {
-                            var desiredFileName = Path.GetFileName(sliceSourcePath);
-                            if (string.IsNullOrWhiteSpace(desiredFileName))
-                            {
-                                desiredFileName = string.IsNullOrWhiteSpace(part.FileName)
-                                    ? $"{track.Name}.wav"
-                                    : part.FileName;
-                            }
-
-                            if (!desiredFileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-                            {
-                                desiredFileName += ".wav";
-                            }
-
-                            var destName = UniqueSliceFileName(desiredFileName, usedFileNames);
-                            dest = Path.GetFullPath(Path.Combine(outputDirectory, destName));
-                            if (!string.Equals(sourceFull, dest, StringComparison.OrdinalIgnoreCase))
-                            {
-                                if (!File.Exists(dest)
-                                    || new FileInfo(dest).Length != new FileInfo(sourceFull).Length
-                                    || File.GetLastWriteTimeUtc(dest) != File.GetLastWriteTimeUtc(sourceFull))
-                                {
-                                    File.Copy(sourceFull, dest, overwrite: true);
-                                }
-                            }
-
-                            reusedDestBySource[sourceFull] = dest;
-                        }
-
+                        var dest = CopySourceWavOnce(
+                            sliceSourcePath,
+                            outputDirectory,
+                            part,
+                            track.Name,
+                            usedFileNames,
+                            reusedDestBySource);
                         var needsTrim = localStart != 0 || localEnd != sliceInfo.FrameCount;
-                        var effectiveRate = sliceInfo.SampleRate != 0
-                            ? sliceInfo.SampleRate
-                            : sampleRate;
                         map[trackKey] = new TrackMediaBinding(
                             dest,
                             localStart,
@@ -411,7 +396,63 @@ internal static partial class WaapiMusicImporter
                         continue;
                     }
 
-                    // ソース範囲がファイルに収まらないときだけ切り出す（ゲイン焼き込みなし）。
+                    // XML 複数曲など: パート（曲）範囲だけ切り出し、曲内セグメントはトリム。
+                    if (CanSlicePartRange(
+                            sliceSourcePath,
+                            partLocalStart,
+                            partLocalEnd,
+                            localStart,
+                            localEnd,
+                            sliceInfo))
+                    {
+                        var partKey = part.Number + "\u001f" + Path.GetFullPath(sliceSourcePath);
+                        if (!slicedPartDest.TryGetValue(partKey, out var destPart))
+                        {
+                            var desiredPartName = string.IsNullOrWhiteSpace(part.FileName)
+                                ? $"{track.Name}.wav"
+                                : part.FileName;
+                            if (!desiredPartName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                            {
+                                desiredPartName += ".wav";
+                            }
+
+                            var partFileName = UniqueSliceFileName(desiredPartName, usedFileNames);
+                            destPart = Path.GetFullPath(Path.Combine(outputDirectory, partFileName));
+                            WriteSegmentSafely(
+                                sliceSourcePath,
+                                destPart,
+                                partLocalStart,
+                                partLocalEnd,
+                                sliceBlockAlign);
+                            slicedPartDest[partKey] = destPart;
+                            log(UiStrings.LogWavSliceWritten(partFileName));
+                        }
+
+                        var relativeStart = localStart - partLocalStart;
+                        var relativeEnd = localEnd - partLocalStart;
+                        var partFrames = partLocalEnd - partLocalStart;
+                        var needsPartTrim = relativeStart != 0 || relativeEnd != partFrames;
+                        map[trackKey] = new TrackMediaBinding(
+                            destPart,
+                            relativeStart,
+                            relativeEnd,
+                            partFrames,
+                            effectiveRate,
+                            ApplyClipTrim: needsPartTrim,
+                            ReusedOriginal: false);
+                        log(
+                            UiStrings.LogTrackMediaBinding(
+                                segment.Name,
+                                track.Name,
+                                Path.GetFileName(destPart),
+                                relativeStart,
+                                relativeEnd,
+                                reusedOriginal: false,
+                                applyClipTrim: needsPartTrim));
+                        continue;
+                    }
+
+                    // ソース範囲がファイル／パートに収まらないときだけセグメント単位で切り出す。
                     var desiredSliceName = string.IsNullOrWhiteSpace(part.FileName)
                         ? $"{track.Name}.wav"
                         : part.FileName;
@@ -471,6 +512,77 @@ internal static partial class WaapiMusicImporter
         return localStart >= 0
             && localEnd <= sliceInfo.FrameCount
             && localEnd > localStart;
+    }
+
+    /// <summary>
+    /// パート範囲を曲ファイルとして切り出せるか。セグメントはその中に収まっていること。
+    /// </summary>
+    private static bool CanSlicePartRange(
+        string sliceSourcePath,
+        long partLocalStart,
+        long partLocalEnd,
+        long localStart,
+        long localEnd,
+        WavFileInfo sliceInfo)
+    {
+        if (sliceInfo.FrameCount <= 0 || !File.Exists(sliceSourcePath))
+        {
+            return false;
+        }
+
+        if (partLocalStart < 0
+            || partLocalEnd > sliceInfo.FrameCount
+            || partLocalEnd <= partLocalStart)
+        {
+            return false;
+        }
+
+        return localStart >= partLocalStart
+            && localEnd <= partLocalEnd
+            && localEnd > localStart;
+    }
+
+    private static string CopySourceWavOnce(
+        string sliceSourcePath,
+        string outputDirectory,
+        WaveformOutputPart part,
+        string trackName,
+        HashSet<string> usedFileNames,
+        Dictionary<string, string> reusedDestBySource)
+    {
+        var sourceFull = Path.GetFullPath(sliceSourcePath);
+        if (reusedDestBySource.TryGetValue(sourceFull, out var dest))
+        {
+            return dest;
+        }
+
+        var desiredFileName = Path.GetFileName(sliceSourcePath);
+        if (string.IsNullOrWhiteSpace(desiredFileName))
+        {
+            desiredFileName = string.IsNullOrWhiteSpace(part.FileName)
+                ? $"{trackName}.wav"
+                : part.FileName;
+        }
+
+        if (!desiredFileName.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+        {
+            desiredFileName += ".wav";
+        }
+
+        var destName = UniqueSliceFileName(desiredFileName, usedFileNames);
+        dest = Path.GetFullPath(Path.Combine(outputDirectory, destName));
+        if (!string.Equals(sourceFull, dest, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(dest)
+                || new FileInfo(dest).Length != new FileInfo(sourceFull).Length
+                || File.GetLastWriteTimeUtc(dest) != File.GetLastWriteTimeUtc(sourceFull))
+            {
+                File.Copy(sourceFull, dest, overwrite: true);
+            }
+        }
+
+        reusedDestBySource[sourceFull] = dest;
+        return dest;
     }
 
     internal readonly record struct TrackMediaBinding(
