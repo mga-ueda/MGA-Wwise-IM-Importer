@@ -12,9 +12,9 @@
     <Product>MGA Wwise IM Importer</Product>
     <ApplicationTitle>MGA Wwise IM Importer</ApplicationTitle>
     <ApplicationIcon>Assets\Branding\MgaWwiseIMImporter.ico</ApplicationIcon>
-    <Version>1.1.5-beta</Version>
-    <AssemblyVersion>1.1.5.0</AssemblyVersion>
-    <FileVersion>1.1.5.0</FileVersion>
+    <Version>1.1.6-beta</Version>
+    <AssemblyVersion>1.1.6.0</AssemblyVersion>
+    <FileVersion>1.1.6.0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
     <Utf8Output>true</Utf8Output>
     <PublishSingleFile>true</PublishSingleFile>
