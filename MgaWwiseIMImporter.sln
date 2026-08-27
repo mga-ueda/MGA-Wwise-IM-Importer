@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MgaWwiseIMImporter", "MgaWwiseIMImporter.csproj", "{C47CDBE9-3C1B-4656-B334-03E0785DD60F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MgaWwiseIMImporter.Tests", "MgaWwiseIMImporter.Tests\MgaWwiseIMImporter.Tests.csproj", "{67DFFA37-070E-4AC2-84AF-A176716C15CE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C47CDBE9-3C1B-4656-B334-03E0785DD60F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C47CDBE9-3C1B-4656-B334-03E0785DD60F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C47CDBE9-3C1B-4656-B334-03E0785DD60F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C47CDBE9-3C1B-4656-B334-03E0785DD60F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{67DFFA37-070E-4AC2-84AF-A176716C15CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{67DFFA37-070E-4AC2-84AF-A176716C15CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{67DFFA37-070E-4AC2-84AF-A176716C15CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{67DFFA37-070E-4AC2-84AF-A176716C15CE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
