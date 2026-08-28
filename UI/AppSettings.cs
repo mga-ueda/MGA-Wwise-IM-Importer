@@ -21,6 +21,9 @@ internal sealed class AppSettings
     /// <summary>Tips 枠の表示（既定オン）。</summary>
     public bool ShowTips { get; set; } = true;
 
+    /// <summary>ログと Tips 本文のフォントサイズ（pt。既定 8.5）。</summary>
+    public double LogTipsFontSizePoints { get; set; } = DefaultLogTipsFontSizePoints;
+
     /// <summary>再生出力 API（既定 WaveOut）。</summary>
     public AudioOutputApi AudioApi { get; set; } = AudioOutputApi.WaveOut;
 
@@ -132,6 +135,12 @@ internal sealed class AppSettings
         Save();
     }
 
+    public void SaveLogTipsFontSizePoints(double points)
+    {
+        LogTipsFontSizePoints = NormalizeLogTipsFontSizePoints(points);
+        Save();
+    }
+
     public void SaveWaveformHeightScale(int scale)
     {
         WaveformHeightScale = NormalizeWaveformHeightScale(scale);
@@ -188,6 +197,7 @@ internal sealed class AppSettings
         UiLanguage = UiStrings.ToStoredValue(UiLanguage),
         SkippedUpdateVersion = SkippedUpdateVersion ?? string.Empty,
         ShowTips = ShowTips,
+        LogTipsFontSizePoints = LogTipsFontSizePoints,
         AudioApi = AudioOutputSettings.ToStoredValue(AudioApi),
         AudioDeviceId = AudioDeviceId ?? string.Empty,
         WaveformHeightScale = WaveformHeightScale,
@@ -213,6 +223,7 @@ internal sealed class AppSettings
             UiLanguage = UiStrings.ParseLanguage(data.UiLanguage),
             SkippedUpdateVersion = AppVersion.NormalizeTag(data.SkippedUpdateVersion),
             ShowTips = data.ShowTips,
+            LogTipsFontSizePoints = NormalizeLogTipsFontSizePoints(data.LogTipsFontSizePoints),
             AudioApi = AudioOutputSettings.ParseApi(data.AudioApi),
             AudioDeviceId = data.AudioDeviceId ?? string.Empty,
             WaveformHeightScale = NormalizeWaveformHeightScale(data.WaveformHeightScale),
@@ -283,6 +294,26 @@ internal sealed class AppSettings
     /// <summary>波形高さ倍率を 1〜3 に正規化する。</summary>
     public static int NormalizeWaveformHeightScale(int scale) =>
         scale is >= 1 and <= 3 ? scale : 1;
+
+    public const double DefaultLogTipsFontSizePoints = 8.5;
+    public const double MinLogTipsFontSizePoints = 6.0;
+    public const double MaxLogTipsFontSizePoints = 18.0;
+    public const double LogTipsFontSizeStepPoints = 0.5;
+    /// <summary>旧ログ行間 10pt / 既定フォント 8.5pt。</summary>
+    public const double LogTipsLineHeightRatio = 10.0 / 8.5;
+
+    /// <summary>ログ／Tips フォントサイズを 6〜18pt（0.5pt 刻み）に正規化する。</summary>
+    public static double NormalizeLogTipsFontSizePoints(double points)
+    {
+        if (points <= 0)
+        {
+            return DefaultLogTipsFontSizePoints;
+        }
+
+        var clamped = Math.Clamp(points, MinLogTipsFontSizePoints, MaxLogTipsFontSizePoints);
+        var stepped = Math.Round(clamped / LogTipsFontSizeStepPoints) * LogTipsFontSizeStepPoints;
+        return Math.Clamp(stepped, MinLogTipsFontSizePoints, MaxLogTipsFontSizePoints);
+    }
 
     /// <summary>メトロノーム音量を 0.1〜1.0（10% 刻み）に正規化する。</summary>
     public static float NormalizeMetronomeVolume(float volume)

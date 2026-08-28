@@ -42,5 +42,11 @@ internal sealed class ShortcutForwardingRichTextBox : RichTextBox
             or Key.PageUp
             or Key.PageDown
             or Key.Home
-            or Key.End;
+            or Key.End
+            or Key.OemPlus
+            or Key.OemMinus
+            or Key.Add
+            or Key.Subtract
+            or Key.D0
+            or Key.NumPad0;
 }

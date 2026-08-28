@@ -124,6 +124,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private const double TimeZoomWheelStep = 1.189207115;
     private double _timeZoom = TimeZoomMin;
     private double _viewStart; // 表示左端の絶対進捗 0..1
+    public bool IsTimeZoomAtMax => _timeZoom >= TimeZoomMax - 1e-9;
 
     // 振幅ズーム（1=既定。既定より縮小しない）
     private const double AmpZoomMin = 1.0;

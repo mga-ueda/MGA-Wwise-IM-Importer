@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -856,6 +856,12 @@ public partial class MainWindow
             return;
         }
 
+        if (TryHandleLogTipsFontShortcut(key, modifiers))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // ログ欄フォーカス中は再生／波形ショートカットを無効（Form1 と同じ）。
         if (editorTextBox.IsKeyboardFocusWithin)
         {
@@ -1068,11 +1074,37 @@ public partial class MainWindow
             return false;
         }
 
-        var timelineWidth = Math.Max(1, waveformView.TimelineContentWidth);
-        // 表示中の再生ヘッド基準（エンジン Progress はバッファ遅れがあり、右キーが進まないように見える）
-        var progressDelta = (key == Key.Left ? -1 : 1)
-            * (waveformView.TimeViewSpan / timelineWidth);
-        var next = Math.Clamp(_smoothProgress + progressDelta, 0d, 1d);
+        double next;
+        if (waveformView.IsTimeZoomAtMax)
+        {
+            var frameCount = _loadedPreview.WavInfo.FrameCount;
+            if (frameCount <= 0)
+            {
+                return false;
+            }
+
+            var currentSample = (long)Math.Round(Math.Clamp(_smoothProgress, 0d, 1d) * frameCount);
+            currentSample = Math.Clamp(currentSample, 0L, frameCount - 1);
+            var nextSample = Math.Clamp(
+                currentSample + (key == Key.Left ? -1L : 1L),
+                0L,
+                frameCount - 1);
+            if (nextSample == currentSample)
+            {
+                return true;
+            }
+
+            next = nextSample / (double)frameCount;
+        }
+        else
+        {
+            var timelineWidth = Math.Max(1, waveformView.TimelineContentWidth);
+            // 表示中の再生ヘッド基準（エンジン Progress はバッファ遅れがあり、右キーが進まないように見える）
+            var progressDelta = (key == Key.Left ? -1 : 1)
+                * (waveformView.TimeViewSpan / timelineWidth);
+            next = Math.Clamp(_smoothProgress + progressDelta, 0d, 1d);
+        }
+
         if (Math.Abs(next - _smoothProgress) < 1e-15)
         {
             return true;

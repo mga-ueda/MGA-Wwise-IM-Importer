@@ -902,6 +902,7 @@ internal sealed partial class WaveformView
     /// 深いズーム用: 各サンプルを点として、隣同士を直線で結ぶ（線形補間表示）。
     /// 振幅拡大時は表示矩形へ Y をピン留めせず、クリップで切る（辺張り付きによる破綻を防ぐ）。
     /// 1px に複数サンプルある区間は全点接続せず 1px 1 点に間引き、塗りつぶし状の汚れを防ぐ。
+    /// 時間軸が最大ズームのときだけ、実サンプル位置に点を重ねる。
     /// </summary>
     private void DrawSamplePolyline(
         Graphics g,
@@ -956,6 +957,11 @@ internal sealed partial class WaveformView
                 var x = AbsoluteToX(frame / (double)frameCount, wave);
                 var y = SampleY(sample, gain);
                 g.DrawLine(linePen, x, y - 2.5f, x, y + 2.5f);
+                if (IsTimeZoomAtMax)
+                {
+                    DrawSamplePoints(g, wavePen.Color, [new PointF(x, y)]);
+                }
+
                 return;
             }
 
@@ -1006,10 +1012,29 @@ internal sealed partial class WaveformView
             }
 
             g.DrawLines(linePen, points);
+
+            // 最大ズームかつ 1 サンプルが 1px 以上空くときだけ点を重ねる。
+            // 密なままだと点が線に溶けて塗りつぶしになる。
+            if (IsTimeZoomAtMax && count <= wave.Width)
+            {
+                DrawSamplePoints(g, wavePen.Color, points);
+            }
         }
         finally
         {
             g.Restore(state);
+        }
+    }
+
+    private static void DrawSamplePoints(Graphics g, Color color, PointF[] points)
+    {
+        const float radius = 4f;
+        var diameter = radius * 2f;
+        using var brush = new SolidBrush(color);
+        for (var i = 0; i < points.Length; i++)
+        {
+            var p = points[i];
+            g.FillEllipse(brush, p.X - radius, p.Y - radius, diameter, diameter);
         }
     }
 

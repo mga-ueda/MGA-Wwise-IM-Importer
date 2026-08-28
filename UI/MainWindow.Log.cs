@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace MgaWwiseIMImporter.UI;
@@ -12,8 +13,10 @@ public partial class MainWindow
     /// <summary>DarkScrollBarStyle Width fallback.</summary>
     private const double LogScrollBarFallbackWidth = 8;
 
-    /// <summary>Form1 LogLineSpacingTwips=200（10pt）相当。</summary>
-    private static double LogLineHeightDip => AppFonts.DipFromPoints(10);
+    private double LogLineHeightDip =>
+        AppFonts.DipFromPoints(
+            AppSettings.NormalizeLogTipsFontSizePoints(_appSettings.LogTipsFontSizePoints)
+            * AppSettings.LogTipsLineHeightRatio);
 
     private ScrollBar? _logVerticalScrollBar;
 
@@ -204,4 +207,120 @@ public partial class MainWindow
     /// <summary>連続する空行は 1 行までに抑える（本文中の \n\n\n や二重 NewLine 対策）。</summary>
     private bool ShouldSkipBlankLogLine(string line) =>
         string.IsNullOrWhiteSpace(line) && _logLastLineWasBlank;
+
+    private void ApplyLogTipsFontSize()
+    {
+        var points = AppSettings.NormalizeLogTipsFontSizePoints(_appSettings.LogTipsFontSizePoints);
+        _appSettings.LogTipsFontSizePoints = points;
+        var dip = AppFonts.DipFromPoints(points);
+        var lineDip = LogLineHeightDip;
+
+        editorTextBox.FontSize = dip;
+        editorTextBox.Document.FontSize = dip;
+        editorTextBox.Document.LineHeight = lineDip;
+        tipsLabel.FontSize = dip;
+
+        foreach (var block in editorTextBox.Document.Blocks)
+        {
+            if (block is not Paragraph paragraph)
+            {
+                continue;
+            }
+
+            paragraph.FontSize = dip;
+            paragraph.LineHeight = lineDip;
+        }
+    }
+
+    private bool IsPointerOverLogOrTips() => logAreaPanel.IsMouseOver;
+
+    private bool TryHandleLogTipsFontShortcut(Key key, ModifierKeys modifiers)
+    {
+        if (!IsPointerOverLogOrTips() && !editorTextBox.IsKeyboardFocusWithin)
+        {
+            return false;
+        }
+
+        if (modifiers == ModifierKeys.Control && key is Key.D0 or Key.NumPad0)
+        {
+            return TryResetLogTipsFontSize();
+        }
+
+        if (modifiers == ModifierKeys.Control
+            && TryGetLogTipsFontSizeSteps(key, out var steps))
+        {
+            return TryNudgeLogTipsFontSize(steps);
+        }
+
+        // 物理 [+] は Shift 付き（Ctrl++）になることが多い。
+        if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift)
+            && key is Key.OemPlus or Key.Add)
+        {
+            return TryNudgeLogTipsFontSize(1);
+        }
+
+        return false;
+    }
+
+    private static bool TryGetLogTipsFontSizeSteps(Key key, out int steps)
+    {
+        switch (key)
+        {
+            case Key.OemPlus:
+            case Key.Add:
+                steps = 1;
+                return true;
+            case Key.OemMinus:
+            case Key.Subtract:
+                steps = -1;
+                return true;
+            default:
+                steps = 0;
+                return false;
+        }
+    }
+
+    private bool TryAdjustLogTipsFontSizeByWheel(int wheelDelta)
+    {
+        if (wheelDelta == 0 || Keyboard.Modifiers != ModifierKeys.Control || !IsPointerOverLogOrTips())
+        {
+            return false;
+        }
+
+        var notches = Math.Max(1, Math.Abs(wheelDelta) / 120);
+        return TryNudgeLogTipsFontSize(Math.Sign(wheelDelta) * notches);
+    }
+
+    private bool TryNudgeLogTipsFontSize(int steps)
+    {
+        if (steps == 0)
+        {
+            return false;
+        }
+
+        var current = AppSettings.NormalizeLogTipsFontSizePoints(_appSettings.LogTipsFontSizePoints);
+        var next = AppSettings.NormalizeLogTipsFontSizePoints(
+            current + steps * AppSettings.LogTipsFontSizeStepPoints);
+        if (Math.Abs(next - current) < 1e-9)
+        {
+            return true;
+        }
+
+        _appSettings.SaveLogTipsFontSizePoints(next);
+        ApplyLogTipsFontSize();
+        return true;
+    }
+
+    private bool TryResetLogTipsFontSize()
+    {
+        var current = AppSettings.NormalizeLogTipsFontSizePoints(_appSettings.LogTipsFontSizePoints);
+        if (Math.Abs(current - AppSettings.DefaultLogTipsFontSizePoints) < 1e-9)
+        {
+            return true;
+        }
+
+        _appSettings.SaveLogTipsFontSizePoints(AppSettings.DefaultLogTipsFontSizePoints);
+        ApplyLogTipsFontSize();
+        return true;
+    }
 }

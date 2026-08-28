@@ -206,7 +206,7 @@ public partial class MainWindow : Window
         copyrightLinkLabel.LinkText = UiStrings.CopyrightText;
 
         editorTextBox.FontFamily = AppFonts.LogTypeface.FontFamily;
-        editorTextBox.FontSize = AppFonts.DipFromPoints(7); // Form1: CreateLogFont(7F)
+        ApplyLogTipsFontSize();
 
         RefreshFadeCurveIcons();
         ApplyActionBarTips();
@@ -274,6 +274,8 @@ public partial class MainWindow : Window
     private void ApplyLogAreaTips()
     {
         TipService.Set(editorTextBox, UiStrings.TipLogEditor);
+        TipService.Set(tipsLabel, UiStrings.TipLogTipsFontSize);
+        TipService.Set(tipsPanel, UiStrings.TipLogTipsFontSize);
         TipService.Set(logClearButton, UiStrings.TipLogClear);
         TipService.Set(logCopyButton, UiStrings.TipLogCopy);
         TipService.Set(logDownloadButton, UiStrings.TipLogDownload);
@@ -958,6 +960,12 @@ public partial class MainWindow : Window
         var screenPoint = PointToScreen(e.GetPosition(this));
         if (transportBar.IsMetronomeHitAtScreenPoint(screenPoint)
             && TryAdjustMetronomeVolume(e.Delta))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (TryAdjustLogTipsFontSizeByWheel(e.Delta))
         {
             e.Handled = true;
             return;

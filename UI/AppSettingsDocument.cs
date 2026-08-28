@@ -27,6 +27,9 @@ internal sealed class AppSettingsData
 
     public bool ShowTips { get; set; } = true;
 
+    /// <summary>ログと Tips 本文のフォントサイズ（pt。既定 8.5）。</summary>
+    public double LogTipsFontSizePoints { get; set; } = 8.5;
+
     public string AudioApi { get; set; } = "WaveOut";
 
     public string AudioDeviceId { get; set; } = string.Empty;

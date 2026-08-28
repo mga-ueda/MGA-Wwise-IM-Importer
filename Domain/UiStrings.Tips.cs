@@ -78,8 +78,16 @@ internal static partial class UiStrings
         "Simple spectrum meter for playback output.");
 
     public static string TipLogEditor => Get(
-        "操作・EXPORT・接続などのログです。右下のアイコンで消去・コピー・保存できます。",
-        "Log for operations, EXPORT, and connection. Use the icons to clear, copy, or save.");
+        "操作・EXPORT・接続などのログです。右下のアイコンで消去・コピー・保存できます。"
+        + Environment.NewLine
+        + "[Ctrl]+ホイール / [Ctrl]+[+][-]: ログと Tips の文字サイズ（6〜18pt。[Ctrl]+[0] で既定 8.5pt。アプリ設定に保存）",
+        "Log for operations, EXPORT, and connection. Use the icons to clear, copy, or save."
+        + Environment.NewLine
+        + "[Ctrl]+wheel / [Ctrl]+[+][-]: log and Tips font size (6–18pt; [Ctrl]+[0] resets to 8.5pt; saved in app settings)");
+
+    public static string TipLogTipsFontSize => Get(
+        "[Ctrl]+ホイール / [Ctrl]+[+][-]: ログと Tips の文字サイズ（6〜18pt。[Ctrl]+[0] で既定 8.5pt。アプリ設定に保存）",
+        "[Ctrl]+wheel / [Ctrl]+[+][-]: log and Tips font size (6–18pt; [Ctrl]+[0] resets to 8.5pt; saved in app settings)");
 
     public static string TipLogClear => Get(
         "ログ表示を消去します。",
@@ -164,7 +172,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Alt]+▼ドラッグ: 一つ前のマーカーも同量移動"
         + Environment.NewLine
-        + "[←] / [→]: シークバーを 1px 移動"
+        + "[←] / [→]: シークバーを 1px 移動（時間軸最大拡大時は 1 サンプル）"
         + Environment.NewLine
         + "[Alt]+[←] / [→]: シーク位置のマーカーを 1px 移動（+[Shift] で 3px、シークも連動）"
         + Environment.NewLine
@@ -193,7 +201,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Alt]+drag ▼: also move previous marker by the same delta"
         + Environment.NewLine
-        + "[←] / [→]: nudge seek bar by 1px"
+        + "[←] / [→]: nudge seek bar by 1px (1 sample at max time zoom)"
         + Environment.NewLine
         + "[Alt]+[←] / [→]: nudge marker at seek by 1px (+[Shift] for 3px; seek follows)"
         + Environment.NewLine
