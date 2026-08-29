@@ -63,6 +63,12 @@ internal static partial class UiStrings
         "MTempoTrackEvent (Tempo Track) が見つかりません。",
         "MTempoTrackEvent (Tempo Track) was not found.");
 
+    public static string ErrMarkerTrackLinearTimeBase => Get(
+        "マーカートラックがリニア時間基準（時計）のため、テンポ／拍子が XML に含まれていません。"
+        + "ミュージカル（音符）に切り替えてから、マーカートラックを XML で書き出してください。",
+        "The marker track is in Linear time base (clock), so the XML has no tempo or time signature. "
+        + "Switch it to Musical (note) and export the marker track as XML again.");
+
     public static string ErrTempoEventNoBpm => Get(
         "TempoEvent に BPM がありません。",
         "TempoEvent has no BPM.");

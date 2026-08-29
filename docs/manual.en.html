@@ -234,11 +234,28 @@
       <p><strong>② Export the marker track as XML</strong></p>
       <ol>
         <li>In the track list, select the <strong>marker track</strong>. The marker track is the one to export — <strong>exporting the tempo or signature track instead does not contain enough information</strong>.</li>
+        <li>Set that marker track’s <strong>time base to Musical (the note icon)</strong>. If it stays Linear (the clock icon), the XML will contain no tempo or time-signature data and loading will fail.</li>
         <li>Run <span class="ui">File → Export → Selected Tracks</span> and save as <code>.xml</code>.</li>
         <li>Use the same base name as the WAV (<code>Song.xml</code> next to <code>Song.wav</code>).</li>
       </ol>
-      <div class="note">
-        <p>An XML exported from the marker track also carries the tempo and time-signature data. If loading reports “MTempoTrackEvent (Tempo Track) was not found”, check that it was the <strong>marker track</strong> you selected for export (tempo/signature-track-only exports are insufficient).</p>
+      <div class="note" id="marker-musical">
+        <p>An XML exported from a marker track in the <strong>Musical time base</strong> also carries the tempo and time-signature data. If loading reports “MTempoTrackEvent (Tempo Track) was not found”, check both of the following.</p>
+        <ul>
+          <li>That you selected the <strong>marker track</strong> for export (tempo/signature-track-only exports are insufficient)</li>
+          <li>That the marker track is set to <strong>Musical (note)</strong> — Linear (clock) omits tempo</li>
+        </ul>
+        <p><strong>How to switch to Musical (Nuendo / Cubase)</strong></p>
+        <ol>
+          <li>Select the marker track</li>
+          <li>In the Inspector (the track details on the left), click <span class="ui">Switch time base between Musical and Linear</span> (the note / clock button) so it shows the <strong>note</strong></li>
+        </ol>
+        <p>If the button is missing (marker tracks often hide it by default):</p>
+        <ol>
+          <li>Right-click the marker track in the track list</li>
+          <li>Open <span class="ui">Track Controls Settings</span></li>
+          <li>From the hidden list, add <span class="ui">Toggle time base</span></li>
+          <li>Click OK, then use the track-list button to set the <strong>note</strong></li>
+        </ol>
       </div>
 
       <p><strong>③ Export the WAV</strong></p>
@@ -543,7 +560,7 @@
           </tr>
           <tr>
             <td>Dropping the XML reports “MTempoTrackEvent (Tempo Track) was not found”</td>
-            <td>An XML exported from something other than the marker track (e.g. the tempo or signature track only) lacks the required data. Select the <strong>marker track</strong> and redo <span class="ui">File → Export → Selected Tracks</span>.</td>
+            <td>The XML may have been exported from something other than the marker track (e.g. tempo or signature only), or the marker track may still be <strong>Linear (clock)</strong>. Set the marker track to <strong>Musical (note)</strong> and redo <span class="ui">File → Export → Selected Tracks</span>. The switch steps are in <a href="#marker-musical">4-2</a>.</td>
           </tr>
           <tr>
             <td>The WAV should contain markers, but none appear after loading</td>

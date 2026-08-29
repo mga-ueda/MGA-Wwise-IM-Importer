@@ -234,11 +234,28 @@
       <p><strong>② マーカートラックを XML で書き出す</strong></p>
       <ol>
         <li>トラックリストで<strong>マーカートラックを選択</strong>します。選択するのはマーカートラックです——<strong>テンポトラックや拍子トラックを書き出しても情報が不足します</strong>。</li>
+        <li>そのマーカートラックの<strong>時間基準（タイムベース）をミュージカル（音符）</strong>にします。リニア（時計）のままだと、XML にテンポ・拍子が入らず読み込みエラーになります。</li>
         <li>メニューの <span class="ui">ファイル → 書き出し → 選択トラック</span>（Export → Selected Tracks）を実行し、<code>.xml</code> で保存します。</li>
         <li>ファイル名は WAV と同じベース名にします（<code>Song.wav</code> に対して <code>Song.xml</code>）。</li>
       </ol>
-      <div class="note">
-        <p>マーカートラックを選択して書き出した XML には、テンポ・拍子の情報も含まれます。読み込み時に「MTempoTrackEvent (Tempo Track) が見つかりません」と出る場合は、<strong>マーカートラックを選択して</strong>書き出したかを確認してください（テンポ／拍子トラックだけの書き出しでは不足します）。</p>
+      <div class="note" id="marker-musical">
+        <p>マーカートラックを<strong>ミュージカル時間基準</strong>にして書き出した XML には、テンポ・拍子も含まれます。読み込み時に「MTempoTrackEvent (Tempo Track) が見つかりません」と出る場合は、次を確認してください。</p>
+        <ul>
+          <li><strong>マーカートラックを選択して</strong>書き出したか（テンポ／拍子トラックだけの書き出しでは不足します）</li>
+          <li>マーカートラックが<strong>ミュージカル（音符）</strong>になっているか（リニア／時計だとテンポが入らない）</li>
+        </ul>
+        <p><strong>ミュージカルにする手順（Nuendo／Cubase）</strong></p>
+        <ol>
+          <li>マーカートラックを選択する</li>
+          <li>インスペクター（左のトラック詳細）の <span class="ui">タイムベースをミュージカルとリニアの間で切り替え</span>（音符／時計のボタン）を押し、<strong>音符</strong>にする</li>
+        </ol>
+        <p>ボタンが見えないとき（マーカートラックでは最初から隠されていることがあります）:</p>
+        <ol>
+          <li>マーカートラックのトラックリストを右クリックする</li>
+          <li><span class="ui">トラックコントロール設定</span>（Track Controls Settings）を開く</li>
+          <li>非表示側から <span class="ui">Toggle time base</span>（タイムベースの切替）を選んで追加する</li>
+          <li>OK したあと、トラック上のボタンで<strong>音符</strong>にする</li>
+        </ol>
       </div>
 
       <p><strong>③ WAV を書き出す</strong></p>
@@ -543,7 +560,7 @@
           </tr>
           <tr>
             <td>XML のドロップで「MTempoTrackEvent (Tempo Track) が見つかりません」</td>
-            <td>マーカートラック以外（テンポ／拍子トラックのみ等）を書き出した XML では情報が揃いません。<strong>マーカートラックを選択して</strong> <span class="ui">ファイル → 書き出し → 選択トラック</span> をやり直してください。</td>
+            <td>マーカートラック以外（テンポ／拍子トラックのみ等）を書き出したか、マーカートラックが<strong>リニア（時計）</strong>のままかを確認してください。マーカートラックを<strong>ミュージカル（音符）</strong>にしてから <span class="ui">ファイル → 書き出し → 選択トラック</span> をやり直してください。切替手順は <a href="#marker-musical">4-2</a> にあります。</td>
           </tr>
           <tr>
             <td>マーカーを埋め込んだはずの WAV なのに、読み込んでもマーカーが出ない</td>

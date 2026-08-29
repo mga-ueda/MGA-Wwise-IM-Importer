@@ -48,6 +48,9 @@ internal sealed class NuendoTracklistInfo
     /// <summary>Cubase / Nuendo のテンポ・拍子イベントで一般的な PPQ 分解能。</summary>
     public const double PulsesPerQuarterNote = 480d;
 
+    /// <summary>マーカートラック Domain Type。1 = リニア（秒）。0 = ミュージカル。</summary>
+    private const int LinearDomainType = 1;
+
     public required string Path { get; init; }
     public double? RehearsalTempo { get; init; }
     public IReadOnlyList<NuendoTempoEvent> TempoEvents { get; init; } = [];
@@ -61,7 +64,7 @@ internal sealed class NuendoTracklistInfo
         var tempoTrack = document
             .Descendants("obj")
             .FirstOrDefault(e => (string?)e.Attribute("class") == "MTempoTrackEvent")
-            ?? throw new InvalidDataException(UiStrings.ErrTempoTrackMissing);
+            ?? throw new InvalidDataException(ResolveMissingTempoMessage(document));
 
         var signatureTrack = document
             .Descendants("obj")
@@ -178,6 +181,34 @@ internal sealed class NuendoTracklistInfo
         }
 
         return sb.ToString();
+    }
+
+    private static string ResolveMissingTempoMessage(XDocument document)
+    {
+        var markerTrack = document
+            .Descendants("obj")
+            .FirstOrDefault(e => (string?)e.Attribute("class") == "MMarkerTrackEvent");
+        if (markerTrack is not null
+            && TryReadMarkerDomainType(markerTrack) == LinearDomainType)
+        {
+            return UiStrings.ErrMarkerTrackLinearTimeBase;
+        }
+
+        return UiStrings.ErrTempoTrackMissing;
+    }
+
+    /// <summary>
+    /// マーカートラック自身の時間基準。0 = ミュージカル、1 = リニア。
+    /// プロジェクト長（PArrangeSetup）の Domain は見ない。
+    /// </summary>
+    private static int? TryReadMarkerDomainType(XElement markerTrack)
+    {
+        var domain = markerTrack
+            .Elements("obj")
+            .Where(obj => (string?)obj.Attribute("class") == "MListNode")
+            .SelectMany(node => node.Elements("member"))
+            .FirstOrDefault(member => (string?)member.Attribute("name") == "Domain");
+        return domain is null ? null : NuendoXml.ReadIntChild(domain, "Type");
     }
 
     private static NuendoMarkerEvent? ParseMarker(XElement obj)
