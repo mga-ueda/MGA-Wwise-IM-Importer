@@ -499,7 +499,7 @@
         <li><span class="ui">Keep Layer Balance</span> … 既定オフ。Loudness Normalization 利用時に推奨。グループ相対バランスを Music Track の Make-Up Gain へ非破壊設定。<strong>アプリ設定</strong>（CLEAR では既定に戻さない）</li>
       </ul>
       <div class="note">
-        <p><strong>先頭 Music Segment の Look-ahead を 50 ms 固定にしている理由</strong>: Loudness Normalization・Voice Volume・ゲインなど手段を問わず、元波形が持つ音量より極端に低い音量を Wwise 上で指定した場合、音量が確定するまでに数ミリ秒かかるようで、波形冒頭が一瞬元の音量のまま聴こえる挙動が確認されています。その安全策として 50 ms を設定しています。Zero latency を利用している場合は 0 にしたいところですが、致し方なくこの値にしています。この処置は現状暫定的なものであり、今後変更される可能性があります。</p>
+        <p><strong>先頭 Music Segment の Look-ahead を 50 ms 固定にしている理由</strong>: Loudness Normalization・Voice Volume・ゲインなど手段を問わず、元波形が持つ音量より極端に低い音量を Wwise 上で指定した場合、音量が確定するまでに数ミリ秒かかるようで、波形冒頭が一瞬元の音量のまま聴こえる挙動が確認されています。この症状はオーサリングツール上でのみ確認されており、実機では発生しない模様です。安全策として 50 ms を設定しています。Zero latency を利用している場合は 0 にしたいところですが、0 ms だとソーススタベーションエラーが出るため、致し方なく 50 ms にしています。この処置は現状暫定的なものであり、今後変更される可能性があります。</p>
       </div>
       <div class="note">
         <p><strong>なぜ Keep Layer Balance が必要か</strong>: Wwise の Loudness Normalization は音源ごとに一律でターゲットラウドネスへ揃えるため、意図的に控えめにミックスしたレイヤーまで他と同じ音量へ持ち上げられ、グループ内の音量バランスが崩れてしまいます。オンにすると、EXPORT 時にグループ内各パートの Integrated Loudness（LKFS）を計測し、最も大きいパートの Make-Up Gain を 0 dB、それ以外は相対差のぶんだけ下げて設定します。これにより Normalization 後も DAW で決めたレイヤーバランスがそのまま再現されます。補正は Music Track の Make-Up Gain への非破壊設定で、WAV には焼き込みません。</p>
