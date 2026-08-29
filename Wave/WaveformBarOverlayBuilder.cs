@@ -200,10 +200,14 @@ internal static class WaveformBarOverlayBuilder
         var waveEndPpq = tempoMap.FindPpqForSamples(timelineOffset + frameCount, sampleRate);
         var boundaries = BarGrid.GetBarBoundaries(tracklist.SignatureEvents, waveEndPpq);
 
+        // TimeReference は整数サンプルなので、小節頭が 1 サンプル未満ずれてアウフタクト誤判定される。
+        var snapEpsilon = TempoMap.BarSnapPpqEpsilon(tempoMap.GetBpmAt(waveStartPpq), sampleRate);
+        waveStartPpq = BarGrid.SnapToNearbyBarPpq(boundaries, waveStartPpq, snapEpsilon);
+
         // 小節番号はマーカーを見ない。XML 小節グリッド + iXML TimeReference でアウフタクト判別。
         var barStartAtWave = BarGrid.FindPreviousBarPpq(boundaries, waveStartPpq);
         var hasAnacrusis = barStartAtWave is not null
-            && waveStartPpq > barStartAtWave.Value + PpqEpsilon;
+            && waveStartPpq > barStartAtWave.Value + snapEpsilon;
 
         var marks = new List<WaveformBarMark>();
 

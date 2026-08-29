@@ -65,6 +65,25 @@ internal sealed class TempoMap
         return (long)Math.Round(PpqToSamples(targetPpq, sampleRate), MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// 整数サンプル往復の丸めを小節頭とみなす PPQ 許容。2 サンプル相当と 0.5 PPQ の大きい方。
+    /// </summary>
+    public static double BarSnapPpqEpsilon(double bpm, double sampleRate)
+    {
+        const double minPpq = 0.5d;
+        return Math.Max(PpqForSampleCount(bpm, sampleRate, samples: 2), minPpq);
+    }
+
+    public static double PpqForSampleCount(double bpm, double sampleRate, double samples)
+    {
+        if (bpm <= 0 || sampleRate <= 0 || samples <= 0)
+        {
+            return 0;
+        }
+
+        return samples / sampleRate * (bpm / 60d) * NuendoTracklistInfo.PulsesPerQuarterNote;
+    }
+
     public double FindPpqForSamples(long absoluteSample, double sampleRate)
     {
         if (absoluteSample <= 0)

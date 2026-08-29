@@ -93,6 +93,29 @@ internal static class BarGrid
     }
 
     /// <summary>
+    /// <paramref name="ppq"/> がいずれかの小節線から <paramref name="epsilon"/> 以内なら、その線へスナップする。
+    /// </summary>
+    public static double SnapToNearbyBarPpq(
+        IReadOnlyList<double> barBoundaries,
+        double ppq,
+        double epsilon)
+    {
+        double? nearest = null;
+        var nearestDistance = double.MaxValue;
+        foreach (var barPpq in barBoundaries)
+        {
+            var distance = Math.Abs(barPpq - ppq);
+            if (distance <= epsilon && distance < nearestDistance)
+            {
+                nearest = barPpq;
+                nearestDistance = distance;
+            }
+        }
+
+        return nearest ?? ppq;
+    }
+
+    /// <summary>
     /// 候補 PPQ が values のいずれかに十分近いか（同一小節線判定など）。
     /// </summary>
     public static bool IsNearAny(IReadOnlyList<double> values, double ppq, double epsilon = 1e-6)

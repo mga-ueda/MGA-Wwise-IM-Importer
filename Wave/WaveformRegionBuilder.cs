@@ -59,7 +59,10 @@ internal static class WaveformRegionBuilder
         var anacrusisRanges = new List<(long Start, long End)>();
 
         // 例外: 冒頭が小節頭でない → 次の小節線で区切り、冒頭半端小節だけを 1 リージョンにする
-        if (!BarGrid.IsNearAny(barBoundaries, waveStartPpq))
+        var barSnapEpsilon = TempoMap.BarSnapPpqEpsilon(
+            tempoMap.GetBpmAt(waveStartPpq),
+            sampleRate);
+        if (!BarGrid.IsNearAny(barBoundaries, waveStartPpq, barSnapEpsilon))
         {
             var nextBar = BarGrid.FindNextBarPpq(barBoundaries, waveStartPpq);
             if (nextBar is double nextBarPpq
@@ -391,7 +394,10 @@ internal static class WaveformRegionBuilder
     {
         double? previousBarPpq = BarGrid.FindPreviousBarPpq(barBoundaries, waveStartPpq);
         // 波形先頭が小節頭そのもののとき、その線を「直前小節頭」扱いにする
-        if (BarGrid.IsNearAny(barBoundaries, waveStartPpq))
+        if (BarGrid.IsNearAny(
+                barBoundaries,
+                waveStartPpq,
+                TempoMap.BarSnapPpqEpsilon(tempoMap.GetBpmAt(waveStartPpq), sampleRate)))
         {
             previousBarPpq = waveStartPpq;
         }
