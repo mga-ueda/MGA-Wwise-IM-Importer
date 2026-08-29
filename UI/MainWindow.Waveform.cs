@@ -388,9 +388,21 @@ public partial class MainWindow
 
     private void WaveformView_MarkerEditRequested(object? sender, MarkerEditRequestedEventArgs e)
     {
-        TryMutateWaveOnlyMarkers(session => e.Mode == MarkerEditMode.Add
-            ? session.AddMarkers(e.SampleOffsets)
-            : session.RemoveMarkers(e.SampleOffsets));
+        if (_previewSession is null)
+        {
+            return;
+        }
+
+        var changed = e.Mode == MarkerEditMode.Add
+            ? _previewSession.AddMarkers(e.SampleOffsets)
+            : _previewSession.RemoveMarkers(e.SampleOffsets);
+        if (!changed)
+        {
+            return;
+        }
+
+        RefreshMarkersOnWaveform();
+        SaveLastWaveSessionIfLoaded();
     }
 
     private bool TryDeleteWaveOnlyMarker(long sampleOffset) =>
