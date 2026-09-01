@@ -2593,17 +2593,6 @@ internal sealed partial class WaveformView
         return Math.Clamp((int)MathF.Round(a * 255f), 0, 255);
     }
 
-    private void DrawMouseGuide(Graphics g, Rectangle content)
-    {
-        if (_mouseGuideX is not float mx)
-        {
-            return;
-        }
-
-        using var pen = new Pen(WaveformGdiColors.MouseGuide, 1f);
-        g.DrawLine(pen, mx, content.Top, mx, content.Bottom);
-    }
-
     private sealed class OverlayPlayheadState
     {
         public double Progress;

@@ -162,6 +162,8 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private MarkerEditMode? _markerEditMode;
     private int _markerStrokeLastX;
     private float? _mouseGuideX;
+    private readonly System.Windows.Shapes.Line _mouseGuideLine;
+    private bool _mouseGuideRenderingHooked;
     private Bitmap? _staticLayer;
     private bool _staticLayerDirty = true;
     private int _presentationSuspendCount;
@@ -210,6 +212,17 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         TabStop = false;
         Cursor = null;
         Focusable = true;
+        _mouseGuideLine = new System.Windows.Shapes.Line
+        {
+            StrokeThickness = 1,
+            IsHitTestVisible = false,
+            SnapsToDevicePixels = true,
+            Visibility = System.Windows.Visibility.Collapsed,
+        };
+        System.Windows.Media.RenderOptions.SetEdgeMode(
+            _mouseGuideLine,
+            System.Windows.Media.EdgeMode.Aliased);
+        RegisterVisualChild(_mouseGuideLine);
         _exportGlowTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
         _exportGlowTimer.Tick += (_, _) => Invalidate();
         UiStrings.LanguageChanged += (_, _) =>
@@ -239,6 +252,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private void OnUnloaded(object? sender, System.Windows.RoutedEventArgs e)
     {
         _exportGlowTimer.Stop();
+        StopMouseGuideLiveTracking();
         _fadeCurveMenu = null;
         DisposeStaticLayer();
         _frameBitmap?.Dispose();
@@ -418,6 +432,12 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     {
         foreach (var child in _visualChildren)
         {
+            if (ReferenceEquals(child, _mouseGuideLine))
+            {
+                child.Arrange(new System.Windows.Rect(0, 0, finalSize.Width, finalSize.Height));
+                continue;
+            }
+
             var rect = _childArrangeRects.TryGetValue(child, out var r)
                 ? r
                 : new System.Windows.Rect(0, 0, 0, 0);
@@ -488,6 +508,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         Capture = false;
         UpdateTimelineTip(null);
         _mouseGuideX = null;
+        ApplyMouseGuideOverlay();
         Cursor = null;
 
         // 重いレイヤ生成の前にダークな足場だけ先に出す（白フラッシュ防止）
@@ -715,6 +736,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         _markerEditMode = null;
         Capture = false;
         _mouseGuideX = null;
+        ApplyMouseGuideOverlay();
         ClearPlayhead();
         Cursor = null;
         DisposeStaticLayer();
@@ -2471,7 +2493,10 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             _anacrusisTrailSamples,
             WaveformGdiColors.SeekAnacrusis);
         DrawAltMarkerPairDragGuides(g, timeline);
-        DrawMouseGuide(g, timeline);
+        if (IsPlayheadTrailAnimating())
+        {
+            EnsureMouseGuideLiveTracking();
+        }
         DrawPlaylistGroupNameLaneOverlays(g);
         // 不透明のグループ色の上に、コントラストを取った名前を載せ直す。
         DrawNameLaneLabelsOverGroupColors(g);

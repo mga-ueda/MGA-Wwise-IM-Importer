@@ -1,6 +1,8 @@
 ﻿using System.Drawing;
+using System.Runtime.InteropServices;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using TextAlignment = System.Windows.TextAlignment;
@@ -1390,18 +1392,152 @@ internal sealed partial class WaveformView
     }
 
     /// <summary>
-    /// マウスガイド描画の更新要求。再生中は playhead タイマーが既に ~60fps で
-    /// Invalidate しているため、移動ごとに全再描画するとシークバー更新が遅れる。
+    /// マウスガイドは GDI フレームではなく WPF オーバーレイ。
+    /// 再生中の全再描画はシークバーを遅らせるので、ガイドだけを動かす。
     /// </summary>
     private void RequestMouseGuideRepaint()
     {
         if (IsPlayheadTrailAnimating())
         {
+            EnsureMouseGuideLiveTracking();
+        }
+
+        ApplyMouseGuideOverlay();
+    }
+
+    private void EnsureMouseGuideLiveTracking()
+    {
+        if (_mouseGuideRenderingHooked || IsDisposed)
+        {
             return;
         }
 
-        Invalidate();
+        CompositionTarget.Rendering += OnMouseGuideRendering;
+        _mouseGuideRenderingHooked = true;
     }
+
+    private void StopMouseGuideLiveTracking()
+    {
+        if (!_mouseGuideRenderingHooked)
+        {
+            return;
+        }
+
+        CompositionTarget.Rendering -= OnMouseGuideRendering;
+        _mouseGuideRenderingHooked = false;
+    }
+
+    private void OnMouseGuideRendering(object? sender, EventArgs e)
+    {
+        if (IsDisposed)
+        {
+            StopMouseGuideLiveTracking();
+            return;
+        }
+
+        if (!IsPlayheadTrailAnimating())
+        {
+            StopMouseGuideLiveTracking();
+            ApplyMouseGuideOverlay();
+            return;
+        }
+
+        SyncMouseGuideFromScreenCursor();
+        ApplyMouseGuideOverlay();
+    }
+
+    /// <summary>
+    /// WPF の最後の MouseMove ではなく、OS の現在カーソル位置を使う。
+    /// 再生描画で入力が滞ってもガイドがカーソルに付く。
+    /// </summary>
+    private void SyncMouseGuideFromScreenCursor()
+    {
+        if (_peaks is null || _peaks.IsEmpty)
+        {
+            return;
+        }
+
+        var dragging = _isDraggingSeek
+            || _isDraggingMarker
+            || _isDraggingFadeHandle
+            || _markerEditMode is not null;
+        if (!IsMouseOver && !dragging)
+        {
+            return;
+        }
+
+        if (!TryGetLiveMouseGdiX(out var mouseX))
+        {
+            return;
+        }
+
+        var timeline = GetTimelineContentRect();
+        if (timeline.Width <= 0)
+        {
+            return;
+        }
+
+        if (!dragging && mouseX < timeline.Left)
+        {
+            _mouseGuideX = null;
+            SetHoveredPlaylistPart(null);
+            return;
+        }
+
+        UpdateHoveredPlaylistPart(mouseX);
+        _mouseGuideX = Math.Clamp(mouseX, timeline.Left, timeline.Right);
+    }
+
+    private bool TryGetLiveMouseGdiX(out int mouseX)
+    {
+        mouseX = 0;
+        if (!GetCursorPos(out var screen))
+        {
+            return false;
+        }
+
+        // PointFromScreen は画面のデバイス px（GetCursorPos と同じ）→ 要素ローカル DIP。
+        // TransformFromDevice を先に掛けると DPI が二重になり、ガイドが左へ寄る。
+        var local = PointFromScreen(new System.Windows.Point(screen.X, screen.Y));
+        mouseX = ToGdiPoint(local).X;
+        return true;
+    }
+
+    private void ApplyMouseGuideOverlay()
+    {
+        if (_mouseGuideX is not float mx || _peaks is null || _peaks.IsEmpty)
+        {
+            _mouseGuideLine.Visibility = System.Windows.Visibility.Collapsed;
+            return;
+        }
+
+        var timeline = GetTimelineContentRect();
+        if (timeline.Width <= 0)
+        {
+            _mouseGuideLine.Visibility = System.Windows.Visibility.Collapsed;
+            return;
+        }
+
+        var scale = DpiScale;
+        var x = Math.Round(mx) / scale;
+        _mouseGuideLine.Stroke = MgaWwiseIMImporter.UI.UiColors.Brush(
+            MgaWwiseIMImporter.UI.UiColors.MouseGuide);
+        _mouseGuideLine.X1 = x;
+        _mouseGuideLine.X2 = x;
+        _mouseGuideLine.Y1 = timeline.Top / scale;
+        _mouseGuideLine.Y2 = timeline.Bottom / scale;
+        _mouseGuideLine.Visibility = System.Windows.Visibility.Visible;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeScreenPoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativeScreenPoint lpPoint);
 
     private bool IsPlayheadTrailAnimating()
     {
