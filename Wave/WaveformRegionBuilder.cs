@@ -314,7 +314,8 @@ internal static class WaveformRegionBuilder
 
     /// <summary>
     /// 連続する着色（非除外）リージョンを 1 ファイル分にまとめる。
-    /// -R などで色付けしない区間は区切りとなり、続く着色列は次の _n になる。
+    /// 頭・尻の -R はカットだけで曲を増やさない。残す区間のあいだの -R だけが区切りになる。
+    /// 残る曲が 1 つならドロップ名、2 つ以上なら _n。
     /// </summary>
     public static IReadOnlyList<WaveformOutputPart> BuildOutputParts(
         IReadOnlyList<WaveformRegionMark> regions,
@@ -368,18 +369,69 @@ internal static class WaveformRegionBuilder
         }
 
         Flush();
+        return ProjectExportFileNames(parts, sourcePath, compactFileNumbers: false);
+    }
 
-        // 1 パートならドロップ名を維持（複数波形と同じ。区間は Clip trim）。
-        if (parts.Count == 1)
+    /// <summary>
+    /// 書き出すパートのファイル名を確定する。
+    /// 1 曲ならドロップ／基底名のまま。2 曲以上なら _n。
+    /// <paramref name="compactFileNumbers"/> が true なら有効パートを 1 から詰める。
+    /// </summary>
+    public static WaveformOutputPart[] ProjectExportFileNames(
+        IReadOnlyList<WaveformOutputPart> enabledParts,
+        string sourcePath,
+        bool compactFileNumbers)
+    {
+        var baseName = Path.GetFileNameWithoutExtension(sourcePath);
+        if (string.IsNullOrEmpty(baseName))
         {
-            var originalName = Path.GetFileName(sourcePath);
-            if (!string.IsNullOrEmpty(originalName))
-            {
-                parts[0] = parts[0] with { FileName = originalName };
-            }
+            baseName = "wave";
         }
 
-        return parts;
+        if (enabledParts.Count == 0)
+        {
+            return [];
+        }
+
+        if (enabledParts.Count == 1)
+        {
+            var originalName = ResolveOriginalExportFileName(sourcePath, baseName);
+            return [enabledParts[0] with { FileName = originalName }];
+        }
+
+        var projected = new WaveformOutputPart[enabledParts.Count];
+        for (var i = 0; i < enabledParts.Count; i++)
+        {
+            var part = enabledParts[i];
+            var fileNumber = compactFileNumbers ? i + 1 : part.Number;
+            var partBaseName = !string.IsNullOrEmpty(part.SourcePath)
+                ? Path.GetFileNameWithoutExtension(part.SourcePath)
+                : baseName;
+            if (string.IsNullOrEmpty(partBaseName))
+            {
+                partBaseName = baseName;
+            }
+
+            projected[i] = part with { FileName = $"{partBaseName}_{fileNumber}.wav" };
+        }
+
+        return projected;
+    }
+
+    private static string ResolveOriginalExportFileName(string sourcePath, string baseName)
+    {
+        var originalName = Path.GetFileName(sourcePath);
+        if (string.IsNullOrEmpty(originalName))
+        {
+            return $"{baseName}.wav";
+        }
+
+        if (Path.GetExtension(originalName).Length == 0)
+        {
+            return originalName + ".wav";
+        }
+
+        return originalName;
     }
 
     private static void AddSplitsWhereBarStartBpmChanges(

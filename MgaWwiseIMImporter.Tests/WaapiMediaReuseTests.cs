@@ -125,6 +125,170 @@ public class WaapiMediaReuseTests
     }
 
     [Fact]
+    public void BuildOutputParts_HeadAndTailExclude_SingleSong_KeepsOriginalName()
+    {
+        var regions = new[]
+        {
+            new WaveformRegionMark(0, 1000, IsExcluded: true),
+            new WaveformRegionMark(1000, 12000),
+            new WaveformRegionMark(12000, 36000, NameSuffix: "-L"),
+            new WaveformRegionMark(36000, 45000, NameSuffix: "-E"),
+            new WaveformRegionMark(45000, 48000, IsExcluded: true),
+        };
+
+        var parts = WaveformRegionBuilder.BuildOutputParts(regions, @"C:\music\master.wav");
+
+        var part = Assert.Single(parts);
+        Assert.Equal("master.wav", part.FileName);
+        Assert.Equal(1000, part.StartSampleOffset);
+        Assert.Equal(45000, part.EndSampleOffset);
+    }
+
+    [Fact]
+    public void BuildOutputParts_HeadMidTailExclude_TwoSongs_UsesNumberedNames()
+    {
+        var regions = new[]
+        {
+            new WaveformRegionMark(0, 1000, IsExcluded: true),
+            new WaveformRegionMark(1000, 12000),
+            new WaveformRegionMark(12000, 15000, IsExcluded: true),
+            new WaveformRegionMark(15000, 36000, NameSuffix: "-L"),
+            new WaveformRegionMark(36000, 45000, NameSuffix: "-E"),
+            new WaveformRegionMark(45000, 48000, IsExcluded: true),
+        };
+
+        var parts = WaveformRegionBuilder.BuildOutputParts(regions, @"C:\music\master.wav");
+
+        Assert.Equal(2, parts.Count);
+        Assert.Equal("master_1.wav", parts[0].FileName);
+        Assert.Equal("master_2.wav", parts[1].FileName);
+        Assert.Equal(1000, parts[0].StartSampleOffset);
+        Assert.Equal(12000, parts[0].EndSampleOffset);
+        Assert.Equal(15000, parts[1].StartSampleOffset);
+        Assert.Equal(45000, parts[1].EndSampleOffset);
+    }
+
+    [Fact]
+    public void ProjectExportFileNames_SingleRemainingPart_DropsNumberSuffix()
+    {
+        var parts = new[]
+        {
+            new WaveformOutputPart(
+                2,
+                18000,
+                48000,
+                "master_2.wav",
+                @"C:\music\master.wav",
+                18000,
+                48000),
+        };
+
+        var projected = WaveformRegionBuilder.ProjectExportFileNames(
+            parts,
+            @"C:\music\master.wav",
+            compactFileNumbers: false);
+
+        var part = Assert.Single(projected);
+        Assert.Equal("master.wav", part.FileName);
+        Assert.Equal(2, part.Number);
+        Assert.Equal(18000, part.StartSampleOffset);
+    }
+
+    [Fact]
+    public void ProjectExportFileNames_TwoParts_CompactRenumbers()
+    {
+        var parts = new[]
+        {
+            new WaveformOutputPart(1, 0, 1000, "master_1.wav", @"C:\music\master.wav"),
+            new WaveformOutputPart(3, 2000, 4000, "master_3.wav", @"C:\music\master.wav"),
+        };
+
+        var compact = WaveformRegionBuilder.ProjectExportFileNames(
+            parts,
+            @"C:\music\master.wav",
+            compactFileNumbers: true);
+        Assert.Equal("master_1.wav", compact[0].FileName);
+        Assert.Equal("master_2.wav", compact[1].FileName);
+
+        var raw = WaveformRegionBuilder.ProjectExportFileNames(
+            parts,
+            @"C:\music\master.wav",
+            compactFileNumbers: false);
+        Assert.Equal("master_1.wav", raw[0].FileName);
+        Assert.Equal("master_3.wav", raw[1].FileName);
+    }
+
+    [Fact]
+    public void SliceSegmentWavs_LeadingExclude_WritesOriginalNameAndSlices()
+    {
+        var work = Path.Combine(Path.GetTempPath(), "mga-media-headcut-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            const uint sampleRate = 48000;
+            const int frameCount = 48000;
+            const int headCut = 12000;
+            var sourcePath = TestWavFactory.WriteSilentPcm16Mono(
+                Path.Combine(work, "song.wav"),
+                sampleRate,
+                frameCount);
+            var outputDirectory = Path.Combine(work, "originals");
+            Directory.CreateDirectory(outputDirectory);
+            File.WriteAllText(Path.Combine(outputDirectory, "song.wav"), "stale");
+            var regions = new[]
+            {
+                new WaveformRegionMark(0, headCut, IsExcluded: true),
+                new WaveformRegionMark(headCut, 36000),
+                new WaveformRegionMark(36000, frameCount, NameSuffix: "-L"),
+            };
+            var parts = WaveformRegionBuilder.BuildOutputParts(regions, sourcePath);
+            var projected = WaveformRegionBuilder.ProjectExportFileNames(
+                parts,
+                sourcePath,
+                compactFileNumbers: false);
+            var bars = new[]
+            {
+                new WaveformBarMark(0, 1, 120, 4, 4),
+            };
+            var plan = WwiseMusicPlanBuilder.Build(
+                sourcePath: sourcePath,
+                sampleRate: sampleRate,
+                outputParts: projected,
+                regions: regions,
+                bars: bars,
+                markers: Array.Empty<WaveformMarkerMark>(),
+                outputDirectory: outputDirectory);
+            var wavInfo = WavFileInfo.Read(sourcePath);
+
+            var map = WaapiMusicImporter.SliceSegmentWavs(
+                plan,
+                sourcePath,
+                outputDirectory,
+                projected,
+                sampleRate,
+                blockAlign: 2,
+                wavInfo,
+                _ => { });
+
+            var dest = Assert.Single(Directory.GetFiles(outputDirectory, "*.wav"));
+            Assert.Equal("song.wav", Path.GetFileName(dest));
+            Assert.Equal(frameCount - headCut, WavFileInfo.Read(dest).FrameCount);
+            Assert.All(map.Values, binding =>
+            {
+                Assert.False(binding.ReusedOriginal);
+                Assert.Equal("song.wav", Path.GetFileName(binding.WavPath));
+            });
+        }
+        finally
+        {
+            if (Directory.Exists(work))
+            {
+                Directory.Delete(work, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void SliceSegmentWavs_XmlStyleTwoSongs_WritesOneWavPerPart()
     {
         var work = Path.Combine(Path.GetTempPath(), "mga-media-split-" + Guid.NewGuid().ToString("N"));

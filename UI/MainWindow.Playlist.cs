@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -604,41 +604,20 @@ public partial class MainWindow
         IReadOnlyList<WaveformOutputPart> parts,
         string sourcePath)
     {
-        var baseName = Path.GetFileNameWithoutExtension(sourcePath);
-        if (string.IsNullOrEmpty(baseName))
-        {
-            baseName = "wave";
-        }
-
         var enabled = parts
             .Where(part => !_disabledPartNumbers.Contains(part.Number))
             .OrderBy(part => part.StartSampleOffset)
             .ThenBy(part => part.Number)
             .ToArray();
-        var projected = new WaveformOutputPart[enabled.Length];
-        var multiWave = _loadedPreview?.IsMultiWaveOnly == true;
-        for (var i = 0; i < enabled.Length; i++)
+        if (_loadedPreview?.IsMultiWaveOnly == true)
         {
-            var part = enabled[i];
-            if (multiWave)
-            {
-                projected[i] = part;
-                continue;
-            }
-
-            var fileNumber = compactFileNumbersCheckBox.IsChecked == true ? i + 1 : part.Number;
-            var partBaseName = !string.IsNullOrEmpty(part.SourcePath)
-                ? Path.GetFileNameWithoutExtension(part.SourcePath)
-                : baseName;
-            if (string.IsNullOrEmpty(partBaseName))
-            {
-                partBaseName = baseName;
-            }
-
-            projected[i] = part with { FileName = $"{partBaseName}_{fileNumber}.wav" };
+            return enabled;
         }
 
-        return projected;
+        return WaveformRegionBuilder.ProjectExportFileNames(
+            enabled,
+            sourcePath,
+            compactFileNumbersCheckBox.IsChecked == true);
     }
 
     private string BuildNamingSourcePath(string sourcePath)
