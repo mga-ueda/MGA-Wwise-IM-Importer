@@ -652,13 +652,30 @@ public partial class MainWindow
 
     private TransportPositionInfo? ResolvePositionInfo(double progress)
     {
-        if (_loadedPreview is null || _loadedPreview.Bars.Count == 0)
+        if (_loadedPreview is null)
         {
             return null;
         }
 
         var totalSamples = Math.Max(1, _loadedPreview.Peaks.FrameCount);
         var sampleOffset = (long)Math.Round(progress * totalSamples);
+        var sampleRate = _loadedPreview.WavInfo.SampleRate == 0 ? 48000 : _loadedPreview.WavInfo.SampleRate;
+        var time = TimeSpan.FromSeconds(sampleOffset / (double)sampleRate);
+
+        // XML 無し（小節線なし）でもタイムコードは出す。拍子／小節位置だけ無効。
+        if (_loadedPreview.Bars.Count == 0)
+        {
+            return new TransportPositionInfo(
+                Bpm: 0,
+                Numerator: 0,
+                Denominator: 0,
+                Bar: 0,
+                Beat: 1,
+                Subdivision: 1,
+                Time: time,
+                HasMusicalPosition: false);
+        }
+
         var bar = _loadedPreview.Bars[0];
         foreach (var candidate in _loadedPreview.Bars)
         {
@@ -670,7 +687,6 @@ public partial class MainWindow
             bar = candidate;
         }
 
-        var sampleRate = _loadedPreview.WavInfo.SampleRate == 0 ? 48000 : _loadedPreview.WavInfo.SampleRate;
         var secondsPerBeat = bar.Bpm > 0 ? 60d / bar.Bpm : 0d;
         var samplesFromBar = sampleOffset - bar.SampleOffset;
         var secondsFromBar = samplesFromBar / (double)sampleRate;
@@ -682,7 +698,7 @@ public partial class MainWindow
             Math.Max(1, bar.BarNumber),
             beat + 1,
             1,
-            TimeSpan.FromSeconds(sampleOffset / (double)sampleRate));
+            time);
     }
 
     private int ResolveBarNumberFromProgress(double progress)
