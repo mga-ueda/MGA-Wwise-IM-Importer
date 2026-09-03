@@ -22,6 +22,7 @@ public partial class MainWindow
     private string _lastKnownWwiseProjectFilePath = string.Empty;
     private string _lastKnownWwiseProjectName = string.Empty;
     private bool _wwiseProjectActivateBusy;
+    private bool _yieldedAlwaysOnTopToWwise;
 
     private void InitializeWaapiEventWiring()
     {
@@ -37,7 +38,8 @@ public partial class MainWindow
             AutosaveCurrentProject();
             ReleaseFocusToWaveform();
         };
-        waapiStatusBar.ProjectNameClick += (_, _) => _ = OpenOrFocusKeptWwiseProjectAsync();
+        waapiStatusBar.ProjectNameClick += (_, _) => RequestOpenOrFocusWwiseProject();
+        Activated += (_, _) => RestoreAlwaysOnTopAfterWwiseFocus();
         _waapiPollTimer.Tick += async (_, _) => await PollWaapiAsync().ConfigureAwait(true);
     }
 
@@ -138,15 +140,73 @@ public partial class MainWindow
 
     private void RememberLiveWwiseProject(WaapiProbeResult result)
     {
-        if (result.ProjectFilePath.Length > 0)
+        var changed = false;
+        if (WaapiJson.LooksLikeProjectFilePath(result.ProjectFilePath)
+            && !string.Equals(_lastKnownWwiseProjectFilePath, result.ProjectFilePath, StringComparison.OrdinalIgnoreCase))
         {
-            _lastKnownWwiseProjectFilePath = result.ProjectFilePath;
+            _lastKnownWwiseProjectFilePath = result.ProjectFilePath.Trim().Trim('"');
+            changed = true;
         }
 
-        if (result.ProjectName.Length > 0)
+        if (result.ProjectName.Length > 0
+            && !string.Equals(_lastKnownWwiseProjectName, result.ProjectName, StringComparison.Ordinal))
         {
             _lastKnownWwiseProjectName = result.ProjectName;
+            changed = true;
         }
+
+        if (_lastKnownWwiseProjectName.Length == 0)
+        {
+            var derived = DeriveWwiseProjectDisplayName(_lastKnownWwiseProjectFilePath);
+            if (derived.Length > 0)
+            {
+                _lastKnownWwiseProjectName = derived;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            PersistLastKnownWwiseProject();
+        }
+    }
+
+    /// <returns>Keep Target の .wproj から名前／パスを補完したとき true。</returns>
+    private bool RestoreLastKnownWwiseProject(ProjectProfile profile)
+    {
+        _lastKnownWwiseProjectName = profile.LastKnownWwiseProjectName?.Trim() ?? string.Empty;
+        _lastKnownWwiseProjectFilePath = profile.LastKnownWwiseProjectFilePath?.Trim() ?? string.Empty;
+        if (_lastKnownWwiseProjectFilePath.Length == 0 && _keptTargetProjectFilePath.Length > 0)
+        {
+            _lastKnownWwiseProjectFilePath = _keptTargetProjectFilePath;
+        }
+
+        if (!WaapiJson.LooksLikeProjectFilePath(_lastKnownWwiseProjectFilePath))
+        {
+            var nearOutput = WwiseProjectActivator.TryFindProjectFileNearDirectory(profile.OutputDirectory);
+            if (nearOutput.Length > 0)
+            {
+                _lastKnownWwiseProjectFilePath = nearOutput;
+            }
+        }
+
+        if (_lastKnownWwiseProjectName.Length == 0)
+        {
+            _lastKnownWwiseProjectName = DeriveWwiseProjectDisplayName(
+                _lastKnownWwiseProjectFilePath.Length > 0
+                    ? _lastKnownWwiseProjectFilePath
+                    : _keptTargetProjectFilePath);
+        }
+
+        var seeded = !string.Equals(
+                profile.LastKnownWwiseProjectName?.Trim() ?? string.Empty,
+                _lastKnownWwiseProjectName,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                profile.LastKnownWwiseProjectFilePath?.Trim() ?? string.Empty,
+                _lastKnownWwiseProjectFilePath,
+                StringComparison.OrdinalIgnoreCase);
+        return seeded && (_lastKnownWwiseProjectName.Length > 0 || _lastKnownWwiseProjectFilePath.Length > 0);
     }
 
     private void WaapiStatusBar_KeepTargetChanged(object? sender, EventArgs e)
@@ -156,6 +216,20 @@ public partial class MainWindow
         {
             _keptTargetPath = _waapiLastResult?.SelectedPath ?? _keptTargetPath;
             _keptTargetProjectFilePath = _waapiLastResult?.ProjectFilePath ?? _lastKnownWwiseProjectFilePath;
+            if (_waapiLastResult is { ProjectName.Length: > 0 } live)
+            {
+                _lastKnownWwiseProjectName = live.ProjectName;
+            }
+
+            if (_keptTargetProjectFilePath.Length > 0)
+            {
+                _lastKnownWwiseProjectFilePath = _keptTargetProjectFilePath;
+            }
+
+            if (_lastKnownWwiseProjectName.Length == 0)
+            {
+                _lastKnownWwiseProjectName = DeriveWwiseProjectDisplayName(_lastKnownWwiseProjectFilePath);
+            }
         }
         else
         {
@@ -164,12 +238,26 @@ public partial class MainWindow
         }
 
         PersistKeepTarget();
+        PersistLastKnownWwiseProject();
         RefreshWaapiStatusDisplay();
     }
 
     private void PersistKeepTarget()
     {
         _projectStore.SaveKeepTarget(_loadedProjectName, _keepTarget, _keptTargetPath, _keptTargetProjectFilePath);
+    }
+
+    private void PersistLastKnownWwiseProject()
+    {
+        if (_suppressProjectUiEvents || _closing || string.IsNullOrWhiteSpace(_loadedProjectName))
+        {
+            return;
+        }
+
+        _projectStore.SaveLastKnownWwiseProject(
+            _loadedProjectName,
+            _lastKnownWwiseProjectName,
+            _lastKnownWwiseProjectFilePath);
     }
 
     private string GetDisplayTargetPath() => _keepTarget
@@ -183,36 +271,97 @@ public partial class MainWindow
             return;
         }
 
+        var rememberedName = ResolveRememberedWwiseProjectDisplayName(allowUnnamed: false);
+        var displayName = result.ProjectName.Length > 0 ? result.ProjectName : rememberedName;
+        var launchPath = ResolveWwiseProjectFilePathForLaunch();
+        var hasLaunchPath = launchPath.Length > 0;
+        var clickable = hasLaunchPath && displayName.Length > 0;
+
         if (result.Ok)
         {
             waapiStatusBar.UpdateSelection(
                 result.WwiseVersion,
-                result.ProjectName,
+                displayName,
                 GetDisplayTargetPath(),
-                _keepTarget);
+                _keepTarget,
+                projectNameClickable: clickable);
         }
         else if (_keepTarget)
         {
-            waapiStatusBar.UpdateDisconnectedKeepTarget(GetKeptWwiseProjectDisplayName(_lastKnownWwiseProjectName), _keptTargetPath);
+            waapiStatusBar.UpdateDisconnectedKeepTarget(
+                ResolveRememberedWwiseProjectDisplayName(allowUnnamed: true),
+                _keptTargetPath,
+                projectNameClickable: hasLaunchPath);
         }
         else
         {
             waapiStatusBar.UpdateDisconnectedLastProject(
-                _lastKnownWwiseProjectName,
+                rememberedName,
                 UiStrings.StatusDisconnected,
-                projectNameClickable: _lastKnownWwiseProjectFilePath.Length > 0);
+                projectNameClickable: clickable);
         }
 
         UpdateExportEnabled();
     }
 
-    private string GetKeptWwiseProjectDisplayName(string fallback) =>
-        fallback.Length > 0 ? fallback : UiStrings.LabelUnnamedProject;
+    private string ResolveRememberedWwiseProjectDisplayName(bool allowUnnamed)
+    {
+        if (_lastKnownWwiseProjectName.Length > 0)
+        {
+            return _lastKnownWwiseProjectName;
+        }
 
-    private string ResolveWwiseProjectFilePathForLaunch() =>
-        _keptTargetProjectFilePath.Length > 0 ? _keptTargetProjectFilePath : _lastKnownWwiseProjectFilePath;
+        var derived = DeriveWwiseProjectDisplayName(
+            _keptTargetProjectFilePath.Length > 0
+                ? _keptTargetProjectFilePath
+                : _lastKnownWwiseProjectFilePath);
+        if (derived.Length > 0)
+        {
+            return derived;
+        }
 
-    private async Task OpenOrFocusKeptWwiseProjectAsync()
+        return allowUnnamed ? UiStrings.LabelUnnamedProject : string.Empty;
+    }
+
+    private static string DeriveWwiseProjectDisplayName(string filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return Path.GetFileNameWithoutExtension(filePath.Trim().Trim('"')) ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private string ResolveWwiseProjectFilePathForLaunch()
+    {
+        if (WaapiJson.LooksLikeProjectFilePath(_keptTargetProjectFilePath))
+        {
+            return _keptTargetProjectFilePath.Trim().Trim('"');
+        }
+
+        if (WaapiJson.LooksLikeProjectFilePath(_lastKnownWwiseProjectFilePath))
+        {
+            return _lastKnownWwiseProjectFilePath.Trim().Trim('"');
+        }
+
+        var live = _waapiLastResult?.ProjectFilePath ?? string.Empty;
+        if (WaapiJson.LooksLikeProjectFilePath(live))
+        {
+            return live.Trim().Trim('"');
+        }
+
+        return WwiseProjectActivator.TryFindProjectFileNearDirectory(_projectOutputDirectory);
+    }
+
+    private void RequestOpenOrFocusWwiseProject()
     {
         if (_wwiseProjectActivateBusy)
         {
@@ -222,14 +371,84 @@ public partial class MainWindow
         var path = ResolveWwiseProjectFilePathForLaunch();
         if (path.Length == 0)
         {
+            AppendColoredLine(UiStrings.LogWwiseProjectPathMissing);
             return;
         }
 
+        RememberResolvedLaunchPath(path);
+        YieldAlwaysOnTopToWwise();
+        WwiseProjectActivator.TryFocusExistingAuthoring(path);
+        _ = OpenOrFocusKeptWwiseProjectAsync(path);
+    }
+
+    private void RememberResolvedLaunchPath(string path)
+    {
+        if (string.Equals(_lastKnownWwiseProjectFilePath, path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _lastKnownWwiseProjectFilePath = path;
+        if (_lastKnownWwiseProjectName.Length == 0)
+        {
+            _lastKnownWwiseProjectName = DeriveWwiseProjectDisplayName(path);
+        }
+
+        PersistLastKnownWwiseProject();
+    }
+
+    private void YieldAlwaysOnTopToWwise()
+    {
+        if (!Topmost)
+        {
+            return;
+        }
+
+        _yieldedAlwaysOnTopToWwise = true;
+        Topmost = false;
+    }
+
+    private void RestoreAlwaysOnTopAfterWwiseFocus()
+    {
+        if (!_yieldedAlwaysOnTopToWwise || !_appSettings.AlwaysOnTop)
+        {
+            return;
+        }
+
+        _yieldedAlwaysOnTopToWwise = false;
+        Topmost = true;
+    }
+
+    private async Task OpenOrFocusKeptWwiseProjectAsync(string? projectFilePath = null)
+    {
+        if (_wwiseProjectActivateBusy)
+        {
+            return;
+        }
+
+        var path = projectFilePath is { Length: > 0 }
+            ? projectFilePath
+            : ResolveWwiseProjectFilePathForLaunch();
+        if (path.Length == 0)
+        {
+            AppendColoredLine(UiStrings.LogWwiseProjectPathMissing);
+            return;
+        }
+
+        RememberResolvedLaunchPath(path);
         _wwiseProjectActivateBusy = true;
         try
         {
-            var (ok, message) = await WwiseProjectActivator.OpenOrFocusAsync(_waapiSettings, path).ConfigureAwait(true);
-            if (!ok && message.Length > 0)
+            YieldAlwaysOnTopToWwise();
+            var (ok, message) = await WwiseProjectActivator.OpenOrFocusAsync(_waapiSettings, path)
+                .ConfigureAwait(true);
+            if (ok)
+            {
+                YieldAlwaysOnTopToWwise();
+                WwiseProjectActivator.TryFocusExistingAuthoring(path);
+            }
+
+            if (message.Length > 0)
             {
                 AppendColoredLine(message);
             }

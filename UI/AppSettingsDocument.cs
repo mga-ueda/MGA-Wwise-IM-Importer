@@ -148,6 +148,10 @@ internal sealed class ProjectProfileData
 
     public string KeptTargetProjectFilePath { get; set; } = string.Empty;
 
+    public string LastKnownWwiseProjectName { get; set; } = string.Empty;
+
+    public string LastKnownWwiseProjectFilePath { get; set; } = string.Empty;
+
     public static ProjectProfileData FromProfile(ProjectProfile profile) => new()
     {
         Name = profile.Name,
@@ -181,6 +185,8 @@ internal sealed class ProjectProfileData
         KeepTarget = profile.KeepTarget,
         KeptTargetPath = profile.KeptTargetPath ?? string.Empty,
         KeptTargetProjectFilePath = profile.KeptTargetProjectFilePath ?? string.Empty,
+        LastKnownWwiseProjectName = profile.LastKnownWwiseProjectName ?? string.Empty,
+        LastKnownWwiseProjectFilePath = profile.LastKnownWwiseProjectFilePath ?? string.Empty,
     };
 
     public ProjectProfile ToProfile()
@@ -236,6 +242,8 @@ internal sealed class ProjectProfileData
         profile.KeepTarget = KeepTarget;
         profile.KeptTargetPath = (KeptTargetPath ?? string.Empty).Trim().Trim('"');
         profile.KeptTargetProjectFilePath = (KeptTargetProjectFilePath ?? string.Empty).Trim().Trim('"');
+        profile.LastKnownWwiseProjectName = (LastKnownWwiseProjectName ?? string.Empty).Trim();
+        profile.LastKnownWwiseProjectFilePath = (LastKnownWwiseProjectFilePath ?? string.Empty).Trim().Trim('"');
         return profile;
     }
 }

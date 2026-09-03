@@ -209,7 +209,8 @@ internal sealed partial class WaapiStatusBar : UserControl
         string wwiseVersion,
         string projectName,
         string selectedPath,
-        bool keepTarget = false)
+        bool keepTarget = false,
+        bool? projectNameClickable = null)
     {
         _keepLockEnabled = true;
         if (keepTarget != _keepTargetChecked)
@@ -227,15 +228,18 @@ internal sealed partial class WaapiStatusBar : UserControl
             wwiseVersion,
             projectName,
             string.IsNullOrEmpty(selectedPath) ? UiStrings.StatusNoneSelected : selectedPath,
-            projectNameClickable: keepTarget && projectName.Length > 0);
+            projectNameClickable: projectNameClickable ?? (keepTarget && projectName.Length > 0));
     }
 
-    public void UpdateDisconnectedKeepTarget(string projectName, string keptPath) =>
+    public void UpdateDisconnectedKeepTarget(
+        string projectName,
+        string keptPath,
+        bool? projectNameClickable = null) =>
         UpdateDisconnectedStatus(
             projectName,
             string.IsNullOrEmpty(keptPath) ? UiStrings.StatusNoneSelected : keptPath,
             keepTargetChecked: true,
-            projectNameClickable: projectName.Length > 0);
+            projectNameClickable: projectNameClickable ?? projectName.Length > 0);
 
     public void UpdateDisconnectedLastProject(
         string projectName,

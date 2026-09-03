@@ -26,7 +26,7 @@
       <StackPanel x:Name="DetailPanel" Orientation="Horizontal" VerticalAlignment="Center">
         <TextBlock x:Name="VersionLabel" FontSize="12" VerticalAlignment="Center" />
         <TextBlock x:Name="SepAfterVersion" Text=" - " FontSize="12" VerticalAlignment="Center" />
-        <TextBlock x:Name="ProjectNameLabel" FontSize="12" VerticalAlignment="Center" Cursor="Hand"
+        <TextBlock x:Name="ProjectNameLabel" FontSize="12" VerticalAlignment="Center" Cursor="Arrow"
                    MouseLeftButtonUp="ProjectNameLabel_Click"
                    MouseEnter="ProjectNameLabel_MouseEnter"
                    MouseLeave="ProjectNameLabel_MouseLeave" />

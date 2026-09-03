@@ -86,6 +86,12 @@ internal sealed class ProjectProfile
     /// <summary>固定時の Wwise プロジェクトファイルパス（不一致なら再選択しない）。</summary>
     public string KeptTargetProjectFilePath { get; set; } = string.Empty;
 
+    /// <summary>このプロファイルで最後に確認した Wwise プロジェクト名（未接続時の表示用）。</summary>
+    public string LastKnownWwiseProjectName { get; set; } = string.Empty;
+
+    /// <summary>このプロファイルで最後に確認した Wwise プロジェクトファイルパス。</summary>
+    public string LastKnownWwiseProjectFilePath { get; set; } = string.Empty;
+
     public ProjectProfile Clone() => new()
     {
         Name = Name,
@@ -119,6 +125,8 @@ internal sealed class ProjectProfile
         KeepTarget = KeepTarget,
         KeptTargetPath = KeptTargetPath,
         KeptTargetProjectFilePath = KeptTargetProjectFilePath,
+        LastKnownWwiseProjectName = LastKnownWwiseProjectName,
+        LastKnownWwiseProjectFilePath = LastKnownWwiseProjectFilePath,
     };
 
     public void CopyMarkerInto(MarkerSettings markers)
@@ -202,6 +210,8 @@ internal sealed class ProjectSettingsStore
         KeepTarget = false,
         KeptTargetPath = string.Empty,
         KeptTargetProjectFilePath = string.Empty,
+        LastKnownWwiseProjectName = string.Empty,
+        LastKnownWwiseProjectFilePath = string.Empty,
     };
 
     public static ProjectSettingsStore Load()
@@ -292,6 +302,21 @@ internal sealed class ProjectSettingsStore
         profile.KeepTarget = enabled;
         profile.KeptTargetPath = keptTargetPath?.Trim() ?? string.Empty;
         profile.KeptTargetProjectFilePath = keptTargetProjectFilePath?.Trim() ?? string.Empty;
+        WriteProfile(name, profile);
+    }
+
+    public void SaveLastKnownWwiseProject(
+        string name,
+        string projectName,
+        string projectFilePath)
+    {
+        if (!_profiles.TryGetValue(name.Trim(), out var profile))
+        {
+            return;
+        }
+
+        profile.LastKnownWwiseProjectName = projectName?.Trim() ?? string.Empty;
+        profile.LastKnownWwiseProjectFilePath = projectFilePath?.Trim() ?? string.Empty;
         WriteProfile(name, profile);
     }
 

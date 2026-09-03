@@ -37,6 +37,11 @@ internal static class WaapiStartupProbe
                 }
 
                 projectFilePath = WaapiJson.ReadProjectFilePath(project);
+                if (projectFilePath.Length == 0)
+                {
+                    projectFilePath = await TryReadProjectFilePathFromObjectGetAsync(client, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
             catch
             {
@@ -159,6 +164,37 @@ internal static class WaapiStartupProbe
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// getProjectInfo に .wproj が無い版向け。object.get の filePath を使う。
+    /// </summary>
+    private static async Task<string> TryReadProjectFilePathFromObjectGetAsync(
+        WaapiHttpClient client,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await client.CallAsync(
+                    WaapiUris.CoreObjectGet,
+                    new Dictionary<string, object?> { ["waql"] = "$ from type Project" },
+                    new Dictionary<string, object?> { ["return"] = new[] { "name", "filePath" } },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!result.TryGetProperty("return", out var objects)
+                || objects.ValueKind != JsonValueKind.Array
+                || objects.GetArrayLength() == 0)
+            {
+                return string.Empty;
+            }
+
+            return WaapiJson.ReadProjectFilePath(objects[0]);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private static string FormatProject(JsonElement project)

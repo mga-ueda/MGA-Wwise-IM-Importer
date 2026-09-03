@@ -432,8 +432,8 @@ internal static partial class UiStrings
         "Cannot connect. Ensure Wwise is running and WAAPI is enabled.");
 
     public static string LogWwiseProjectPathMissing => Get(
-        "Keep Target : ロック中 Wwise プロジェクトのパスがありません。",
-        "Keep Target : locked Wwise project path is missing.");
+        "Wwise プロジェクトのファイルパスが不明なため開けません。Wwise でプロジェクトを開いた状態で一度接続してください。",
+        "Cannot open the Wwise project because its file path is unknown. Connect once with the project open in Wwise.");
 
     public static string LogWwiseProjectFileMissing(string path) => Format(
         "Keep Target : Wwise プロジェクトファイルが見つかりません → {0}",

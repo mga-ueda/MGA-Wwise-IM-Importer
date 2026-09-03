@@ -6,22 +6,96 @@ namespace MgaWwiseIMImporter.Wwise;
 internal static class WaapiJson
 {
     /// <summary>
-    /// getProjectInfo 応答からプロジェクト（.wproj）パスを読む。
-    /// Wwise 版によりキーが path / filePath のどちらかで返る。
+    /// getProjectInfo / object.get 応答から .wproj のファイルシステムパスを読む。
+    /// <c>path</c> は Wwise オブジェクトパス（\Name）のことがあるため、.wproj だけを採用する。
     /// </summary>
     public static string ReadProjectFilePath(JsonElement project)
     {
-        if (TryGetString(project, "path", out var path))
-        {
-            return path;
-        }
-
-        if (TryGetString(project, "filePath", out var filePath))
+        if (TryGetString(project, "filePath", out var filePath) && LooksLikeProjectFilePath(filePath))
         {
             return filePath;
         }
 
+        if (TryGetString(project, "path", out var path) && LooksLikeProjectFilePath(path))
+        {
+            return path;
+        }
+
+        if (TryBuildProjectFilePathFromDirectories(project, out var fromDirectories))
+        {
+            return fromDirectories;
+        }
+
         return string.Empty;
+    }
+
+    /// <summary>.wproj のファイルシステムパスか（Wwise オブジェクトパスは含まない）。</summary>
+    public static bool LooksLikeProjectFilePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var trimmed = path.Trim().Trim('"');
+        return trimmed.EndsWith(".wproj", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryBuildProjectFilePathFromDirectories(JsonElement project, out string path)
+    {
+        path = string.Empty;
+        if (project.ValueKind != JsonValueKind.Object
+            || !project.TryGetProperty("directories", out var directories))
+        {
+            return false;
+        }
+
+        if (!TryGetString(directories, "root", out var root))
+        {
+            return false;
+        }
+
+        TryGetString(project, "name", out var name);
+        try
+        {
+            var directory = Path.GetFullPath(root.Trim().Trim('"'));
+            if (name.Length > 0)
+            {
+                path = Path.Combine(directory, name + ".wproj");
+                return true;
+            }
+
+            if (Directory.Exists(directory))
+            {
+                var matches = Directory.GetFiles(directory, "*.wproj");
+                if (matches.Length == 1)
+                {
+                    path = matches[0];
+                    return true;
+                }
+
+                if (name.Length > 0)
+                {
+                    var match = Array.Find(
+                        matches,
+                        file => string.Equals(
+                            Path.GetFileNameWithoutExtension(file),
+                            name,
+                            StringComparison.OrdinalIgnoreCase));
+                    if (match is not null)
+                    {
+                        path = match;
+                        return true;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        return false;
     }
 
     /// <summary>非空文字列プロパティのみ true。</summary>

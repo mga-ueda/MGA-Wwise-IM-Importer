@@ -204,7 +204,7 @@ public partial class MainWindow
 
     /// <summary>
     /// 波形・セッションを卸し、選択中プロジェクトの設定をアプリ既定へ戻して保存する。
-    /// Always on Top／Stream／Keep Layer Balance（アプリ設定）、書き出し先フォルダ、WAAPI Keep Target は変更しない。
+    /// Always on Top／Stream／Keep Layer Balance（アプリ設定）、書き出し先フォルダ、WAAPI Keep Target／最後に確認した Wwise プロジェクトは変更しない。
     /// プロジェクト名／一覧は消さない。
     /// </summary>
     private void ClearCurrentProjectToDefaults()
@@ -221,6 +221,8 @@ public partial class MainWindow
         var preservedKeepTarget = _keepTarget;
         var preservedKeptTargetPath = _keptTargetPath;
         var preservedKeptTargetProjectFilePath = _keptTargetProjectFilePath;
+        var preservedLastKnownWwiseProjectName = _lastKnownWwiseProjectName;
+        var preservedLastKnownWwiseProjectFilePath = _lastKnownWwiseProjectFilePath;
         // More Options の開閉はユーザー操作のまま残す（既定の展開で上書きしない）。
         var preservedMoreOptionsExpanded = markerOptionsPanel.MoreOptionsExpanded;
 
@@ -229,6 +231,8 @@ public partial class MainWindow
         profile.KeepTarget = preservedKeepTarget;
         profile.KeptTargetPath = preservedKeptTargetPath;
         profile.KeptTargetProjectFilePath = preservedKeptTargetProjectFilePath;
+        profile.LastKnownWwiseProjectName = preservedLastKnownWwiseProjectName;
+        profile.LastKnownWwiseProjectFilePath = preservedLastKnownWwiseProjectFilePath;
         profile.MoreOptionsExpanded = preservedMoreOptionsExpanded;
         // Stream／Keep Layer Balance はアプリ設定。プロファイル互換用に現状を残す。
         profile.StreamEnabled = _appSettings.StreamEnabled;

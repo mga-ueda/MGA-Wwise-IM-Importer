@@ -297,6 +297,7 @@ public partial class MainWindow
     /// <summary>プロジェクト切替・削除・起動時に、指定プロファイルを UI 全体へ反映する。</summary>
     private void ApplyProjectProfile(ProjectProfile profile, bool applyLastSession)
     {
+        var persistRememberedWwise = false;
         _suppressProjectUiEvents = true;
         try
         {
@@ -325,6 +326,7 @@ public partial class MainWindow
             _keepTarget = profile.KeepTarget;
             _keptTargetPath = profile.KeptTargetPath;
             _keptTargetProjectFilePath = profile.KeptTargetProjectFilePath;
+            persistRememberedWwise = RestoreLastKnownWwiseProject(profile);
             waapiStatusBar.KeepTargetChecked = _keepTarget;
             waapiStatusBar.AutoActiveChecked = profile.AutoActive;
         }
@@ -333,9 +335,15 @@ public partial class MainWindow
             _suppressProjectUiEvents = false;
         }
 
+        if (persistRememberedWwise)
+        {
+            PersistLastKnownWwiseProject();
+        }
+
         exportButton.IsEnabled = false;
         reloadButton.IsEnabled = false;
         ClearWaveformState();
+        RefreshWaapiStatusDisplay();
 
         if (applyLastSession && profile.KeepLastSession)
         {
@@ -367,6 +375,8 @@ public partial class MainWindow
         profile.KeepTarget = _keepTarget;
         profile.KeptTargetPath = _keptTargetPath;
         profile.KeptTargetProjectFilePath = _keptTargetProjectFilePath;
+        profile.LastKnownWwiseProjectName = _lastKnownWwiseProjectName;
+        profile.LastKnownWwiseProjectFilePath = _lastKnownWwiseProjectFilePath;
         profile.AutoActive = waapiStatusBar.AutoActiveChecked;
     }
 
