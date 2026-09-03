@@ -44,7 +44,7 @@ internal static class WwiseMusicPlanBuilder
         IReadOnlyDictionary<int, PlaylistExitSourceMode>? partChangeOccursAtModes = null,
         PlaylistExitSourceMode defaultChangeOccursAt = PlaylistExitSourceMode.Immediate,
         IReadOnlyDictionary<int, bool>? partPlayPostExit = null,
-        bool defaultPlayPostExit = true,
+        bool defaultPlayPostExit = false,
         IReadOnlyDictionary<int, bool>? partAdditiveLayers = null,
         string? containerNameOverride = null)
     {

@@ -17,8 +17,8 @@ internal sealed class ProjectProfile
 
     public PlaylistExitSourceMode ExitSourceAt { get; set; } = PlaylistExitSourceMode.Immediate;
 
-    /// <summary>Play -E（Wwise Play post-exit。既定オン）。</summary>
-    public bool PlayPostExit { get; set; } = true;
+    /// <summary>Play -E（Wwise Play post-exit。既定オフ）。</summary>
+    public bool PlayPostExit { get; set; }
 
     public MarkerGridOverrideMode GridOverride { get; set; } = MarkerGridOverrideMode.Bar;
 
@@ -185,7 +185,7 @@ internal sealed class ProjectSettingsStore
         FadeInCurve = RegionEdgeFade.BuiltinPlaylistFadeInCurve.ToString(),
         FadeOutCurve = RegionEdgeFade.BuiltinPlaylistFadeOutCurve.ToString(),
         ExitSourceAt = PlaylistExitSourceMode.Immediate,
-        PlayPostExit = true,
+        PlayPostExit = false,
         GridOverride = MarkerGridOverrideMode.Bar,
         CommentDigits = 3,
         CommentZeroPad = true,

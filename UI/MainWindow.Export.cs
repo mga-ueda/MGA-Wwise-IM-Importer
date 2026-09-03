@@ -374,7 +374,7 @@ public partial class MainWindow
                 snapshot.PartChangeOccursAtModes,
                 PlaylistExitSourceMode.Immediate,
                 snapshot.PartPlayPostExit,
-                defaultPlayPostExit: true,
+                defaultPlayPostExit: false,
                 snapshot.PartAdditiveLayers,
                 containerNameOverride);
             ReportProgress(UiStrings.LogPlanReady(plan.Playlists.Count));

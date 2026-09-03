@@ -436,7 +436,7 @@ public partial class MainWindow
         NormalizeExitSourceModeForCurrentWave(mode, _previewSession?.AllowsSessionMarkerEdit == true);
 
     private bool ResolvePlayPostExit(int partNumber) =>
-        _partPlayPostExit.GetValueOrDefault(partNumber, true);
+        _partPlayPostExit.GetValueOrDefault(partNumber, false);
 
     private bool ResolveAdditiveLayers(int partNumber) =>
         _partAdditiveLayers.GetValueOrDefault(partNumber, false);

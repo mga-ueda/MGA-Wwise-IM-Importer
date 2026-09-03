@@ -104,7 +104,7 @@ internal sealed class ProjectProfileData
 
     public string ExitSourceAt { get; set; } = nameof(PlaylistExitSourceMode.Immediate);
 
-    public bool PlayPostExit { get; set; } = true;
+    public bool PlayPostExit { get; set; }
 
     public string GridOverride { get; set; } = nameof(MarkerGridOverrideMode.Bar);
 

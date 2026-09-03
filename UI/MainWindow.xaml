@@ -250,7 +250,7 @@
                                          FontSize="11.333" />
                   <StackPanel x:Name="optionsChoicesPanel"
                               Margin="{x:Static ui:DesignMetrics.FlatOptionPanelPadding}">
-                    <ui:FlatOptionCheckBox x:Name="playMinusECheckBox" IsChecked="True" FontSize="11.333" />
+                    <ui:FlatOptionCheckBox x:Name="playMinusECheckBox" IsChecked="False" FontSize="11.333" />
                     <ui:FlatOptionCheckBox x:Name="additiveLayersCheckBox" IsEnabled="False" FontSize="11.333" />
                   </StackPanel>
                 </StackPanel>

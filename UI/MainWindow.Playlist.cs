@@ -315,7 +315,7 @@ public partial class MainWindow
                 _partFadeOutCurves.TryAdd(part.Number, _appSettings.DefaultPlaylistFadeOutCurve);
                 _partExitSourceModes.TryAdd(part.Number, PlaylistExitSourceMode.Immediate);
                 _partChangeOccursAtModes.TryAdd(part.Number, PlaylistExitSourceMode.Immediate);
-                _partPlayPostExit.TryAdd(part.Number, true);
+                _partPlayPostExit.TryAdd(part.Number, false);
 
                 if (!displayNames.TryGetValue(part.Number, out var displayName)
                     || string.IsNullOrWhiteSpace(displayName))
@@ -844,7 +844,7 @@ public partial class MainWindow
 
         var leader = members[0];
         var exit = _partExitSourceModes.GetValueOrDefault(leader, PlaylistExitSourceMode.Immediate);
-        var playPostExit = _partPlayPostExit.GetValueOrDefault(leader, true);
+        var playPostExit = _partPlayPostExit.GetValueOrDefault(leader, false);
         var additiveLayers = _partAdditiveLayers.GetValueOrDefault(leader, false);
         var fadeIn = _partFadeInSeconds.GetValueOrDefault(leader);
         var fadeOut = _partFadeOutSeconds.GetValueOrDefault(leader);
@@ -1061,7 +1061,7 @@ public partial class MainWindow
             SelectFadeRadio(FadeInGroupRadios, _partGroupFadeSeconds.GetValueOrDefault(partNumber));
             SelectExitSourceRadio(ExitSourceRadios, _partExitSourceModes.GetValueOrDefault(partNumber, PlaylistExitSourceMode.Immediate));
             SelectExitSourceRadio(ChangeOccursRadios, _partChangeOccursAtModes.GetValueOrDefault(partNumber, PlaylistExitSourceMode.Immediate));
-            playMinusECheckBox.IsChecked = _partPlayPostExit.GetValueOrDefault(partNumber, true);
+            playMinusECheckBox.IsChecked = _partPlayPostExit.GetValueOrDefault(partNumber, false);
             additiveLayersCheckBox.IsChecked = _partAdditiveLayers.GetValueOrDefault(partNumber, false);
             UpdateAdditiveLayersOptionEnabled();
         }

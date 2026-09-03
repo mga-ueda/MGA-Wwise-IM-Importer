@@ -38,8 +38,8 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     private bool _isPlaying;
     private bool _disposed;
     private bool _suppressPlaybackEnded;
-    /// <summary>ループ折り返し時に -E を二重再生するか（既定 true）。</summary>
-    private bool _playExitLayer = true;
+    /// <summary>ループ折り返し時に -E を二重再生するか（既定 false）。</summary>
+    private bool _playExitLayer;
     /// <summary>
     /// 次の Play 前に出力デバイスを作り直し、先読みバッファを破棄するか。
     /// Pause／Stop／一時停止中のシーク後はデバイス側に旧位置が残り得る（ASIO で顕著）。
