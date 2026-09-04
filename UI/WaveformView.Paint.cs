@@ -1302,19 +1302,17 @@ internal sealed partial class WaveformView
 
         var topY = wave.Top;
         var bottomY = wave.Bottom - 1f;
-        // 表示幅に応じてサンプルし、スプラインではなく折れ線で正確に描く
-        var pixelSpan = Math.Max(
-            2f,
-            Math.Abs(
-                AbsoluteToX(SampleToAbsolute(endSample, frameCount), wave)
-                - AbsoluteToX(SampleToAbsolute(startSample, frameCount), wave)));
+        // 表示幅に応じて t をサンプルし、スプラインではなく折れ線で描く。
+        // X はサンプル格子へ丸めない（短いフェードを拡大すると同一 X に複数 Y が乗り階段になる）。
+        var abs0 = SampleToAbsolute(startSample, frameCount);
+        var abs1 = SampleToAbsolute(endSample, frameCount);
+        var pixelSpan = Math.Max(2f, Math.Abs(AbsoluteToX(abs1, wave) - AbsoluteToX(abs0, wave)));
         var steps = Math.Clamp((int)Math.Ceiling(pixelSpan), 16, 256);
         var points = new List<PointF>(steps + 1);
         for (var i = 0; i <= steps; i++)
         {
             var t = i / (double)steps;
-            var sample = startSample + (long)Math.Round((endSample - startSample) * t);
-            var abs = SampleToAbsolute(sample, frameCount);
+            var abs = abs0 + (abs1 - abs0) * t;
             if (abs < _viewStart - 1e-9 || abs > ViewEnd + 1e-9)
             {
                 continue;
