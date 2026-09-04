@@ -131,12 +131,7 @@ public partial class MainWindow
             // エラーはログに加えてダイアログでも通知する（スキップ／キャンセルは対象外）。
             if (!_closing && importErrorMessage is not null)
             {
-                OwnerCenteredMessageBox.Show(
-                    this,
-                    importErrorMessage,
-                    UiStrings.DialogWwiseImportFailedTitle,
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                ShowWwiseImportFailedDialog(importErrorMessage);
             }
 
             if (!_closing && exportSucceeded && waapiStatusBar.AutoActiveChecked)
@@ -167,6 +162,27 @@ public partial class MainWindow
             }
         }
     }
+
+    private void ShowWwiseImportFailedDialog(string message)
+    {
+        OwnerCenteredMessageBox.Show(
+            this,
+            message,
+            UiStrings.DialogWwiseImportFailedTitle,
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+    }
+
+#if DEBUG
+    internal void ShowWwiseImportFailedDialogForTest()
+    {
+        AppendReport(
+            $"{UiStrings.LogWwiseImportHeader}{Environment.NewLine}"
+            + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
+            + $"{UiStrings.KeyMessage} ak.wwise.core.object.set: Object not found.{Environment.NewLine}{Environment.NewLine}");
+        ShowWwiseImportFailedDialog("ak.wwise.core.object.set: Object not found.");
+    }
+#endif
 
     /// <summary>Keep Target がオンのときだけ記憶パスを再選択する（Form1 と同じガード）。</summary>
     private async Task TryRestoreKeptTargetIfEnabledAsync(bool logReport)

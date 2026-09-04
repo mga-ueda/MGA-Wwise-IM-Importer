@@ -51,6 +51,7 @@ internal sealed partial class WaveformView
         {
             EndMarkerCommentEdit(commit: true);
             SetSelectedMarker(hit.SampleOffset);
+            SeekToSample(hit.SampleOffset);
             _isDraggingMarker = true;
             _markerDragFromSample = hit.SampleOffset;
             _markerDragPreviewSample = hit.SampleOffset;
@@ -71,7 +72,7 @@ internal sealed partial class WaveformView
             return;
         }
 
-        if (!TryGetProgressFromX(location.X, out var progress))
+        if (!TryResolveSeekProgress(location.X, out var progress))
         {
             return;
         }
@@ -1136,6 +1137,7 @@ internal sealed partial class WaveformView
         if (_mouseGuideX is not null)
         {
             _mouseGuideX = null;
+            _mouseGuideSnapSample = null;
             RequestMouseGuideRepaint();
         }
     }
@@ -1353,6 +1355,8 @@ internal sealed partial class WaveformView
 
     private readonly record struct MarkerGridPoint(long SampleOffset, float X);
 
+    private const float MouseGuideMarkerSnapPx = 8f;
+
     private void UpdateMouseGuide(int mouseX)
     {
         if (_peaks is null || _peaks.IsEmpty)
@@ -1368,13 +1372,13 @@ internal sealed partial class WaveformView
             return;
         }
 
-        var x = Math.Clamp(mouseX, timeline.Left, timeline.Right);
         if (mouseX < timeline.Left)
         {
             SetHoveredPlaylistPart(null);
             if (_mouseGuideX is not null)
             {
                 _mouseGuideX = null;
+                _mouseGuideSnapSample = null;
                 RequestMouseGuideRepaint();
             }
 
@@ -1382,12 +1386,16 @@ internal sealed partial class WaveformView
         }
 
         UpdateHoveredPlaylistPart(mouseX);
-        if (_mouseGuideX is float prev && Math.Abs(prev - x) < 0.25f)
+        ResolveMouseGuideX(mouseX, timeline, out var x, out var snapSample);
+        if (_mouseGuideX is float prev
+            && Math.Abs(prev - x) < 0.25f
+            && _mouseGuideSnapSample == snapSample)
         {
             return;
         }
 
         _mouseGuideX = x;
+        _mouseGuideSnapSample = snapSample;
         RequestMouseGuideRepaint();
     }
 
@@ -1480,12 +1488,112 @@ internal sealed partial class WaveformView
         if (!dragging && mouseX < timeline.Left)
         {
             _mouseGuideX = null;
+            _mouseGuideSnapSample = null;
             SetHoveredPlaylistPart(null);
             return;
         }
 
         UpdateHoveredPlaylistPart(mouseX);
-        _mouseGuideX = Math.Clamp(mouseX, timeline.Left, timeline.Right);
+        ResolveMouseGuideX(mouseX, timeline, out var x, out var snapSample);
+        _mouseGuideX = x;
+        _mouseGuideSnapSample = snapSample;
+    }
+
+    private bool CanSnapMouseGuideToMarkers =>
+        !_isDraggingSeek
+        && !_isDraggingMarker
+        && !_isDraggingFadeHandle
+        && _markerEditMode is null;
+
+    private void ResolveMouseGuideX(
+        int mouseX,
+        Rectangle timeline,
+        out float x,
+        out long? snapSample)
+    {
+        if (CanSnapMouseGuideToMarkers
+            && TrySnapMouseXToMarker(mouseX, timeline, out var snappedX, out var sample))
+        {
+            x = snappedX;
+            snapSample = sample;
+            return;
+        }
+
+        x = Math.Clamp(mouseX, timeline.Left, timeline.Right);
+        snapSample = null;
+    }
+
+    private bool TrySnapMouseXToMarker(
+        int mouseX,
+        Rectangle timeline,
+        out float snappedX,
+        out long sampleOffset)
+    {
+        snappedX = 0f;
+        sampleOffset = 0;
+        if (_peaks is null || _peaks.IsEmpty || _peaks.FrameCount <= 0 || _markers.Count == 0)
+        {
+            return false;
+        }
+
+        var frameCount = _peaks.FrameCount;
+        var bestDist = MouseGuideMarkerSnapPx;
+        long? bestSample = null;
+        var bestX = 0f;
+        foreach (var marker in _markers)
+        {
+            var sample = Math.Clamp(marker.SampleOffset, 0L, frameCount);
+            var abs = SampleToAbsolute(sample, frameCount);
+            if (abs < _viewStart - 1e-9 || abs > ViewEnd + 1e-9)
+            {
+                continue;
+            }
+
+            var markerX = AbsoluteToX(abs, timeline);
+            var dist = Math.Abs(markerX - mouseX);
+            if (dist > bestDist)
+            {
+                continue;
+            }
+
+            bestDist = dist;
+            bestSample = sample;
+            bestX = markerX;
+        }
+
+        if (bestSample is not { } found)
+        {
+            return false;
+        }
+
+        snappedX = bestX;
+        sampleOffset = found;
+        return true;
+    }
+
+    private bool TryResolveSeekProgress(int mouseX, out double progress)
+    {
+        if (_mouseGuideSnapSample is { } sample
+            && _peaks is not null
+            && _peaks.FrameCount > 0)
+        {
+            progress = SampleToAbsolute(sample, _peaks.FrameCount);
+            return true;
+        }
+
+        return TryGetProgressFromX(mouseX, out progress);
+    }
+
+    private void SeekToSample(long sampleOffset)
+    {
+        if (_peaks is null || _peaks.FrameCount <= 0)
+        {
+            return;
+        }
+
+        var progress = SampleToAbsolute(sampleOffset, _peaks.FrameCount);
+        _lastMouseSeekProgress = progress;
+        SeekRequested?.Invoke(this, progress);
     }
 
     private bool TryGetLiveMouseGdiX(out int mouseX)
@@ -1511,8 +1619,8 @@ internal sealed partial class WaveformView
             return;
         }
 
-        var timeline = GetTimelineContentRect();
-        if (timeline.Width <= 0)
+        var wave = GetWaveformContentRect();
+        if (wave.Width <= 0 || wave.Height <= 0)
         {
             _mouseGuideLine.Visibility = System.Windows.Visibility.Collapsed;
             return;
@@ -1524,8 +1632,8 @@ internal sealed partial class WaveformView
             MgaWwiseIMImporter.UI.UiColors.MouseGuide);
         _mouseGuideLine.X1 = x;
         _mouseGuideLine.X2 = x;
-        _mouseGuideLine.Y1 = timeline.Top / scale;
-        _mouseGuideLine.Y2 = timeline.Bottom / scale;
+        _mouseGuideLine.Y1 = wave.Top / scale;
+        _mouseGuideLine.Y2 = wave.Bottom / scale;
         _mouseGuideLine.Visibility = System.Windows.Visibility.Visible;
     }
 

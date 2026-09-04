@@ -161,6 +161,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private MarkerEditMode? _markerEditMode;
     private int _markerStrokeLastX;
     private float? _mouseGuideX;
+    private long? _mouseGuideSnapSample;
     private readonly System.Windows.Shapes.Line _mouseGuideLine;
     private bool _mouseGuideRenderingHooked;
     private Bitmap? _staticLayer;
@@ -507,6 +508,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         Capture = false;
         UpdateTimelineTip(null);
         _mouseGuideX = null;
+        _mouseGuideSnapSample = null;
         ApplyMouseGuideOverlay();
         Cursor = null;
 
@@ -735,6 +737,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         _markerEditMode = null;
         Capture = false;
         _mouseGuideX = null;
+        _mouseGuideSnapSample = null;
         ApplyMouseGuideOverlay();
         ClearPlayhead();
         Cursor = null;
@@ -2431,16 +2434,17 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
 
         var content = ContentBoundsOf(bounds, ContentPadPx);
         var timeline = GetTimelineRect(content);
+        var wave = GetWaveformRect(content, g);
         DrawSourceLevelMeter(g, content);
         DrawSourceNameHoverChrome(g);
         DrawPlaylistHoverOutline(g);
         DrawExportPartGlow(g, timeline);
-        DrawPlayhead(g, timeline, _playheadProgress, _trailSamples, WaveformGdiColors.SeekCyan);
+        DrawPlayhead(g, wave, _playheadProgress, _trailSamples, WaveformGdiColors.SeekCyan);
         foreach (var overlay in _overlayPlayheads)
         {
             DrawPlayhead(
                 g,
-                timeline,
+                wave,
                 overlay.Progress,
                 overlay.TrailSamples,
                 WaveformGdiColors.SeekCyan);
@@ -2448,7 +2452,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
 
         DrawPlayhead(
             g,
-            timeline,
+            wave,
             _fadeOutPlayheadProgress,
             _fadeOutTrailSamples,
             _fadeOutPlayheadIsExit
@@ -2458,18 +2462,18 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         {
             DrawPlayhead(
                 g,
-                timeline,
+                wave,
                 overlayFadeOut.Progress,
                 overlayFadeOut.TrailSamples,
                 WaveformGdiColors.SeekFadeOut);
         }
 
-        DrawPlayhead(g, timeline, _exitPlayheadProgress, _exitTrailSamples, WaveformGdiColors.SeekExit);
+        DrawPlayhead(g, wave, _exitPlayheadProgress, _exitTrailSamples, WaveformGdiColors.SeekExit);
         foreach (var overlayExit in _overlayExitPlayheads)
         {
             DrawPlayhead(
                 g,
-                timeline,
+                wave,
                 overlayExit.Progress,
                 overlayExit.TrailSamples,
                 WaveformGdiColors.SeekExit);
@@ -2477,11 +2481,11 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
 
         DrawPlayhead(
             g,
-            timeline,
+            wave,
             _anacrusisPlayheadProgress,
             _anacrusisTrailSamples,
             WaveformGdiColors.SeekAnacrusis);
-        DrawAltMarkerPairDragGuides(g, timeline);
+        DrawAltMarkerPairDragGuides(g, wave);
         if (IsPlayheadTrailAnimating())
         {
             EnsureMouseGuideLiveTracking();

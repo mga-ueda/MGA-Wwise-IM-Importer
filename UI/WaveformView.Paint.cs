@@ -455,6 +455,19 @@ internal sealed partial class WaveformView
         return new Rectangle(mainLeft, content.Top, mainWidth, content.Height);
     }
 
+    /// <summary>Measure〜Playlist レーンを除いた、波形本体の矩形。</summary>
+    private Rectangle GetWaveformContentRect()
+    {
+        using var g = CreateMeasureGraphics();
+        return GetWaveformRect(ContentBounds, g);
+    }
+
+    private Rectangle GetWaveformRect(Rectangle content, Graphics g)
+    {
+        var (_, _, wave, _, _, _) = GetLayout(content, g);
+        return wave;
+    }
+
     private void BuildStaticLayer(Rectangle bounds)
     {
         // サイズ・DPI が同じなら Bitmap を作り直さず再利用する（ズーム連打時の GC 圧を抑える）

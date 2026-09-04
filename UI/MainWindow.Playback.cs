@@ -934,6 +934,15 @@ public partial class MainWindow
             return;
         }
 
+#if DEBUG
+        if (key == Key.F8 && modifiers == ModifierKeys.None)
+        {
+            ShowWwiseImportFailedDialogForTest();
+            e.Handled = true;
+            return;
+        }
+#endif
+
         if (key == Key.E && modifiers == ModifierKeys.None && !IsTextEntryFocusActive())
         {
             TogglePlayPostExitForCurrentPlaylist();
