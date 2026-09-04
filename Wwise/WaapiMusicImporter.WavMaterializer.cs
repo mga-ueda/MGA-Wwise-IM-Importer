@@ -35,7 +35,9 @@ internal static partial class WaapiMusicImporter
     }
 
     /// <summary>
-    /// 共有 WAV のセグメント範囲を MusicClip Begin/End Offset（ミリ秒）で合わせる。
+    /// すべての MusicClip に Begin/End Trim Offset（ミリ秒）を明示設定する。
+    /// トリム不要（メディア全長）のクリップも、Wwise 側のメディア長推定が
+    /// 不正確な場合に短く切れることがあるため、実測のメディア長で必ず上書きする。
     /// MusicClip は Track の descendants に出ないことがあるため、from type MusicClip で探す。
     /// 頭トリムしたクリップを 0 位置へ寄せる PlayAt（負値）は WAAPI の制約
     /// [0, 1e10] で設定できないため、必要なパッチ一覧を返し WWU 直接更新へ回す。
@@ -49,8 +51,7 @@ internal static partial class WaapiMusicImporter
         CancellationToken cancellationToken)
     {
         var playAtFixes = new List<MusicClipPlayAtFix>();
-        var anyTrim = segmentMedia.Values.Any(m => m.ApplyClipTrim);
-        if (!anyTrim)
+        if (segmentMedia.Count == 0)
         {
             return playAtFixes;
         }
@@ -71,7 +72,7 @@ internal static partial class WaapiMusicImporter
                 foreach (var track in segment.Tracks)
                 {
                     var key = TrackSliceKey(segment.Name, track.Name);
-                    if (!segmentMedia.TryGetValue(key, out var media) || !media.ApplyClipTrim)
+                    if (!segmentMedia.TryGetValue(key, out var media))
                     {
                         continue;
                     }

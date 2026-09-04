@@ -7,6 +7,13 @@ namespace MgaWwiseIMImporter.Wwise;
 
 internal static partial class WaapiMusicImporter
 {
+    /// <summary>
+    /// プロジェクトのクローズ／ロード中に WAAPI の HTTP 接続が一時的に切れたときの例外か。
+    /// （HttpRequestException=接続断、TaskCanceledException=HttpClient タイムアウト）
+    /// </summary>
+    private static bool IsTransientHttpError(Exception ex) =>
+        ex is HttpRequestException or TaskCanceledException;
+
     private static async Task WaitForProjectClosedAsync(WaapiHttpClient client)
     {
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(90);
@@ -38,6 +45,10 @@ internal static partial class WaapiMusicImporter
             {
                 // 「プロジェクトが読み込まれていない」等 → クローズ完了とみなす。
                 return;
+            }
+            catch (Exception ex) when (IsTransientHttpError(ex))
+            {
+                // クローズ中は HTTP 接続自体が一瞬落ちることがある。待って再確認する。
             }
 
             await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
@@ -79,6 +90,10 @@ internal static partial class WaapiMusicImporter
             {
                 // ロック中／ロード中。待って再確認する。
             }
+            catch (Exception ex) when (IsTransientHttpError(ex))
+            {
+                // ロード中は HTTP 接続自体が一瞬落ちることがある。待って再確認する。
+            }
 
             await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
         }
@@ -107,6 +122,12 @@ internal static partial class WaapiMusicImporter
                 && (ex.Message.Contains(WaapiUris.Locked, StringComparison.OrdinalIgnoreCase)
                     || ex.Message.Contains("exclusive lock", StringComparison.OrdinalIgnoreCase)))
             {
+                await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (
+                DateTime.UtcNow < deadline && IsTransientHttpError(ex))
+            {
+                // クローズ／ロード直後は HTTP 接続が一瞬落ちることがある。リトライする。
                 await Task.Delay(500, CancellationToken.None).ConfigureAwait(false);
             }
         }

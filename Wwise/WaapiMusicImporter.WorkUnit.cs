@@ -121,11 +121,19 @@ internal static partial class WaapiMusicImporter
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        await client.CallAsync(
-                WaapiUris.UiProjectClose,
-                new Dictionary<string, object?> { ["bypassSave"] = true },
-                cancellationToken: CancellationToken.None)
-            .ConfigureAwait(false);
+        try
+        {
+            await client.CallAsync(
+                    WaapiUris.UiProjectClose,
+                    new Dictionary<string, object?> { ["bypassSave"] = true },
+                    cancellationToken: CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsTransientHttpError(ex))
+        {
+            // クローズ開始と同時に HTTP 接続が切れて応答を受け取れないことがある。
+            // 実際にクローズされたかは直後の WaitForProjectClosedAsync で確認する。
+        }
 
         try
         {
