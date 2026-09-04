@@ -450,6 +450,7 @@ internal sealed class WaveformPreviewSession
 
     /// <summary>
     /// 単独マーカー移動の到達サンプルを、同一 Playlist 内かつフレーム内に収める。
+    /// 仮想連結時は、Playlist が取れなくても同一ソース波形の外へは出さない。
     /// </summary>
     public long ClampWaveOnlyMarkerMove(long fromSampleOffset, long desiredToSampleOffset)
     {
@@ -661,7 +662,8 @@ internal sealed class WaveformPreviewSession
 
     /// <summary>
     /// マーカー移動の許容範囲（同一 Playlist の [start, end) を inclusive 上限へ変換）。
-    /// Playlist が取れないときは false。
+    /// 仮想連結時は同一 <see cref="WaveformSourceSpan"/> との交差も取る。
+    /// Playlist が取れない単体波形では false（呼び出し側が全体へフォールバック）。
     /// </summary>
     private bool TryGetMarkerMoveRange(
         long sampleOffset,
@@ -670,15 +672,37 @@ internal sealed class WaveformPreviewSession
     {
         rangeMinInclusive = 0;
         rangeMaxInclusive = 0;
-        if (!TryGetHostOutputPart(sampleOffset, out var part)
-            || part.EndSampleOffset <= part.StartSampleOffset)
+        var hasPart = TryGetHostOutputPart(sampleOffset, out var part)
+            && part.EndSampleOffset > part.StartSampleOffset;
+        if (hasPart)
         {
-            return false;
+            rangeMinInclusive = part.StartSampleOffset;
+            rangeMaxInclusive = part.EndSampleOffset - 1;
+            if (rangeMaxInclusive < rangeMinInclusive)
+            {
+                hasPart = false;
+            }
         }
 
-        rangeMinInclusive = part.StartSampleOffset;
-        rangeMaxInclusive = part.EndSampleOffset - 1;
-        return rangeMaxInclusive >= rangeMinInclusive;
+        if (Preview.IsMultiWaveOnly
+            && WaveformSourceSpan.TryFindContaining(Preview.SourceSpans, sampleOffset, out var span)
+            && span.TryGetInclusiveSampleRange(out var spanMin, out var spanMax))
+        {
+            if (hasPart)
+            {
+                rangeMinInclusive = Math.Max(rangeMinInclusive, spanMin);
+                rangeMaxInclusive = Math.Min(rangeMaxInclusive, spanMax);
+            }
+            else
+            {
+                rangeMinInclusive = spanMin;
+                rangeMaxInclusive = spanMax;
+            }
+
+            return rangeMaxInclusive >= rangeMinInclusive;
+        }
+
+        return hasPart;
     }
 
     private bool TryGetHostOutputPart(long sampleOffset, out WaveformOutputPart part)
@@ -1429,21 +1453,8 @@ internal sealed class WaveformPreviewSession
     }
 
     /// <summary>仮想サンプルが属する SourceSpan を返す。</summary>
-    private bool TryGetSourceSpanForSample(long sampleOffset, out WaveformSourceSpan span)
-    {
-        foreach (var candidate in Preview.SourceSpans)
-        {
-            if (sampleOffset >= candidate.VirtualStartSample
-                && sampleOffset < candidate.VirtualEndSample)
-            {
-                span = candidate;
-                return true;
-            }
-        }
-
-        span = default;
-        return false;
-    }
+    private bool TryGetSourceSpanForSample(long sampleOffset, out WaveformSourceSpan span) =>
+        WaveformSourceSpan.TryFindContaining(Preview.SourceSpans, sampleOffset, out span);
 
     private bool IsMarkerOnDisabledPart(long sampleOffset)
     {

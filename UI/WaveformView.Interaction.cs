@@ -388,6 +388,7 @@ internal sealed partial class WaveformView
 
     /// <summary>
     /// ドラッグ中の到達サンプルを同一 Playlist 内に収める。
+    /// 仮想連結時は同一ソース波形の外へも出さない。
     /// Alt ペア移動時は、一つ前マーカーが止まった方向へ主マーカーも進めない。
     /// </summary>
     private long ClampMarkerDragPreviewSample(long desiredSampleOffset)
@@ -398,7 +399,7 @@ internal sealed partial class WaveformView
             return desiredSampleOffset;
         }
 
-        if (!TryGetHostOutputPartRange(
+        if (!TryGetMarkerMoveRange(
                 _markerDragFromSample,
                 out var rangeMin,
                 out var rangeMax))
@@ -454,10 +455,45 @@ internal sealed partial class WaveformView
         return false;
     }
 
+    /// <summary>
+    /// マーカー移動の許容範囲。同一 Playlist、かつ仮想連結時は同一ソース波形内。
+    /// Playlist が取れない単体波形では false。
+    /// </summary>
+    private bool TryGetMarkerMoveRange(
+        long sampleOffset,
+        out long rangeMinInclusive,
+        out long rangeMaxInclusive)
+    {
+        var hasPart = TryGetHostOutputPartRange(
+            sampleOffset,
+            out rangeMinInclusive,
+            out rangeMaxInclusive);
+
+        if (_sourceSpans.Count > 1
+            && WaveformSourceSpan.TryFindContaining(_sourceSpans, sampleOffset, out var span)
+            && span.TryGetInclusiveSampleRange(out var spanMin, out var spanMax))
+        {
+            if (hasPart)
+            {
+                rangeMinInclusive = Math.Max(rangeMinInclusive, spanMin);
+                rangeMaxInclusive = Math.Min(rangeMaxInclusive, spanMax);
+            }
+            else
+            {
+                rangeMinInclusive = spanMin;
+                rangeMaxInclusive = spanMax;
+            }
+
+            return rangeMaxInclusive >= rangeMinInclusive;
+        }
+
+        return hasPart;
+    }
+
     private bool TryGetPreviousMarkerSample(long sampleOffset, out long previousSample)
     {
         previousSample = 0;
-        var limitToPlaylist = TryGetHostOutputPartRange(
+        var limitToPlaylist = TryGetMarkerMoveRange(
             sampleOffset,
             out var rangeMin,
             out var rangeMax);
