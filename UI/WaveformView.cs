@@ -119,9 +119,10 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     // 時間軸ズーム（1=全体表示。既定より縮小しない）
     private const double TimeZoomMin = 1.0;
     private const double TimeZoomMax = 81920.0;
-    // キーボード: ? 2^(1/8)。ホイールは少し大きめ ? 2^(1/4)
-    private const double TimeZoomStep = 1.09050773267;
-    private const double TimeZoomWheelStep = 1.189207115;
+    // 旧 2^(1/8) の 3 段階分 = 2^(3/8)。キーボード拡縮。
+    private const double TimeZoomStep = 1.2968395546510096;
+    // 旧 2^(1/4) の 3 段階分 = 2^(3/4)。ホイール拡縮。
+    private const double TimeZoomWheelStep = 1.681792830507429;
     private double _timeZoom = TimeZoomMin;
     private double _viewStart; // 表示左端の絶対進捗 0..1
     public bool IsTimeZoomAtMax => _timeZoom >= TimeZoomMax - 1e-9;
@@ -129,12 +130,10 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     // 振幅ズーム（1=既定。既定より縮小しない）
     private const double AmpZoomMin = 1.0;
     private const double AmpZoomMax = 128.0;
-    private const double AmpZoomStep = 1.09050773267;
-    private const double AmpZoomWheelStep = 1.189207115;
+    private const double AmpZoomStep = 1.2968395546510096;
+    private const double AmpZoomWheelStep = 1.681792830507429;
     /// <summary>
     /// 1px あたりこのサンプル数以下なら縦棒ではなくサンプル折れ線にする。
-    /// キーボード拡縮（<see cref="TimeZoomStep"/>）おおよそ 6 段階手前まで詳細表示する狙い
-    /// （基準 4 × TimeZoomStep^6 ≒ 6.7、運用値は一段手前の 8）。
     /// </summary>
     private const int PolylineMaxSamplesPerPixel = 8;
     private double _ampZoom = AmpZoomMin;
@@ -1144,16 +1143,16 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     }
 
     /// <summary>時間軸を拡大（既定より縮小しない）。</summary>
-    public void ZoomTimeIn() => AdjustTimeZoom(TimeZoomStep, AnchorProgressForKeyboardZoom());
+    public void ZoomTimeIn() => AdjustTimeZoom(TimeZoomStep, AnchorProgressForTimeZoom());
 
     /// <summary>時間軸を縮小（既定未満にはしない）。</summary>
-    public void ZoomTimeOut() => AdjustTimeZoom(1.0 / TimeZoomStep, AnchorProgressForKeyboardZoom());
+    public void ZoomTimeOut() => AdjustTimeZoom(1.0 / TimeZoomStep, AnchorProgressForTimeZoom());
 
     /// <summary>時間軸ズームを既定（全体表示）に戻す。</summary>
     public void ResetTimeZoom() => ResetTimeZoom(refresh: true);
 
     /// <summary>時間軸を最大倍率にする。</summary>
-    public void ZoomTimeToMax() => SetTimeZoomAbsolute(TimeZoomMax, AnchorProgressForKeyboardZoom());
+    public void ZoomTimeToMax() => SetTimeZoomAbsolute(TimeZoomMax, AnchorProgressForTimeZoom());
 
     /// <summary>振幅を拡大（既定より縮小しない）。</summary>
     public void ZoomAmpIn() => AdjustAmpZoom(AmpZoomStep);
@@ -1533,20 +1532,15 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         return true;
     }
 
-    /// <summary>
-    /// マウスホイールによる時間軸ズーム。
-    /// <paramref name="mouseXDip"/> は WPF DIP 座標。内部でデバイス px に変換する。
-    /// </summary>
-    public void ZoomTimeByWheel(int wheelDelta, int mouseXDip)
+    /// <summary>マウスホイールによる時間軸ズーム。シークバー位置を基準にする。</summary>
+    public void ZoomTimeByWheel(int wheelDelta)
     {
         if (_peaks is null || _peaks.IsEmpty || wheelDelta == 0)
         {
             return;
         }
 
-        var mouseX = (int)Math.Round(mouseXDip * DpiScale);
-
-        // ノッチに応じた連続倍率（ホイールは 1/4 oct 刻み）
+        // ノッチに応じた連続倍率（ホイールは 3/4 oct 刻み）
         var notches = Math.Max(1.0, Math.Abs(wheelDelta) / 120.0);
         var factor = Math.Pow(TimeZoomWheelStep, notches);
         if (wheelDelta < 0)
@@ -1554,10 +1548,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
             factor = 1.0 / factor;
         }
 
-        var anchor = TryGetProgressFromX(mouseX, out var progress)
-            ? progress
-            : AnchorProgressForKeyboardZoom();
-        AdjustTimeZoom(factor, anchor);
+        AdjustTimeZoom(factor, AnchorProgressForTimeZoom());
     }
 
     /// <summary>Shift+マウスホイールによる時間軸の左右スクロール。</summary>
@@ -1626,11 +1617,10 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     }
 
     /// <summary>
-    /// 上下キー／Ctrl+上下の時間ズーム基準。
-    /// 常にシーク（再生ヘッド）位置を使う。表示外でもビュー中央へ落とさない
-    /// （ホイールでマウス付近へ寄ったあとに上下キーすると、中央基準に見えてしまうため）。
+    /// 時間軸ズームの基準。常にシーク（再生ヘッド）位置を使う。
+    /// シークが無いときだけ表示中央に落とす。
     /// </summary>
-    private double AnchorProgressForKeyboardZoom()
+    private double AnchorProgressForTimeZoom()
     {
         if (_playheadProgress is double playhead)
         {
@@ -1742,8 +1732,7 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
 
         zoom = Math.Clamp(zoom, TimeZoomMin, TimeZoomMax);
         var oldSpan = ViewSpan;
-        // 表示内なら画面上の相対位置を維持。表示外（キーボードでシークが外にあるとき）は
-        // アンカーを中央に据えてから拡縮する。
+        // 表示内なら画面上の相対位置を維持。表示外はアンカーを中央に据えてから拡縮する。
         var inView = anchorAbsolute >= _viewStart - 1e-12
             && anchorAbsolute <= ViewEnd + 1e-12;
         var rel = !inView

@@ -977,7 +977,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        var position = e.GetPosition(waveformView);
         if (Keyboard.Modifiers == ModifierKeys.Control)
         {
             waveformView.ZoomAmpByWheel(e.Delta);
@@ -992,7 +991,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            waveformView.ZoomTimeByWheel(e.Delta, (int)position.X);
+            waveformView.ZoomTimeByWheel(e.Delta);
             transportBar.PulseCommandFeedback(
                 e.Delta > 0 ? TransportCommand.TimeZoomIn : TransportCommand.TimeZoomOut);
         }
