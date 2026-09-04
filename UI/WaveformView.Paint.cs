@@ -850,31 +850,16 @@ internal sealed partial class WaveformView
                 }
                 else
                 {
-                    var bucketCount = detail.Mins.Length;
-                    for (var px = 0; px < wave.Width; px++)
-                    {
-                        var bucket = bucketCount == wave.Width
-                            ? Math.Clamp(px, 0, bucketCount - 1)
-                            : (int)Math.Clamp(
-                                Math.Floor((px + 0.5d) / wave.Width * bucketCount),
-                                0,
-                                bucketCount - 1);
-                        var abs = _viewStart + ((px + 0.5d) / wave.Width) * ViewSpan;
-                        var sample = (long)Math.Clamp(
-                            Math.Floor(abs * frameCount),
-                            0,
-                            Math.Max(0L, frameCount - 1));
-                        var gain = RegionEdgeFade.GainAt(sample, displayFades);
-                        DrawPeakColumn(
-                            g,
-                            wavePen,
-                            wave,
-                            midY,
-                            amplitude * gain,
-                            wave.Left + px + 0.5f,
-                            detail.Mins[bucket],
-                            detail.Maxs[bucket]);
-                    }
+                    DrawPeakColumns(
+                        g,
+                        wavePen,
+                        wave,
+                        midY,
+                        amplitude,
+                        detail,
+                        frameCount,
+                        rangeFrames,
+                        displayFades);
                 }
             }
             else
@@ -915,7 +900,8 @@ internal sealed partial class WaveformView
     /// 深いズーム用: 各サンプルを点として、隣同士を直線で結ぶ（線形補間表示）。
     /// 振幅拡大時は表示矩形へ Y をピン留めせず、クリップで切る（辺張り付きによる破綻を防ぐ）。
     /// 1px に複数サンプルある区間は全点接続せず 1px 1 点に間引き、塗りつぶし状の汚れを防ぐ。
-    /// 時間軸が最大ズームのときだけ、実サンプル位置に点を重ねる。
+    /// 実サンプル点は Sonic Anvil と同じ規則
+    /// （可視サンプル数 ≤ min(<see cref="SamplePointMaxVisibleFrames"/>, 画面幅)）で重ねる。
     /// </summary>
     private void DrawSamplePolyline(
         Graphics g,
@@ -948,6 +934,9 @@ internal sealed partial class WaveformView
             return detail.Mins[index];
         }
 
+        // Sonic Anvil と同じ規則: 可視サンプル数 ≤ min(500, 画面幅 DIP) のときだけ点を打つ。
+        var collectDots = ShouldDrawSamplePoints(count, (float)(wave.Width / DpiScale));
+
         var state = g.Save();
         try
         {
@@ -970,7 +959,7 @@ internal sealed partial class WaveformView
                 var x = AbsoluteToX(frame / (double)frameCount, wave);
                 var y = SampleY(sample, gain);
                 g.DrawLine(linePen, x, y - 2.5f, x, y + 2.5f);
-                if (IsTimeZoomAtMax)
+                if (collectDots)
                 {
                     DrawSamplePoints(g, wavePen.Color, [new PointF(x, y)]);
                 }
@@ -1026,9 +1015,9 @@ internal sealed partial class WaveformView
 
             g.DrawLines(linePen, points);
 
-            // 最大ズームかつ 1 サンプルが 1px 以上空くときだけ点を重ねる。
-            // 密なままだと点が線に溶けて塗りつぶしになる。
-            if (IsTimeZoomAtMax && count <= wave.Width)
+            // 点が線へ溶けて塗りつぶしにならないよう、疎なときだけ点を重ねる
+            // （count <= wave.Width の全点折れ線時のみ。間引き代表点には打たない）。
+            if (collectDots && count <= wave.Width)
             {
                 DrawSamplePoints(g, wavePen.Color, points);
             }
@@ -1039,9 +1028,14 @@ internal sealed partial class WaveformView
         }
     }
 
-    private static void DrawSamplePoints(Graphics g, Color color, PointF[] points)
+    /// <summary>実サンプル点を打つ密度か（Sonic Anvil と同じ判定。幅は DIP）。</summary>
+    private static bool ShouldDrawSamplePoints(int count, float widthDips) =>
+        count > 0 && count <= Math.Min(SamplePointMaxVisibleFrames, widthDips);
+
+    private void DrawSamplePoints(Graphics g, Color color, PointF[] points)
     {
-        const float radius = 4f;
+        // Sonic Anvil と同じ点サイズ（8/3 DIP をデバイス px へ換算）。
+        var radius = Math.Max(1f, (float)(SamplePointRadius * DpiScale));
         var diameter = radius * 2f;
         using var brush = new SolidBrush(color);
         for (var i = 0; i < points.Length; i++)
@@ -1424,6 +1418,78 @@ internal sealed partial class WaveformView
 
     private static bool IsExitSuffix(WaveformRegionMark region) =>
         region.NameSuffix.Equals(WaveformRegionBuilder.LoopEndSuffix, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 画面幅バケットの min/max 縦棒をまとめて描く。
+    /// Sonic Anvil と同様、1px あたり <see cref="ConnectNeighborMaxSamplesPerPixel"/> サンプル以下の
+    /// 中間ズームでは隣接列の上下端を繋ぎ、折れ線⇔縦棒の切り替わりが点描状に見えないようにする。
+    /// </summary>
+    private void DrawPeakColumns(
+        Graphics g,
+        Pen wavePen,
+        Rectangle wave,
+        float midY,
+        float amplitude,
+        WavPeakData detail,
+        long frameCount,
+        long rangeFrames,
+        IReadOnlyList<RegionEdgeFade> displayFades)
+    {
+        var bucketCount = detail.Mins.Length;
+        if (bucketCount <= 0 || wave.Width <= 0)
+        {
+            return;
+        }
+
+        var connectNeighbors =
+            rangeFrames <= (long)wave.Width * ConnectNeighborMaxSamplesPerPixel;
+        var yHi = new float[wave.Width];
+        var yLo = new float[wave.Width];
+        for (var px = 0; px < wave.Width; px++)
+        {
+            var bucket = bucketCount == wave.Width
+                ? Math.Clamp(px, 0, bucketCount - 1)
+                : (int)Math.Clamp(
+                    Math.Floor((px + 0.5d) / wave.Width * bucketCount),
+                    0,
+                    bucketCount - 1);
+            var abs = _viewStart + ((px + 0.5d) / wave.Width) * ViewSpan;
+            var sample = (long)Math.Clamp(
+                Math.Floor(abs * frameCount),
+                0,
+                Math.Max(0L, frameCount - 1));
+            var gain = RegionEdgeFade.GainAt(sample, displayFades);
+            var amp = amplitude * gain;
+            var y1 = Math.Clamp(midY - detail.Maxs[bucket] * amp, wave.Top, wave.Bottom);
+            var y2 = Math.Clamp(midY - detail.Mins[bucket] * amp, wave.Top, wave.Bottom);
+            if (y2 < y1)
+            {
+                (y1, y2) = (y2, y1);
+            }
+
+            if (y2 - y1 < 1f)
+            {
+                y2 = Math.Min(wave.Bottom, y1 + 1f);
+            }
+
+            yHi[px] = y1;
+            yLo[px] = y2;
+        }
+
+        for (var px = 0; px < wave.Width; px++)
+        {
+            var hi = yHi[px];
+            var lo = yLo[px];
+            if (connectNeighbors && px + 1 < wave.Width)
+            {
+                hi = Math.Min(hi, yHi[px + 1]);
+                lo = Math.Max(lo, yLo[px + 1]);
+            }
+
+            var x = wave.Left + px + 0.5f;
+            g.DrawLine(wavePen, x, hi, x, lo);
+        }
+    }
 
     private static void DrawPeakColumn(
         Graphics g,

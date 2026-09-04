@@ -1100,7 +1100,8 @@ public partial class MainWindow
         }
 
         double next;
-        if (waveformView.IsTimeZoomAtMax)
+        // サンプル点が描かれる密度では 1px ではなく 1 サンプル単位で動かす（Sonic Anvil と同じ）。
+        if (waveformView.SamplePointsVisible)
         {
             var frameCount = _loadedPreview.WavInfo.FrameCount;
             if (frameCount <= 0)

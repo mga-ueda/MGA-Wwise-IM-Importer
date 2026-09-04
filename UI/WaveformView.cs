@@ -125,7 +125,30 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private const double TimeZoomWheelStep = 1.681792830507429;
     private double _timeZoom = TimeZoomMin;
     private double _viewStart; // 表示左端の絶対進捗 0..1
-    public bool IsTimeZoomAtMax => _timeZoom >= TimeZoomMax - 1e-9;
+    /// <summary>
+    /// 実サンプル点が描かれる密度か（Sonic Anvil の SamplePointsVisible と同じ規則。
+    /// このとき ←/→ シークは 1px ではなく 1 サンプル移動にする）。
+    /// </summary>
+    public bool SamplePointsVisible
+    {
+        get
+        {
+            if (_peaks is null || _peaks.IsEmpty || _peaks.FrameCount <= 0)
+            {
+                return false;
+            }
+
+            var widthDevicePx = TimelineContentWidth;
+            if (widthDevicePx <= 0)
+            {
+                return false;
+            }
+
+            var visibleFrames = ViewSpan * _peaks.FrameCount;
+            var widthDips = widthDevicePx / DpiScale;
+            return visibleFrames <= Math.Min(SamplePointMaxVisibleFrames, widthDips);
+        }
+    }
 
     // 振幅ズーム（1=既定。既定より縮小しない）
     private const double AmpZoomMin = 1.0;
@@ -133,9 +156,19 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     private const double AmpZoomStep = 1.2968395546510096;
     private const double AmpZoomWheelStep = 1.681792830507429;
     /// <summary>
-    /// 1px あたりこのサンプル数以下なら縦棒ではなくサンプル折れ線にする。
+    /// 1px あたりこのサンプル数以下なら縦棒ではなくサンプル折れ線にする
+    /// （MGA Sonic Anvil と同値。1 サンプル/px 以下だけ折れ線化する）。
     /// </summary>
-    private const int PolylineMaxSamplesPerPixel = 8;
+    private const int PolylineMaxSamplesPerPixel = 1;
+    /// <summary>
+    /// 1px あたりこのサンプル数以下では隣接ピーク柱の上下端を繋ぎ、
+    /// 折れ線⇔縦棒の切り替わりが点描状に見えないようにする（Sonic Anvil と同じ）。
+    /// </summary>
+    private const int ConnectNeighborMaxSamplesPerPixel = 8;
+    /// <summary>実サンプル点を打つ最大可視サンプル数（Sonic Anvil と同値）。</summary>
+    private const int SamplePointMaxVisibleFrames = 500;
+    /// <summary>実サンプル点の半径（DIP。デバイス px へは DPI 倍率で換算）。</summary>
+    private const double SamplePointRadius = 8d / 3d;
     private double _ampZoom = AmpZoomMin;
 
     private double? _playheadProgress;

@@ -172,7 +172,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Alt]+▼ドラッグ: 一つ前のマーカーも同量移動"
         + Environment.NewLine
-        + "[←] / [→]: シークバーを 1px 移動（時間軸最大拡大時は 1 サンプル）"
+        + "[←] / [→]: シークバーを 1px 移動（サンプル点の表示中は 1 サンプル）"
         + Environment.NewLine
         + "[Alt]+[←] / [→]: シーク位置のマーカーを 1px 移動（+[Shift] で 3px、シークも連動）"
         + Environment.NewLine
@@ -201,7 +201,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Alt]+drag ▼: also move previous marker by the same delta"
         + Environment.NewLine
-        + "[←] / [→]: nudge seek bar by 1px (1 sample at max time zoom)"
+        + "[←] / [→]: nudge seek bar by 1px (1 sample while sample points are shown)"
         + Environment.NewLine
         + "[Alt]+[←] / [→]: nudge marker at seek by 1px (+[Shift] for 3px; seek follows)"
         + Environment.NewLine
