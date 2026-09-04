@@ -26,6 +26,7 @@ public class WaapiExitSourceMappingTests
             new WwisePlaylistPlan
             {
                 Name = "P1",
+                StateName = "P1",
                 SourceWavPath = @"C:\tmp\a.wav",
                 SourcePartNumbers = [1],
                 ExitSourceAt = PlaylistExitSourceMode.NextBar,

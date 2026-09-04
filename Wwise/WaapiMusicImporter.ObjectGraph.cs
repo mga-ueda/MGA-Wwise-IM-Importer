@@ -663,7 +663,7 @@ internal static partial class WaapiMusicImporter
             .Select(p => (object)new Dictionary<string, object?>
             {
                 ["type"] = "State",
-                ["name"] = p.Name,
+                ["name"] = p.StateName,
             })
             .ToList();
 
@@ -883,7 +883,7 @@ internal static partial class WaapiMusicImporter
             await TrySetSoundEngineStateAsync(
                     client,
                     importSettings.ResolveStateGroupPath(plan.ContainerName),
-                    plan.Playlists[0].Name,
+                    plan.Playlists[0].StateName,
                     log,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -1178,7 +1178,7 @@ internal static partial class WaapiMusicImporter
                 ["type"] = "MultiSwitchEntry",
                 // 再 EXPORT 時に merge できるよう、Playlist 名で安定させる。
                 ["name"] = p.Name,
-                [WaapiPropertyNames.EntryPath] = new[] { $"{stateGroupPath}\\{p.Name}" },
+                [WaapiPropertyNames.EntryPath] = new[] { $"{stateGroupPath}\\{p.StateName}" },
                 [WaapiPropertyNames.AudioNode] = $"{containerPath}\\{p.Name}",
             })
             .ToList();

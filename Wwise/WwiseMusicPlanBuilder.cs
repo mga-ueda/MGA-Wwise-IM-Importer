@@ -72,16 +72,30 @@ internal static class WwiseMusicPlanBuilder
             ? Path.GetDirectoryName(sourcePath) ?? string.Empty
             : outputDirectory.Trim();
         var units = BuildPlaylistUnits(outputParts, partGroupIds);
+        var playlistNames = new string[units.Count];
+        for (var unitIndex = 0; unitIndex < units.Count; unitIndex++)
+        {
+            playlistNames[unitIndex] = ResolvePlaylistName(
+                baseName,
+                units,
+                unitIndex,
+                playlistNameOverrides);
+        }
+
+        // Switch State は Playlist 名を流用するが、2 バイト文字は Wwise 側で _ になる。
+        // ドロップファイル名／Playlist 名のどれか 1 つでも該当すれば Music_1 形式へ揃える。
+        var useFallbackStateNames = units.Count > 1
+            && WwiseObjectNames.ShouldUseFallbackSwitchStateNames(
+                CollectSwitchStateNameSources(sourcePath, outputParts, playlistNames));
         var playlists = new List<WwisePlaylistPlan>();
 
         for (var unitIndex = 0; unitIndex < units.Count; unitIndex++)
         {
             var unit = units[unitIndex];
-            var playlistName = ResolvePlaylistName(
-                baseName,
-                units,
-                unitIndex,
-                playlistNameOverrides);
+            var playlistName = playlistNames[unitIndex];
+            var stateName = useFallbackStateNames
+                ? WwiseObjectNames.BuildFallbackSwitchStateName(unitIndex + 1, units.Count)
+                : playlistName;
             var exitSourceAt = ResolveUnitExitSourceAt(
                 unit.Parts,
                 partExitSourceModes,
@@ -110,6 +124,7 @@ internal static class WwiseMusicPlanBuilder
             {
                 playlists.Add(BuildSinglePartPlaylist(
                     playlistName,
+                    stateName,
                     unit.Parts[0],
                     directory,
                     segmentBase: playlistName,
@@ -128,6 +143,7 @@ internal static class WwiseMusicPlanBuilder
             {
                 playlists.Add(BuildLayeredPlaylist(
                     playlistName,
+                    stateName,
                     unit.Parts,
                     directory,
                     sampleRate,
@@ -454,8 +470,61 @@ internal static class WwiseMusicPlanBuilder
         return units;
     }
 
+    private static IEnumerable<string> CollectSwitchStateNameSources(
+        string sourcePath,
+        IReadOnlyList<WaveformOutputPart> outputParts,
+        IReadOnlyList<string> playlistNames)
+    {
+        foreach (var name in FileNameCandidates(sourcePath))
+        {
+            yield return name;
+        }
+
+        foreach (var part in outputParts)
+        {
+            foreach (var name in FileNameCandidates(part.FileName))
+            {
+                yield return name;
+            }
+
+            foreach (var name in FileNameCandidates(part.SourcePath))
+            {
+                yield return name;
+            }
+        }
+
+        foreach (var playlistName in playlistNames)
+        {
+            if (!string.IsNullOrWhiteSpace(playlistName))
+            {
+                yield return playlistName;
+            }
+        }
+    }
+
+    private static IEnumerable<string> FileNameCandidates(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            yield break;
+        }
+
+        var fileName = Path.GetFileName(path);
+        if (!string.IsNullOrWhiteSpace(fileName))
+        {
+            yield return fileName;
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(path);
+        if (!string.IsNullOrWhiteSpace(stem) && !string.Equals(stem, fileName, StringComparison.Ordinal))
+        {
+            yield return stem;
+        }
+    }
+
     private static WwisePlaylistPlan BuildSinglePartPlaylist(
         string playlistName,
+        string stateName,
         WaveformOutputPart part,
         string directory,
         string segmentBase,
@@ -493,6 +562,7 @@ internal static class WwiseMusicPlanBuilder
         return new WwisePlaylistPlan
         {
             Name = playlistName,
+            StateName = stateName,
             SourceWavPath = sourceWavPath,
             SourcePartNumbers = [part.Number],
             ExitSourceAt = exitSourceAt,
@@ -507,6 +577,7 @@ internal static class WwiseMusicPlanBuilder
 
     private static WwisePlaylistPlan BuildLayeredPlaylist(
         string playlistName,
+        string stateName,
         IReadOnlyList<WaveformOutputPart> parts,
         string directory,
         uint sampleRate,
@@ -659,6 +730,7 @@ internal static class WwiseMusicPlanBuilder
         return new WwisePlaylistPlan
         {
             Name = playlistName,
+            StateName = stateName,
             SourceWavPath = memberPlans[0].WavPath,
             SourcePartNumbers = orderedParts.Select(p => p.Number).ToArray(),
             ExitSourceAt = exitSourceAt,

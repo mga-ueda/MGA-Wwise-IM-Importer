@@ -20,6 +20,17 @@ internal sealed class WwisePlaylistPlan
     public required string Name { get; init; }
 
     /// <summary>
+    /// Music Switch に結ぶ State 名。
+    /// ドロップファイル名に 2 バイト文字が 1 つでもあれば <c>Music_1</c> 形式、
+    /// それ以外は <see cref="Name"/> と同じ。
+    /// </summary>
+    public required string StateName { get; init; }
+
+    /// <summary>State 名をファイル名から差し替えたか。</summary>
+    public bool UsesFallbackStateName =>
+        !string.Equals(Name, StateName, StringComparison.Ordinal);
+
+    /// <summary>
     /// 代表となるエクスポート WAV のフルパス（コピー／ログ用）。
     /// レイヤーグループ時は先頭メンバーのパス。
     /// </summary>

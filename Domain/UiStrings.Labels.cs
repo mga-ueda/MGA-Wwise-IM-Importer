@@ -559,6 +559,16 @@ internal static partial class UiStrings
         name,
         segmentCount);
 
+    public static string LogSwitchStateFallback(string stateNames) => Format(
+        "State names: ファイル名に 2 バイト文字があるため {0} を使用します。",
+        "State names: file names contain 2-byte characters; using {0}.",
+        stateNames);
+
+    public static string LogPlaylistSwitchState(string stateName) => Format(
+        "  State: {0}",
+        "  State: {0}",
+        stateName);
+
     public static string LogWavSliceWritten(string fileName) => Format(
         "WAV: {0}",
         "WAV: {0}",

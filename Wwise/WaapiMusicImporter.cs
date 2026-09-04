@@ -126,6 +126,13 @@ internal static partial class WaapiMusicImporter
             {
                 Log(UiStrings.LogStateGroupCreateNew);
             }
+
+            if (plan.Playlists.Any(p => p.UsesFallbackStateName))
+            {
+                Log(
+                    UiStrings.LogSwitchStateFallback(
+                        string.Join(", ", plan.Playlists.Select(p => p.StateName))));
+            }
         }
 
         Dictionary<int, float>? partGains = null;
@@ -470,9 +477,20 @@ internal static partial class WaapiMusicImporter
         var sb = new StringBuilder();
         sb.AppendLine(UiStrings.LogImportPlanHeader);
         sb.AppendLine(UiStrings.LogImportPlanPlaylists(plan.Playlists.Count, plan.ContainerName));
+        if (plan.IsMultiPart && plan.Playlists.Any(p => p.UsesFallbackStateName))
+        {
+            sb.AppendLine(
+                UiStrings.LogSwitchStateFallback(
+                    string.Join(", ", plan.Playlists.Select(p => p.StateName))));
+        }
+
         foreach (var playlist in plan.Playlists)
         {
             sb.AppendLine(UiStrings.LogPlaylistSummary(playlist.Name, playlist.Segments.Count));
+            if (playlist.UsesFallbackStateName)
+            {
+                sb.AppendLine(UiStrings.LogPlaylistSwitchState(playlist.StateName));
+            }
             if (playlist.GroupState is { } groupState)
             {
                 sb.AppendLine(
