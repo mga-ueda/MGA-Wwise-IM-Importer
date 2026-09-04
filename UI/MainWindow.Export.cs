@@ -107,9 +107,10 @@ public partial class MainWindow
             UpdateExportEnabled();
 
             var exportSucceeded = false;
+            string? importErrorMessage = null;
             try
             {
-                exportSucceeded = await RunWwiseImportAsync(
+                (exportSucceeded, importErrorMessage) = await RunWwiseImportAsync(
                     preview,
                     wwiseSnapshot,
                     exportGeneration,
@@ -125,6 +126,17 @@ public partial class MainWindow
                     UpdateExportEnabled();
                     ReleaseFocusToWaveform();
                 }
+            }
+
+            // エラーはログに加えてダイアログでも通知する（スキップ／キャンセルは対象外）。
+            if (!_closing && importErrorMessage is not null)
+            {
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    importErrorMessage,
+                    UiStrings.DialogWwiseImportFailedTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
 
             if (!_closing && exportSucceeded && waapiStatusBar.AutoActiveChecked)
@@ -309,8 +321,9 @@ public partial class MainWindow
     /// <summary>
     /// エクスポート済み WAV を Wwise の選択位置へ Music 構造として流し込む。
     /// キャンセル時はログを残してスキップする。作成先は EXPORT 開始時に固定したパスを使う。
+    /// 戻り値: 成否と、エラー時のみダイアログ表示用メッセージ（スキップ／キャンセルは null）。
     /// </summary>
-    private async Task<bool> RunWwiseImportAsync(
+    private async Task<(bool Succeeded, string? ErrorMessage)> RunWwiseImportAsync(
         WaveformPreviewData preview,
         PlaylistExportSnapshot snapshot,
         int exportGeneration,
@@ -333,7 +346,7 @@ public partial class MainWindow
                 + UiStrings.LogImportSkippedNoSelection
                 + Environment.NewLine
                 + Environment.NewLine);
-            return false;
+            return (false, null);
         }
 
         var importSettings = WwiseImportSettings.Load()
@@ -390,7 +403,7 @@ public partial class MainWindow
                 + UiStrings.LogImportPlanFailed(ex.Message)
                 + Environment.NewLine
                 + Environment.NewLine);
-            return false;
+            return (false, ex.Message);
         }
 
         var updateExistingStateGroup = false;
@@ -414,12 +427,12 @@ public partial class MainWindow
                     + UiStrings.LogStateGroupCheckFailed(ex.Message)
                     + Environment.NewLine
                     + Environment.NewLine);
-                return false;
+                return (false, ex.Message);
             }
 
             if (_closing || exportGeneration != _exportGeneration)
             {
-                return false;
+                return (false, null);
             }
 
             // 既存 State Group は削除せず、object.set の merge で同一オブジェクトを更新する。
@@ -428,7 +441,7 @@ public partial class MainWindow
 
         if (exportGeneration != _exportGeneration)
         {
-            return false;
+            return (false, null);
         }
 
         try
@@ -450,7 +463,7 @@ public partial class MainWindow
                 updateExistingStateGroup,
                 _previewSession?.RegionEdgeFades,
                 progress));
-            return !_closing && exportGeneration == _exportGeneration;
+            return (!_closing && exportGeneration == _exportGeneration, null);
         }
         catch (Exception ex)
         {
@@ -462,7 +475,7 @@ public partial class MainWindow
                     + $"{UiStrings.KeyMessage} {ex.Message}{Environment.NewLine}{Environment.NewLine}");
             }
 
-            return false;
+            return (false, _closing ? null : ex.Message);
         }
     }
 

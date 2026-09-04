@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.Domain;
+﻿namespace MgaWwiseIMImporter.Domain;
 
 internal static partial class UiStrings
 {
@@ -75,6 +75,9 @@ internal static partial class UiStrings
         "Select the folder for exported audio");
 
     public static string DialogExportTitle => Get("EXPORT", "EXPORT");
+    public static string DialogWwiseImportFailedTitle => Get(
+        "Wwise インポートに失敗",
+        "Wwise import failed");
     public static string DialogOpenGithubFailed => Get(
         "GitHub を開けませんでした。",
         "Unable to open GitHub.");

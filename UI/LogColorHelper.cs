@@ -117,7 +117,9 @@ internal static class LogColorHelper
             return false;
         }
 
-        return trimmedLine.Contains("失敗", StringComparison.Ordinal)
+        // 「失敗」単体はファイル名（例: ○○ 失敗ジングル）に誤ヒットするため、
+        // エラー文言の定型「〜に失敗」で判定する。
+        return trimmedLine.Contains("に失敗", StringComparison.Ordinal)
             || trimmedLine.Contains("エラー", StringComparison.Ordinal)
             || trimmedLine.Contains("見つかりません", StringComparison.Ordinal)
             || trimmedLine.Contains("未達", StringComparison.Ordinal)
