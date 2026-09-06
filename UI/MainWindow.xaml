@@ -83,6 +83,7 @@
                          Grid.Row="0"
                          AllowDrop="True"
                          Focusable="True"
+                         FocusVisualStyle="{x:Null}"
                          Background="{StaticResource WaveformBackBrush}" />
         <ui:ThinHorizontalScrollBar x:Name="waveformHorizontalScrollBar"
                                     Grid.Row="1" />

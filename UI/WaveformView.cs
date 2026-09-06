@@ -245,6 +245,8 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
         TabStop = false;
         Cursor = null;
         Focusable = true;
+        // OverrideMetadata(null) だけではテーマ既定の点線枠が残ることがある。
+        FocusVisualStyle = null;
         _mouseGuideLine = new System.Windows.Shapes.Line
         {
             StrokeThickness = 1,

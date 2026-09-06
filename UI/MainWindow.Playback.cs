@@ -858,15 +858,15 @@ public partial class MainWindow
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
 
+        // プロジェクト名編集中は Home／End／矢印などをキャレット操作用に残す。
+        if (projectNameComboBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
         // Esc はログ欄フォーカス中でも終了確認を出す（Form1 と同じ）。
-        // プロジェクト名編集中はコンボ側の編集キャンセルに委ねる。
         if (key == Key.Escape)
         {
-            if (projectNameComboBox.IsKeyboardFocusWithin)
-            {
-                return;
-            }
-
             ConfirmAndExit();
             e.Handled = true;
             return;

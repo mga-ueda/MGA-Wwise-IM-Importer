@@ -129,6 +129,19 @@ internal sealed class ProjectProfile
         LastKnownWwiseProjectFilePath = LastKnownWwiseProjectFilePath,
     };
 
+    /// <summary>
+    /// 新規プロジェクト用に設定（出力先、フェード、マーカー、Wwiseターゲット等）をコピーしたプロファイルを生成する。
+    /// ドロップされた波形パス等のセッション固有ファイル情報は引き継がない。
+    /// </summary>
+    public ProjectProfile CloneForNewProject(string newName)
+    {
+        var clone = Clone();
+        clone.Name = newName;
+        clone.LastWavePath = string.Empty;
+        clone.LastWavePaths = string.Empty;
+        return clone;
+    }
+
     public void CopyMarkerInto(MarkerSettings markers)
     {
         markers.GridOverride = GridOverride;
@@ -443,6 +456,7 @@ internal sealed class ProjectSettingsStore
             _names.Add(trimmedNew);
             _profiles[trimmedNew] = profile.Clone();
             ActiveName = trimmedNew;
+            DeleteLastWaveSessionFile(trimmedNew);
             WriteProfile(trimmedNew, _profiles[trimmedNew]);
             WriteIndex();
             return trimmedNew;

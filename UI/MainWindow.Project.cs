@@ -219,7 +219,12 @@ public partial class MainWindow
     {
         if (e.Key == Key.Enter)
         {
-            CommitProjectNameEdit();
+            if (CommitProjectNameEdit())
+            {
+                // ComboBox が Enter 後にフォーカスを取り戻すのを避ける。
+                Dispatcher.BeginInvoke(() => ReleaseFocusToWaveform());
+            }
+
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
@@ -231,11 +236,11 @@ public partial class MainWindow
         }
     }
 
-    private void CommitProjectNameEdit()
+    private bool CommitProjectNameEdit()
     {
         if (_suppressProjectUiEvents)
         {
-            return;
+            return false;
         }
 
         var text = (projectNameComboBox.Text ?? string.Empty).Trim();
@@ -244,27 +249,54 @@ public partial class MainWindow
         {
             _creatingNewProject = false;
             RefreshProjectComboItems(_loadedProjectName);
-            return;
+            return true;
         }
 
         if (!_creatingNewProject && string.Equals(text, _loadedProjectName, StringComparison.Ordinal))
         {
-            return;
+            return true;
         }
 
         try
         {
-            var profile = _projectStore.GetActive();
-            CaptureProfileFromUi(profile);
-            var savedName = _projectStore.SaveProfile(_loadedProjectName, text, profile, _creatingNewProject);
+            var isCreating = _creatingNewProject;
+            var currentProfile = _projectStore.GetActive();
+            CaptureProfileFromUi(currentProfile);
+
+            ProjectProfile profileToSave;
+            if (isCreating)
+            {
+                // 新規作成前に現プロジェクトの最新状態を保存する
+                _projectStore.SaveProfile(_loadedProjectName, _loadedProjectName, currentProfile, creatingNew: false);
+                // 新規プロジェクトにはプロジェクト設定のみコピー（ドロップされた波形ファイル情報等は含めない）
+                profileToSave = currentProfile.CloneForNewProject(text);
+            }
+            else
+            {
+                profileToSave = currentProfile;
+            }
+
+            var savedName = _projectStore.SaveProfile(_loadedProjectName, text, profileToSave, isCreating);
             _creatingNewProject = false;
-            ApplyProjectProfile(_projectStore.GetActive(), applyLastSession: savedName != _loadedProjectName);
+            if (isCreating)
+            {
+                ApplyProjectProfile(_projectStore.GetActive(), applyLastSession: false);
+            }
+            else
+            {
+                // リネームは名前だけ差し替える。波形や編集状態は維持する。
+                _loadedProjectName = savedName;
+            }
+
             RefreshProjectComboItems(savedName);
+            return true;
         }
         catch (InvalidOperationException ex)
         {
+            _creatingNewProject = false;
             AppendColoredLine(ex.Message);
             RefreshProjectComboItems(_loadedProjectName);
+            return false;
         }
     }
 
