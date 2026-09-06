@@ -23,18 +23,10 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     /// <summary>グループ内重ね再生の最大本数（クロック＋上乗せ）。</summary>
     public const int MaxPlaylistVoices = 8;
 
-    private WaveFileReader? _reader;
-    private WaveFileReader? _exitReader;
-    private WaveFileReader? _playlistFadeReader;
-    private WaveFileReader? _playlistExitFadeReader;
-    private WaveFileReader? _playlistPreRollReader;
-    private readonly WaveFileReader?[] _overlayReaders = new WaveFileReader?[MaxPlaylistVoices - 1];
-    private readonly WaveFileReader?[] _overlayExitReaders = new WaveFileReader?[MaxPlaylistVoices - 1];
+    private PlaybackPcm? _pcm;
     private IWavePlayer? _output;
     private StereoFloatWaveProvider? _provider;
     private string? _path;
-    /// <summary>再生専用の一時コピー。元ファイルをロックしない。</summary>
-    private string? _playbackCopyPath;
     private bool _isPlaying;
     private bool _disposed;
     private bool _suppressPlaybackEnded;
@@ -64,9 +56,20 @@ internal sealed partial class WaveAudioPlayer : IDisposable
 
     public bool HasSource => !string.IsNullOrEmpty(_path);
 
-    public TimeSpan Position => _reader?.CurrentTime ?? TimeSpan.Zero;
+    public TimeSpan Position
+    {
+        get
+        {
+            if (_pcm is null || _pcm.SampleRate <= 0)
+            {
+                return TimeSpan.Zero;
+            }
 
-    public TimeSpan Duration => _reader?.TotalTime ?? TimeSpan.Zero;
+            return TimeSpan.FromSeconds(CurrentMainSample / (double)_pcm.SampleRate);
+        }
+    }
+
+    public TimeSpan Duration => _pcm?.Duration ?? TimeSpan.Zero;
 
     /// <summary>直近に生成した出力バッファのピーク値（0〜1）。</summary>
     public float OutputPeak => _provider?.OutputPeak ?? 0f;
@@ -256,7 +259,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         var plan = _provider is not null
             ? _provider.GetActivePlan()
             : _activePlan;
-        if (_reader is null || plan is not { } activePlan)
+        if (_pcm is null || plan is not { } activePlan)
         {
             return false;
         }
@@ -317,13 +320,13 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     public bool TryGetExitPlaybackProgress(out double progress)
     {
         progress = 0;
-        if (_provider is null || _reader is null)
+        if (_provider is null || _pcm is null)
         {
             return false;
         }
 
         var frameCount = FrameCount;
-        var sampleRate = _reader.WaveFormat.SampleRate;
+        var sampleRate = _pcm.SampleRate;
         return _provider.TryGetExitPlaybackProgress(frameCount, sampleRate, out progress);
     }
 
@@ -333,28 +336,25 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     {
         progress = 0d;
         isExit = false;
-        if (_provider is null || _reader is null)
+        if (_provider is null || _pcm is null)
         {
             return false;
         }
 
         return _provider.TryGetPlaylistFadePlaybackProgress(
             FrameCount,
-            _reader.WaveFormat.SampleRate,
+            _pcm.SampleRate,
             out progress,
             out isExit);
     }
 
-    private long FrameCount =>
-        _reader is null
-            ? 0
-            : _reader.Length / Math.Max(1, _reader.WaveFormat.BlockAlign);
+    private long FrameCount => _pcm?.FrameCount ?? 0;
 
     public long CurrentMainSample => _provider?.CurrentMainSample ?? 0L;
 
     private LoopPlaybackPlan? FindPlanAtProgress(double progress)
     {
-        if (_reader is null || _loopPlans.Length == 0)
+        if (_pcm is null || _loopPlans.Length == 0)
         {
             return null;
         }
@@ -517,7 +517,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         clockProgress = 0d;
-        if (_provider is null || _reader is null || FrameCount <= 0)
+        if (_provider is null || _pcm is null || FrameCount <= 0)
         {
             return false;
         }
@@ -781,14 +781,12 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         try
         {
             _path = path;
-            // 元 WAV を掴み続けないよう、再生用に一時コピーを開く。
-            // （外部アプリが同じファイルへ上書き保存できるようにする）
-            _playbackCopyPath = CreatePlaybackCopy(path);
-            OpenReadersFromPlaybackCopy(path);
+            // 元ファイルはデコード中だけ開き、再生中は掴み続けない。
+            var info = WavFileInfo.Read(path);
+            OpenFromPcm(PlaybackPcm.FromWave(info));
         }
         catch
         {
-            // 半開きのリーダー・一時コピー・HasSource 不整合を残さない。
             StopAndRelease();
             _path = null;
             throw;
@@ -796,7 +794,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     }
 
     /// <summary>
-    /// 複数波形の仮想タイムライン再生用。ソースを一時連結 WAV にして開く（Export 元には使わない）。
+    /// 複数波形の仮想タイムライン再生用。各ソースをステレオ float へ展開して連結する（Export 元には使わない）。
     /// </summary>
     public void LoadVirtualConcat(IReadOnlyList<WaveformSourceSpan> spans)
     {
@@ -810,44 +808,20 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         try
         {
             _path = spans[0].Path;
-            _playbackCopyPath = WavConcatWriter.WriteTempConcat(spans);
-            OpenReadersFromPlaybackCopy(_playbackCopyPath);
+            OpenFromPcm(PlaybackPcm.FromSpans(spans));
         }
         catch
         {
-            // 半開きのリーダー・一時連結 WAV・HasSource 不整合を残さない。
             StopAndRelease();
             _path = null;
             throw;
         }
     }
 
-    private void OpenReadersFromPlaybackCopy(string formatSourcePath)
+    private void OpenFromPcm(PlaybackPcm pcm)
     {
-        // AudioFileReader は多チャンネル Extensible の float 変換で
-        // ACM（acmFormatSuggest）に頼り NoDriver で失敗するため、変換は自前で行う
-        var info = WavFileInfo.Read(formatSourcePath);
-        _reader = new WaveFileReader(_playbackCopyPath!);
-        _exitReader = new WaveFileReader(_playbackCopyPath!);
-        _playlistFadeReader = new WaveFileReader(_playbackCopyPath!);
-        _playlistExitFadeReader = new WaveFileReader(_playbackCopyPath!);
-        _playlistPreRollReader = new WaveFileReader(_playbackCopyPath!);
-        for (var i = 0; i < _overlayReaders.Length; i++)
-        {
-            _overlayReaders[i] = new WaveFileReader(_playbackCopyPath!);
-            _overlayExitReaders[i] = new WaveFileReader(_playbackCopyPath!);
-        }
-
-        _provider = new StereoFloatWaveProvider(
-            _reader,
-            _exitReader,
-            _playlistFadeReader,
-            _playlistExitFadeReader,
-            _playlistPreRollReader,
-            _overlayReaders!,
-            _overlayExitReaders!,
-            info,
-            message => Trace(message));
+        _pcm = pcm;
+        _provider = new StereoFloatWaveProvider(pcm, message => Trace(message));
         _provider.SetPlayExitLayer(_playExitLayer);
         PushActivePlanToProvider();
         ApplyMetronomeToProvider();
@@ -967,14 +941,14 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         EnsureOutputDevice();
-        if (_output is null || _reader is null)
+        if (_output is null || _pcm is null || _provider is null)
         {
             return;
         }
 
-        if (_reader.Position >= _reader.Length)
+        if (CurrentMainSample >= FrameCount)
         {
-            _reader.Position = 0;
+            _provider.SeekMain(0);
         }
 
         // ASIO 等は Stop/Play だけではハード／ドライバ先読みが残ることがあるため、
@@ -1025,7 +999,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_output is null || _reader is null)
+        if (_output is null || _pcm is null)
         {
             _isPlaying = false;
             return;
@@ -1042,7 +1016,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             _suppressPlaybackEnded = false;
         }
 
-        _reader.Position = 0;
+        _provider?.SeekMain(0);
         _provider?.StopExitLayer();
         _isPlaying = false;
         _discardOutputBufferBeforePlay = true;
@@ -1068,32 +1042,26 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (_reader is null)
+        if (_pcm is null || _provider is null || FrameCount <= 0)
         {
             return;
         }
 
         // ジャンプ時は Exit／Playlist 遷移を直ちに止める（Arm 前でも確実に）
-        _provider?.ClearPlaylistPlayback();
-        _provider?.StopExitLayer();
-
-        var duration = _reader.TotalTime;
-        if (duration <= TimeSpan.Zero)
-        {
-            return;
-        }
+        _provider.ClearPlaylistPlayback();
+        _provider.StopExitLayer();
 
         var clamped = Math.Clamp(progress, 0d, 1d);
         // 終端ぴったりだと即 MediaEnded 扱いになることがあるためわずかに手前へ
-        var ticks = (long)(duration.Ticks * clamped);
-        if (clamped >= 1d && duration.Ticks > 0)
+        var sample = (long)Math.Floor(clamped * FrameCount);
+        if (clamped >= 1d)
         {
-            ticks = Math.Max(0, duration.Ticks - 1);
+            sample = Math.Max(0L, FrameCount - 1);
         }
 
-        _reader.CurrentTime = TimeSpan.FromTicks(ticks);
+        _provider.SeekMain(sample);
         // 不連続シーク後は着地拍をサイレントアーム（ジャンプ抑制で１拍目を落とさない）。
-        _provider?.ResetMetronomeSchedule();
+        _provider.ResetMetronomeSchedule();
 
         // 再生中は連続読み出しで自然に切り替わる。毎回デバイス再作成すると
         // シークバードラッグのスクラブが極端に重くなる。
@@ -1119,7 +1087,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
 
     private void OnPlaybackStopped(object? sender, StoppedEventArgs e)
     {
-        if (_suppressPlaybackEnded || _reader is null)
+        if (_suppressPlaybackEnded || _pcm is null)
         {
             return;
         }
@@ -1132,8 +1100,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         var clockFadeOutEnded = _provider?.ConsumeForceEndAfterClockFadeOut() == true;
         if (playlistEnded
             || clockFadeOutEnded
-            || _reader.Position >= _reader.Length
-            || _reader.CurrentTime >= _reader.TotalTime)
+            || CurrentMainSample >= FrameCount)
         {
             CompletePlaybackEnded(playlistEnded || clockFadeOutEnded);
         }
@@ -1147,7 +1114,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (!_isPlaying || _reader is null || _output is null)
+        if (!_isPlaying || _pcm is null || _output is null)
         {
             return false;
         }
@@ -1192,6 +1159,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         _provider?.StopExitLayer();
         _provider?.ResetOutputPeak();
         _provider = null;
+        _pcm = null;
 
         if (_output is not null)
         {
@@ -1200,55 +1168,14 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             _output.Dispose();
             _output = null;
         }
-
-        if (_reader is not null)
-        {
-            _reader.Dispose();
-            _reader = null;
-        }
-
-        if (_exitReader is not null)
-        {
-            _exitReader.Dispose();
-            _exitReader = null;
-        }
-
-        if (_playlistFadeReader is not null)
-        {
-            _playlistFadeReader.Dispose();
-            _playlistFadeReader = null;
-        }
-
-        if (_playlistExitFadeReader is not null)
-        {
-            _playlistExitFadeReader.Dispose();
-            _playlistExitFadeReader = null;
-        }
-
-        if (_playlistPreRollReader is not null)
-        {
-            _playlistPreRollReader.Dispose();
-            _playlistPreRollReader = null;
-        }
-
-        for (var i = 0; i < _overlayReaders.Length; i++)
-        {
-            _overlayReaders[i]?.Dispose();
-            _overlayReaders[i] = null;
-            _overlayExitReaders[i]?.Dispose();
-            _overlayExitReaders[i] = null;
-        }
-
-        TryDeleteFile(_playbackCopyPath);
-        _playbackCopyPath = null;
     }
 
     private void Trace(string message) => Diagnostic?.Invoke(this, message);
 
     /// <summary>
-    /// PCM / IEEE float の WAV を ACM を使わずステレオ float に変換する再生用プロバイダ。
-    /// メインはループ折り返し、Exit は別リーダでワンショット二重再生してミックスする。
-    /// グループ重ね再生は最大 <see cref="MaxPlaylistVoices"/> − 1 本の上乗せリーダを加算する。
+    /// メモリ上のステレオ float をミックスする再生用プロバイダ。
+    /// メインはループ折り返し、Exit は別ヘッドでワンショット二重再生してミックスする。
+    /// グループ重ね再生は最大 <see cref="MaxPlaylistVoices"/> − 1 本の上乗せヘッドを加算する。
     /// </summary>
 }
 

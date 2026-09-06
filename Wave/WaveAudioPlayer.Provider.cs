@@ -1,4 +1,5 @@
-﻿using NAudio.Wave;
+﻿using System.Runtime.InteropServices;
+using NAudio.Wave;
 using MgaWwiseIMImporter.UI;
 
 namespace MgaWwiseIMImporter.Wave;
@@ -7,20 +8,14 @@ internal sealed partial class WaveAudioPlayer
 {
     private sealed class StereoFloatWaveProvider : IWaveProvider
     {
-        private const float FoldGain = 0.7071f;
-        private readonly WaveFileReader _source;
-        private readonly WaveFileReader _exitSource;
-        private readonly WaveFileReader _playlistFadeSource;
-        private readonly WaveFileReader _playlistExitFadeSource;
-        private readonly WaveFileReader _playlistPreRollSource;
+        private readonly PlaybackPcm _pcm;
+        private readonly PcmPlayhead _source;
+        private readonly PcmPlayhead _exitSource;
+        private readonly PcmPlayhead _playlistFadeSource;
+        private readonly PcmPlayhead _playlistExitFadeSource;
+        private readonly PcmPlayhead _playlistPreRollSource;
         private readonly OverlayPlaylistVoice[] _overlayVoices;
         private readonly Action<string> _diagnostic;
-        private readonly Func<byte[], int, float> _sampleReader;
-        private readonly int _sourceBlockAlign;
-        private readonly int _channels;
-        private readonly int _bytesPerSample;
-        private readonly float _normalize;
-        private byte[] _pcmScratch = [];
         private byte[] _mainFloat = [];
         private byte[] _exitFloat = [];
         private byte[] _playlistFadeFloat = [];
@@ -97,52 +92,36 @@ internal sealed partial class WaveAudioPlayer
         private long _metronomeCurrentBeatStart;
         private long _metronomeCurrentNextBeat;
 
-        public StereoFloatWaveProvider(
-            WaveFileReader source,
-            WaveFileReader exitSource,
-            WaveFileReader playlistFadeSource,
-            WaveFileReader playlistExitFadeSource,
-            WaveFileReader playlistPreRollSource,
-            WaveFileReader[] overlaySources,
-            WaveFileReader[] overlayExitSources,
-            WavFileInfo info,
-            Action<string> diagnostic)
+        public StereoFloatWaveProvider(PlaybackPcm pcm, Action<string> diagnostic)
         {
-            if (info.Channels == 0 || info.BlockAlign == 0 || info.SampleRate == 0)
+            if (pcm.FrameCount <= 0 || pcm.SampleRate <= 0)
             {
                 throw new InvalidDataException(UiStrings.ErrWaveFormatInvalid);
             }
 
-            if (overlaySources.Length != MaxPlaylistVoices - 1
-                || overlayExitSources.Length != MaxPlaylistVoices - 1)
+            _pcm = pcm;
+            _source = new PcmPlayhead(pcm);
+            _exitSource = new PcmPlayhead(pcm);
+            _playlistFadeSource = new PcmPlayhead(pcm);
+            _playlistExitFadeSource = new PcmPlayhead(pcm);
+            _playlistPreRollSource = new PcmPlayhead(pcm);
+            _overlayVoices = new OverlayPlaylistVoice[MaxPlaylistVoices - 1];
+            for (var i = 0; i < _overlayVoices.Length; i++)
             {
-                throw new ArgumentException(
-                    $"Overlay readers must be {MaxPlaylistVoices - 1}.",
-                    nameof(overlaySources));
-            }
-
-            _source = source;
-            _exitSource = exitSource;
-            _playlistFadeSource = playlistFadeSource;
-            _playlistExitFadeSource = playlistExitFadeSource;
-            _playlistPreRollSource = playlistPreRollSource;
-            _overlayVoices = new OverlayPlaylistVoice[overlaySources.Length];
-            for (var i = 0; i < overlaySources.Length; i++)
-            {
-                _overlayVoices[i] = new OverlayPlaylistVoice(
-                    overlaySources[i],
-                    overlayExitSources[i]);
+                _overlayVoices[i] = new OverlayPlaylistVoice(pcm);
             }
 
             _diagnostic = diagnostic;
-            _sampleReader = WavPeakReader.CreateSampleReader(info.AudioFormat, info.BitsPerSample);
-            _channels = info.Channels;
-            _sourceBlockAlign = info.BlockAlign;
-            _bytesPerSample = info.BitsPerSample / 8;
-            var extraChannels = Math.Max(0, _channels - 2);
-            _normalize = 1f / (1f + extraChannels * FoldGain);
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat((int)info.SampleRate, 2);
-            _playlistFadeFrameCount = Math.Max(1, (int)Math.Round(info.SampleRate * 0.5d));
+            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(pcm.SampleRate, 2);
+            _playlistFadeFrameCount = Math.Max(1, (int)Math.Round(pcm.SampleRate * 0.5d));
+        }
+
+        public void SeekMain(long sample)
+        {
+            lock (_readGate)
+            {
+                _source.SeekToSample(sample);
+            }
         }
 
         public WaveFormat WaveFormat { get; }
@@ -1517,6 +1496,14 @@ internal sealed partial class WaveAudioPlayer
 
                 // 加算ミックス（簡易クリップ）。-R 区間はタイムラインを進めつつ無音にする。
                 // メトロノームは除外区間でも再生サンプル位置に同期して重ねる。
+                // ホットパス: BitConverter を避け float スパンへ直接アクセスする。
+                var mainF = AsFloats(_mainFloat, gotFrames);
+                var exitF = AsFloats(_exitFloat, gotFrames);
+                var fadeF = AsFloats(_playlistFadeFloat, gotFrames);
+                var preRollF = AsFloats(_playlistPreRollFloat, gotFrames);
+                var overlayF = AsFloats(_overlayMixFloat, gotFrames);
+                var outF = MemoryMarshal.Cast<byte, float>(
+                    buffer.AsSpan(outIndex, gotFrames * 8));
                 for (var i = 0; i < gotFrames; i++)
                 {
                     var absSample = samplePos + i;
@@ -1537,29 +1524,20 @@ internal sealed partial class WaveAudioPlayer
                     }
                     else
                     {
-                        var mainL = BitConverter.ToSingle(_mainFloat, i * 8);
-                        var mainR = BitConverter.ToSingle(_mainFloat, i * 8 + 4);
-                        var exitL = BitConverter.ToSingle(_exitFloat, i * 8);
-                        var exitR = BitConverter.ToSingle(_exitFloat, i * 8 + 4);
-                        var fadeL = BitConverter.ToSingle(_playlistFadeFloat, i * 8);
-                        var fadeR = BitConverter.ToSingle(_playlistFadeFloat, i * 8 + 4);
-                        var preRollL = BitConverter.ToSingle(_playlistPreRollFloat, i * 8);
-                        var preRollR = BitConverter.ToSingle(_playlistPreRollFloat, i * 8 + 4);
-                        var overlayL = BitConverter.ToSingle(_overlayMixFloat, i * 8);
-                        var overlayR = BitConverter.ToSingle(_overlayMixFloat, i * 8 + 4);
-                        outputL = ClampSample(mainL + exitL + fadeL + preRollL + overlayL + metro);
-                        outputR = ClampSample(mainR + exitR + fadeR + preRollR + overlayR + metro);
+                        var at = i * 2;
+                        outputL = ClampSample(
+                            mainF[at] + exitF[at] + fadeF[at]
+                            + preRollF[at] + overlayF[at] + metro);
+                        outputR = ClampSample(
+                            mainF[at + 1] + exitF[at + 1] + fadeF[at + 1]
+                            + preRollF[at + 1] + overlayF[at + 1] + metro);
                     }
 
                     outputPeak = Math.Max(
                         outputPeak,
                         Math.Max(Math.Abs(outputL), Math.Abs(outputR)));
-                    BitConverter.TryWriteBytes(
-                        buffer.AsSpan(outIndex + i * 8, 4),
-                        outputL);
-                    BitConverter.TryWriteBytes(
-                        buffer.AsSpan(outIndex + i * 8 + 4, 4),
-                        outputR);
+                    outF[i * 2] = outputL;
+                    outF[i * 2 + 1] = outputR;
                 }
 
                 PushMonitorSamples(buffer, outIndex, gotFrames);
@@ -1679,7 +1657,7 @@ internal sealed partial class WaveAudioPlayer
             beatStartSample = 0;
             nextBeatSample = 0;
 
-            var frameCount = _sourceBlockAlign <= 0 ? 0L : _source.Length / _sourceBlockAlign;
+            var frameCount = _pcm.FrameCount;
             if (frameCount <= 0 || bars.Count == 0)
             {
                 return false;
@@ -1782,16 +1760,26 @@ internal sealed partial class WaveAudioPlayer
 
         private void PushMonitorSamples(byte[] buffer, int offset, int frames)
         {
+            if (frames <= 0)
+            {
+                return;
+            }
+
+            var src = MemoryMarshal.Cast<byte, float>(buffer.AsSpan(offset, frames * 8));
             lock (_monitorGate)
             {
+                var writeIndex = (int)(_monitorWriteCount % _monitorRing.Length);
                 for (var i = 0; i < frames; i++)
                 {
-                    var left = BitConverter.ToSingle(buffer, offset + i * 8);
-                    var right = BitConverter.ToSingle(buffer, offset + i * 8 + 4);
-                    _monitorRing[(int)(_monitorWriteCount % _monitorRing.Length)] =
-                        (left + right) * 0.5f;
-                    _monitorWriteCount++;
+                    _monitorRing[writeIndex] = (src[i * 2] + src[i * 2 + 1]) * 0.5f;
+                    writeIndex++;
+                    if (writeIndex == _monitorRing.Length)
+                    {
+                        writeIndex = 0;
+                    }
                 }
+
+                _monitorWriteCount += frames;
             }
         }
 
@@ -1803,11 +1791,22 @@ internal sealed partial class WaveAudioPlayer
                 var available = (int)Math.Min(
                     _monitorWriteCount,
                     Math.Min(destination.Length, _monitorRing.Length));
-                var start = _monitorWriteCount - available;
-                for (var i = 0; i < available; i++)
+                if (available > 0)
                 {
-                    destination[destination.Length - available + i] =
-                        _monitorRing[(int)((start + i) % _monitorRing.Length)];
+                    // オーディオスレッドと共有するロック内なので Array.Copy 2 回で済ませ、保持時間を最小化する。
+                    var destStart = destination.Length - available;
+                    var start = (int)((_monitorWriteCount - available) % _monitorRing.Length);
+                    var firstLen = Math.Min(available, _monitorRing.Length - start);
+                    Array.Copy(_monitorRing, start, destination, destStart, firstLen);
+                    if (firstLen < available)
+                    {
+                        Array.Copy(
+                            _monitorRing,
+                            0,
+                            destination,
+                            destStart + firstLen,
+                            available - firstLen);
+                    }
                 }
 
                 if (available < destination.Length)
@@ -1977,24 +1976,20 @@ internal sealed partial class WaveAudioPlayer
                         _playlistExitFadeFloat,
                         0,
                         exitFrames);
+                    var destExitF = MemoryMarshal.Cast<byte, float>(
+                        dest.AsSpan(destOffset, exitGot * 8));
+                    var exitSrcF = AsFloats(_playlistExitFadeFloat, exitGot);
                     for (var i = 0; i < exitGot; i++)
                     {
-                        var at = destOffset + i * 8;
-                        BitConverter.TryWriteBytes(
-                            dest.AsSpan(at, 4),
-                            ClampSample(
-                                BitConverter.ToSingle(dest, at)
-                                + BitConverter.ToSingle(_playlistExitFadeFloat, i * 8)));
-                        BitConverter.TryWriteBytes(
-                            dest.AsSpan(at + 4, 4),
-                            ClampSample(
-                                BitConverter.ToSingle(dest, at + 4)
-                                + BitConverter.ToSingle(_playlistExitFadeFloat, i * 8 + 4)));
+                        var at = i * 2;
+                        destExitF[at] = ClampSample(destExitF[at] + exitSrcF[at]);
+                        destExitF[at + 1] = ClampSample(destExitF[at + 1] + exitSrcF[at + 1]);
                     }
                 }
             }
 
             var got = Math.Max(mainGot, exitGot);
+            var destF = MemoryMarshal.Cast<byte, float>(dest.AsSpan(destOffset, got * 8));
             for (var i = 0; i < got; i++)
             {
                 var fadeIndex = _playlistFadeFramesRead + i;
@@ -2010,13 +2005,8 @@ internal sealed partial class WaveAudioPlayer
                             (_playlistFadeIncomingFramesRead + fadeIndex)
                             / (float)(_playlistFadeIncomingFrameCount - 1));
                 var gain = fadeOutGain * fadeInGain;
-                var at = destOffset + i * 8;
-                BitConverter.TryWriteBytes(
-                    dest.AsSpan(at, 4),
-                    BitConverter.ToSingle(dest, at) * gain);
-                BitConverter.TryWriteBytes(
-                    dest.AsSpan(at + 4, 4),
-                    BitConverter.ToSingle(dest, at + 4) * gain);
+                destF[i * 2] *= gain;
+                destF[i * 2 + 1] *= gain;
             }
 
             _playlistFadeFramesRead += got;
@@ -2054,6 +2044,7 @@ internal sealed partial class WaveAudioPlayer
                 return;
             }
 
+            var f = AsFloats(buffer, frames);
             for (var i = 0; i < frames; i++)
             {
                 var gain = RegionEdgeFade.GainAt(startSample + i, fades);
@@ -2062,13 +2053,8 @@ internal sealed partial class WaveAudioPlayer
                     continue;
                 }
 
-                var at = i * 8;
-                BitConverter.TryWriteBytes(
-                    buffer.AsSpan(at, 4),
-                    BitConverter.ToSingle(buffer, at) * gain);
-                BitConverter.TryWriteBytes(
-                    buffer.AsSpan(at + 4, 4),
-                    BitConverter.ToSingle(buffer, at + 4) * gain);
+                f[i * 2] *= gain;
+                f[i * 2 + 1] *= gain;
             }
         }
 
@@ -2089,6 +2075,7 @@ internal sealed partial class WaveAudioPlayer
                 return;
             }
 
+            var f = AsFloats(buffer, frames);
             for (var i = 0; i < frames; i++)
             {
                 var fadeIndex = framesRead + i;
@@ -2097,13 +2084,8 @@ internal sealed partial class WaveAudioPlayer
                     : Math.Max(
                         0f,
                         1f - fadeIndex / (float)(frameCount - 1));
-                var at = i * 8;
-                BitConverter.TryWriteBytes(
-                    buffer.AsSpan(at, 4),
-                    BitConverter.ToSingle(buffer, at) * gain);
-                BitConverter.TryWriteBytes(
-                    buffer.AsSpan(at + 4, 4),
-                    BitConverter.ToSingle(buffer, at + 4) * gain);
+                f[i * 2] *= gain;
+                f[i * 2 + 1] *= gain;
             }
 
             lock (_gate)
@@ -2253,6 +2235,9 @@ internal sealed partial class WaveAudioPlayer
                 }
 
                 var mixFrames = Math.Max(got, exitGot);
+                var destF = AsFloats(dest, mixFrames);
+                var voiceF = AsFloats(voice.FloatBuffer, mixFrames);
+                var overlayExitF = AsFloats(_overlayExitFloat, mixFrames);
                 for (var i = 0; i < mixFrames; i++)
                 {
                     var gain = 1f;
@@ -2273,27 +2258,17 @@ internal sealed partial class WaveAudioPlayer
                         }
                     }
 
-                    var at = i * 8;
-                    var left = i < got
-                        ? BitConverter.ToSingle(voice.FloatBuffer, at) * gain
-                        : 0f;
-                    var right = i < got
-                        ? BitConverter.ToSingle(voice.FloatBuffer, at + 4) * gain
-                        : 0f;
+                    var at = i * 2;
+                    var left = i < got ? voiceF[at] * gain : 0f;
+                    var right = i < got ? voiceF[at + 1] * gain : 0f;
                     if (i < exitGot)
                     {
-                        left = ClampSample(
-                            left + BitConverter.ToSingle(_overlayExitFloat, at));
-                        right = ClampSample(
-                            right + BitConverter.ToSingle(_overlayExitFloat, at + 4));
+                        left = ClampSample(left + overlayExitF[at]);
+                        right = ClampSample(right + overlayExitF[at + 1]);
                     }
 
-                    BitConverter.TryWriteBytes(
-                        dest.AsSpan(at, 4),
-                        ClampSample(BitConverter.ToSingle(dest, at) + left));
-                    BitConverter.TryWriteBytes(
-                        dest.AsSpan(at + 4, 4),
-                        ClampSample(BitConverter.ToSingle(dest, at + 4) + right));
+                    destF[at] = ClampSample(destF[at] + left);
+                    destF[at + 1] = ClampSample(destF[at + 1] + right);
                 }
 
                 lock (_gate)
@@ -2444,6 +2419,7 @@ internal sealed partial class WaveAudioPlayer
                 return;
             }
 
+            var f = AsFloats(buffer, frames);
             for (var i = 0; i < frames; i++)
             {
                 var fadeIndex = framesRead + i;
@@ -2452,13 +2428,8 @@ internal sealed partial class WaveAudioPlayer
                     : Math.Min(
                         1f,
                         fadeIndex / (float)(frameCount - 1));
-                var at = i * 8;
-                BitConverter.TryWriteBytes(
-                    buffer.AsSpan(at, 4),
-                    BitConverter.ToSingle(buffer, at) * gain);
-                BitConverter.TryWriteBytes(
-                    buffer.AsSpan(at + 4, 4),
-                    BitConverter.ToSingle(buffer, at + 4) * gain);
+                f[i * 2] *= gain;
+                f[i * 2 + 1] *= gain;
             }
 
             framesRead += frames;
@@ -2542,50 +2513,8 @@ internal sealed partial class WaveAudioPlayer
             }
         }
 
-        private int ReadDecodedFrames(WaveFileReader reader, byte[] dest, int destOffset, int frames)
-        {
-            if (frames <= 0)
-            {
-                return 0;
-            }
-
-            var sourceBytes = frames * _sourceBlockAlign;
-            EnsureBuffer(ref _pcmScratch, sourceBytes);
-
-            var got = reader.Read(_pcmScratch, 0, sourceBytes);
-            var gotFrames = got / _sourceBlockAlign;
-            var writeAt = destOffset;
-            for (var i = 0; i < gotFrames; i++)
-            {
-                var frameOffset = i * _sourceBlockAlign;
-                float left;
-                float right;
-                if (_channels == 1)
-                {
-                    left = right = _sampleReader(_pcmScratch, frameOffset);
-                }
-                else
-                {
-                    left = _sampleReader(_pcmScratch, frameOffset);
-                    right = _sampleReader(_pcmScratch, frameOffset + _bytesPerSample);
-                    for (var ch = 2; ch < _channels; ch++)
-                    {
-                        var v = _sampleReader(_pcmScratch, frameOffset + ch * _bytesPerSample) * FoldGain;
-                        left += v;
-                        right += v;
-                    }
-
-                    left *= _normalize;
-                    right *= _normalize;
-                }
-
-                BitConverter.TryWriteBytes(dest.AsSpan(writeAt, 4), left);
-                BitConverter.TryWriteBytes(dest.AsSpan(writeAt + 4, 4), right);
-                writeAt += 8;
-            }
-
-            return gotFrames;
-        }
+        private static int ReadDecodedFrames(PcmPlayhead reader, byte[] dest, int destOffset, int frames) =>
+            reader.ReadFrames(dest, destOffset, frames);
 
         private static void EnsureBuffer(ref byte[] buffer, int bytes)
         {
@@ -2594,6 +2523,10 @@ internal sealed partial class WaveAudioPlayer
                 buffer = new byte[bytes];
             }
         }
+
+        /// <summary>ステレオ float PCM バッファの先頭 frames フレームを float スパンとして見る。</summary>
+        private static Span<float> AsFloats(byte[] buffer, int frames) =>
+            MemoryMarshal.Cast<byte, float>(buffer.AsSpan(0, frames * 8));
 
         private static float ClampSample(float value) =>
             value < -1f ? -1f : value > 1f ? 1f : value;
@@ -2618,14 +2551,10 @@ internal sealed partial class WaveAudioPlayer
             return false;
         }
 
-        private long CurrentSample(WaveFileReader reader) =>
-            _sourceBlockAlign <= 0 ? 0 : reader.Position / _sourceBlockAlign;
+        private static long CurrentSample(PcmPlayhead reader) => reader.Sample;
 
-        private void SeekToSample(WaveFileReader reader, long sample)
-        {
-            var safe = Math.Max(0, sample);
-            reader.Position = safe * (long)_sourceBlockAlign;
-        }
+        private static void SeekToSample(PcmPlayhead reader, long sample) =>
+            reader.SeekToSample(sample);
 
         private void SeekExitToSample(long sample) => SeekToSample(_exitSource, sample);
 
@@ -2641,10 +2570,10 @@ internal sealed partial class WaveAudioPlayer
             LoopPlaybackPlan? TargetPlan,
             long Generation);
 
-        private sealed class OverlayPlaylistVoice(WaveFileReader reader, WaveFileReader exitReader)
+        private sealed class OverlayPlaylistVoice(PlaybackPcm pcm)
         {
-            public WaveFileReader Reader { get; } = reader;
-            public WaveFileReader ExitReader { get; } = exitReader;
+            public PcmPlayhead Reader { get; } = new(pcm);
+            public PcmPlayhead ExitReader { get; } = new(pcm);
             public byte[] FloatBuffer = [];
             public int VoiceId;
             public long PartStartSample;

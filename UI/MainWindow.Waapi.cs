@@ -488,6 +488,14 @@ public partial class MainWindow
             return;
         }
 
+        // 再生中はポーリングを休止する。毎回の HttpClient 生成・TCP 接続
+        // （未接続時は接続失敗の例外送出）が、特にデバッガ接続時にプロセス全体を
+        // 短時間停止させ、ASIO 出力へ周期的なノイズを乗せるため。
+        if (_audioPlayer.IsPlaying)
+        {
+            return;
+        }
+
         _waapiPollBusy = true;
         try
         {

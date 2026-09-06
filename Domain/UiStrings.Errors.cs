@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.Domain;
+﻿namespace MgaWwiseIMImporter.Domain;
 
 internal static partial class UiStrings
 {
@@ -135,6 +135,10 @@ internal static partial class UiStrings
     public static string ErrWaveFormatInvalid => Get(
         "波形フォーマットが不正です。",
         "Wave format is invalid.");
+
+    public static string ErrPlaybackMemoryTooLong => Get(
+        "再生用にメモリへ展開するには波形が長すぎます。",
+        "The wave is too long to load into memory for playback.");
 
     public static string ErrEmptyData => Get(
         "データが空です。",
