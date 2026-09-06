@@ -1283,12 +1283,77 @@ internal sealed partial class WaveAudioPlayer
             return true;
         }
 
+        /// <summary>初回再生時の無音プリロール残フレーム（_readGate 保護）。</summary>
+        private long _silencePrerollFramesRemaining;
+
+        /// <summary>
+        /// 次の Read から指定フレームぶん無音を出力する。
+        /// プロセス初回の再生では JIT・ドライバ起動などの一回きりのスパイクが
+        /// コールバック締切を超えて音が乱れるため、無音区間で吸収する。
+        /// </summary>
+        public void BeginSilencePreroll(int frames)
+        {
+            lock (_readGate)
+            {
+                _silencePrerollFramesRemaining = Math.Max(0, frames);
+            }
+        }
+
         public int Read(byte[] buffer, int offset, int count)
         {
             lock (_readGate)
             {
+                if (_silencePrerollFramesRemaining > 0)
+                {
+                    var frames = count / 8;
+                    if (frames <= 0)
+                    {
+                        return 0;
+                    }
+
+                    Array.Clear(buffer, offset, frames * 8);
+                    _silencePrerollFramesRemaining -= frames;
+                    Volatile.Write(ref _outputPeak, 0f);
+                    return frames * 8;
+                }
+
                 return ReadCore(buffer, offset, count);
             }
+        }
+
+        /// <summary>
+        /// 初回オーディオコールバック前に、Read 経路の JIT コンパイルと作業バッファ確保を済ませる。
+        /// 特にデバッガ接続時は初回 Read の JIT がコールバック締切を超え、最初の再生で一度だけ
+        /// ノイズが乗るため、ロード直後（再生開始前）に読み捨てておく。
+        /// 生成直後（他レイヤ非アクティブ）に呼ぶこと。
+        /// </summary>
+        public void WarmUp(int frames)
+        {
+            if (frames <= 0)
+            {
+                return;
+            }
+
+            var scratch = new byte[frames * 8];
+            lock (_readGate)
+            {
+                var restore = _source.Sample;
+                _ = ReadCore(scratch, 0, scratch.Length);
+                _source.SeekToSample(restore);
+                lock (_gate)
+                {
+                    ResetMetronomeScheduleNoLock();
+                }
+            }
+
+            // 読み捨て分をスペアナ用リングに残さない。
+            lock (_monitorGate)
+            {
+                Array.Clear(_monitorRing, 0, _monitorRing.Length);
+                _monitorWriteCount = 0;
+            }
+
+            Volatile.Write(ref _outputPeak, 0f);
         }
 
         private int ReadCore(byte[] buffer, int offset, int count)

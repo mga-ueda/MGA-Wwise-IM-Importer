@@ -38,6 +38,10 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     /// 再生中シークでは連続読み出しで自然に切り替わるため、ここでは立てない。
     /// </summary>
     private bool _discardOutputBufferBeforePlay;
+
+    /// <summary>プロセス初回の再生を無音プリロールで開始したか（JIT スパイク吸収は一度で足りる）。</summary>
+    private static bool _firstPlaybackPrimed;
+
     private LoopPlaybackPlan[] _loopPlans = [];
     private LoopPlaybackPlan? _activePlan;
     private AudioOutputSettings _outputSettings = AudioOutputSettings.Default;
@@ -825,6 +829,8 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         _provider.SetPlayExitLayer(_playExitLayer);
         PushActivePlanToProvider();
         ApplyMetronomeToProvider();
+        // 初回コールバックの JIT スパイクによる一発ノイズ対策（特にデバッグ実行の ASIO）。
+        _provider.WarmUp(4096);
         InitOutputDevice();
     }
 
@@ -963,6 +969,15 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         }
 
         _discardOutputBufferBeforePlay = false;
+
+        // プロセス初回の再生のみ、JIT／ドライバ起動の一回きりのスパイクを
+        // 無音区間で吸収する（約 0.2 秒）。以降の再生には影響しない。
+        if (!_firstPlaybackPrimed)
+        {
+            _firstPlaybackPrimed = true;
+            _provider.BeginSilencePreroll(Math.Max(1, _pcm.SampleRate / 5));
+        }
+
         _output.Play();
         _isPlaying = true;
         Trace($"transport.play sample={_provider?.CurrentMainSample ?? 0}");
