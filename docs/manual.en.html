@@ -95,7 +95,12 @@
           </ol>
         </li>
         <li><a href="#action-bar">Action bar / WAAPI status</a></li>
-        <li><a href="#export">What EXPORT creates in Wwise</a></li>
+        <li>
+          <a href="#export">What EXPORT creates in Wwise</a>
+          <ol>
+            <li><a href="#export-state-group">Where State Groups are created</a></li>
+          </ol>
+        </li>
         <li><a href="#suffixes">Suffixes and cues</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
         <li><a href="#shortcuts">Shortcuts</a></li>
@@ -397,7 +402,7 @@
 
       <h3>6-2. Destination and export path</h3>
       <ul>
-        <li><strong>Destination</strong> — in Wwise’s Project Explorer, click the object that should receive the generated content (a Work Unit or Virtual Folder under <span class="ui">Interactive Music Hierarchy</span>, etc.). The app uses “whatever is currently selected in Wwise” as the destination. If reselecting every time is tedious, pin it with <span class="ui">Keep Target</span> on the WAAPI status bar.</li>
+        <li><strong>Destination</strong> — in Wwise’s Project Explorer, click the object that should receive the generated content (a Work Unit or Virtual Folder under <span class="ui">Interactive Music Hierarchy</span>, etc.). The app uses “whatever is currently selected in Wwise” as the destination. If reselecting every time is tedious, pin it with <span class="ui">Keep Target</span> on the WAAPI status bar. This destination is for Interactive Music. Song-switching State Groups are created under <span class="ui">Game Syncs → States → Default Work Unit</span>, not at the selected object (by design. → <a href="#export-state-group">13-1</a>).</li>
         <li><strong>Export path</strong> — set in the project bar; where the source WAV is copied. It must be <strong>under the connected Wwise project’s <code>Originals</code> folder</strong> (e.g. <code>&lt;project&gt;\Originals\Music\IM-Importer</code>) so Wwise can reference the source WAVs.</li>
       </ul>
 
@@ -522,8 +527,8 @@
       <p>Designed so <strong>the Interactive Music implementation in Wwise is the master</strong>. Keep one-shot and loop material on one master waveform instead of pre-separating files; build structure nondestructively. Wave-only / multi-wave <strong>copy the source WAV and apply MusicClip trim</strong>. XML mode <strong>splits one WAV per song</strong>. Fades, layer balance, and cues become Wwise properties (nothing is baked into the source).</p>
       <ul>
         <li>One part or one group → one Music Playlist Container</li>
-        <li>Two or more playlists → Music Switch Container + matching State Group</li>
-        <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…)</li>
+        <li>Two or more playlists → Music Switch Container + matching State Group (location: <a href="#export-state-group">13-1</a>)</li>
+        <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…; same location)</li>
         <li>Any → Any (Exit Source At = Immediate) plus per-playlist Any → Object (Fade / Exit Source At / Play post-exit)</li>
         <li>Default rule (Any to Any) inside each playlist container → Play post-exit follows Play -E</li>
         <li>Edge fades → MusicClip Fade; Keep Layer Balance → Make-Up Gain</li>
@@ -531,6 +536,13 @@
       </ul>
       <div class="note">
         <p><strong>Watch out for same-name files</strong>: if the export path already contains WAVs with the same names, EXPORT <strong>overwrites them without asking</strong>.</p>
+      </div>
+
+      <h3 id="export-state-group">13-1. Where State Groups are created (States Default Work Unit)</h3>
+      <p>Switching between songs and importing several BGM tracks at once are not separate app modes. Both are treated as “needs a song switch,” so a State Group is created automatically. There is no option for where to put it. The app always uses <span class="ui">Game Syncs → States → Default Work Unit</span> — a Work Unit every project already has, and a place that rarely collides with your own Game Syncs.</p>
+      <p>With that State Group in place, you can audition and fine-tune transitions in Wwise right after EXPORT. It also shows the intended mapping when you later reassign the music to your production States. Without it, you could preview only one song at a time, and you would have to assign States just to check the import.</p>
+      <div class="note">
+        <p><strong>This is by design, not a bug.</strong> It appears in a different place from the Interactive Music destination (6-2). Treat it as temporary: after you reassign to your production States, delete that State Group from Default Work Unit. It is not meant to stay in the project.</p>
       </div>
 
       <h2 id="suffixes">14. Suffixes and cues</h2>
@@ -585,6 +597,10 @@
           <tr>
             <td>Markers loaded, but nothing loops</td>
             <td>Check the marker names. Only <code>-L</code> / <code>-E</code> / <code>-R</code> / <code>-A</code>, names containing <code>Loop</code>, or the “exactly two markers” special case define ranges (<a href="#prepare-embedded">4-3</a>).</td>
+          </tr>
+          <tr>
+            <td>An unexpected State Group appeared under <span class="ui">States</span> / <span class="ui">Default Work Unit</span></td>
+            <td>This is by design. It is a temporary State Group so you can switch songs and check the import. The location is fixed so the app does not add another destination option. Delete it after you reassign to your production States. → <a href="#export-state-group">13-1</a></td>
           </tr>
         </tbody>
       </table>

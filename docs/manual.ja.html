@@ -95,7 +95,12 @@
           </ol>
         </li>
         <li><a href="#action-bar">操作バー／WAAPI ステータスバー</a></li>
-        <li><a href="#export">EXPORT と Wwise に作られるもの</a></li>
+        <li>
+          <a href="#export">EXPORT と Wwise に作られるもの</a>
+          <ol>
+            <li><a href="#export-state-group">State Group の作成先</a></li>
+          </ol>
+        </li>
         <li><a href="#suffixes">接尾辞と Cue</a></li>
         <li><a href="#troubleshooting">困ったときは</a></li>
         <li><a href="#shortcuts">ショートカット一覧</a></li>
@@ -397,7 +402,7 @@
 
       <h3>6-2. 作成先と書き出しパス</h3>
       <ul>
-        <li><strong>作成先</strong> …… Wwise の Project Explorer で、生成物を置きたいオブジェクト（<span class="ui">Interactive Music Hierarchy</span> の Work Unit や Virtual Folder など）をクリックして選択します。本アプリは「Wwise 上でいま選択されているオブジェクト」を作成先として使います。毎回選び直すのが煩わしい場合は、WAAPI ステータスバーの <span class="ui">Keep Target</span> で固定できます。</li>
+        <li><strong>作成先</strong> …… Wwise の Project Explorer で、生成物を置きたいオブジェクト（<span class="ui">Interactive Music Hierarchy</span> の Work Unit や Virtual Folder など）をクリックして選択します。本アプリは「Wwise 上でいま選択されているオブジェクト」を作成先として使います。毎回選び直すのが煩わしい場合は、WAAPI ステータスバーの <span class="ui">Keep Target</span> で固定できます。この作成先は Interactive Music の置き場所です。曲の切替用 State Group は、選択した場所ではなく <span class="ui">Game Syncs → States → Default Work Unit</span> に作られます（仕様。→ <a href="#export-state-group">13-1</a>）。</li>
         <li><strong>書き出しパス</strong> …… プロジェクトバーで、元 WAV のコピー先を指定します。<strong>接続中の Wwise プロジェクトの <code>Originals</code> フォルダ配下</strong>である必要があります（例: <code>&lt;プロジェクト&gt;\Originals\Music\IM-Importer</code>）。Wwise がソース WAV を参照できる場所に置くためです。</li>
       </ul>
 
@@ -522,8 +527,8 @@
       <p><strong>Wwise 上の Interactive Music 実装をマスターとして扱う</strong>想定です。ワンショットとループをあらかじめ別 WAV に分けず、マスター波形上の構造を非破壊で組み立てます。Wave 単体／複数波形は元 WAV の<strong>コピーと MusicClip トリム</strong>、XML 付きは曲ごとの<strong>切り出し</strong>です。フェード・レイヤーバランス・Cue は Wwise プロパティへ設定します（ソースへ焼き込みません）。</p>
       <ul>
         <li>パートまたはグループ 1 つ → Music Playlist Container 1 つ</li>
-        <li>Playlist が 2 つ以上 → Music Switch Container ＋ 同名 State Group</li>
-        <li>グループ（2 パート以上）→ 1 Music Segment 内の複数 Music Track ＋ グループ State Group（A／B／C…）</li>
+        <li>Playlist が 2 つ以上 → Music Switch Container ＋ 同名 State Group（作成先は <a href="#export-state-group">13-1</a>）</li>
+        <li>グループ（2 パート以上）→ 1 Music Segment 内の複数 Music Track ＋ グループ State Group（A／B／C…。作成先は同じ）</li>
         <li>Any → Any（Exit Source At = Immediate）と各 Playlist 向け Any → Object（Fade／Exit Source At／Play post-exit）</li>
         <li>各 Playlist Container 内の既定ルール（Any to Any）→ Play -E に応じた Play post-exit</li>
         <li>リージョン端フェード → MusicClip Fade／Keep Layer Balance → Make-Up Gain</li>
@@ -531,6 +536,13 @@
       </ul>
       <div class="note">
         <p><strong>同名ファイルの上書きに注意</strong>: 書き出しパスに同名の WAV がある場合、EXPORT は<strong>確認なしで上書き</strong>しますので、ご注意ください。</p>
+      </div>
+
+      <h3 id="export-state-group">13-1. State Group の作成先（States の Default Work Unit）</h3>
+      <p>複数の曲を切り替える場合も、複数 BGM をまとめて入れる場合も、アプリはモードを分けません。どちらも「曲のスイッチが要る」ものとして扱い、State Group を自動で作ります。作成先を選ぶ項目は用意していません。どのプロジェクトにもあり、他とぶつかりにくい <span class="ui">Game Syncs → States → Default Work Unit</span> に固定しています。</p>
+      <p>この State Group があると、EXPORT 直後から Wwise 上で曲同士の推移を聴けて微調整できます。あとで本番の State へ付け替えるときの参考にもなります。無いと 1 曲ずつしかプレビューできず、確認のたびに State の割り当てが必要になります。</p>
+      <div class="note">
+        <p><strong>バグではありません。</strong> Interactive Music の作成先（6-2）とは別の場所に出ます。仮の State Group なので、本番の State に付け替えたら Default Work Unit 側は削除して構いません。残り続ける想定ではありません。</p>
       </div>
 
       <h2 id="suffixes">14. 接尾辞と Cue</h2>
@@ -585,6 +597,10 @@
           <tr>
             <td>マーカーは読めたのにループしない</td>
             <td>マーカー名を確認してください。区間として解釈されるのは <code>-L</code>／<code>-E</code>／<code>-R</code>／<code>-A</code>、名前に <code>Loop</code> を含むもの、または「マーカーちょうど 2 本」の特例のみです（<a href="#prepare-embedded">4-3</a>）。</td>
+          </tr>
+          <tr>
+            <td><span class="ui">States</span> の <span class="ui">Default Work Unit</span> に見知らぬ State Group がある</td>
+            <td>バグではありません。複数曲を切り替えて確認するための仮の State Group です。作成先オプションを増やさないため、場所は固定しています。本番の State に付け替えたら削除して構いません。→ <a href="#export-state-group">13-1</a></td>
           </tr>
         </tbody>
       </table>
