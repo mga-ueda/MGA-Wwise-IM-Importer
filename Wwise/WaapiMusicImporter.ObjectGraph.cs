@@ -726,6 +726,11 @@ internal static partial class WaapiMusicImporter
         {
             var groupState = playlist.GroupState!;
             var stateGroupPath = importSettings.ResolveStateGroupPath(groupState.Name);
+            if (groupState.UsesFallbackName)
+            {
+                log(UiStrings.LogGroupStateFallback(groupState.Name));
+            }
+
             log(UiStrings.LogCreatingGroupStateGroup(
                 groupState.Name,
                 string.Join(", ", groupState.StateNames),

@@ -9,15 +9,15 @@ namespace MgaWwiseIMImporter.Wwise;
 /// Wwise は先頭が数字のオブジェクト名を拒否する。文字種の網羅的な公式リストは
 /// 公開 Help の命名規約（ベストプラクティス）中心のため、書き出し WAV 名としても
 /// 使う本アプリでは Windows ファイル名として不適切な文字・予約名も拒否する。
-/// State 名は 2 バイト文字を扱えず <c>_</c> に置換されるため、該当時は
-/// <see cref="BuildFallbackSwitchStateName"/> を使う。
+/// State 名および State Group 名は 2 バイト文字を扱えず <c>_</c> に置換されるため、
+/// 該当時は <see cref="BuildFallbackSwitchStateName"/> を使う。
 /// </remarks>
 internal static class WwiseObjectNames
 {
     /// <summary>複数波形モードの Music Switch / State Group 名。</summary>
     public const string MultiWaveContainerName = "Multi_Wave";
 
-    /// <summary>2 バイト文字を含むファイル名があるときの Switch State 名プレフィックス。</summary>
+    /// <summary>2 バイト文字を含むときの Switch State / State Group 名プレフィックス。</summary>
     public const string FallbackSwitchStatePrefix = "Music_";
 
     private static readonly HashSet<string> ReservedWindowsFileNames = new(StringComparer.OrdinalIgnoreCase)
@@ -84,7 +84,7 @@ internal static class WwiseObjectNames
     }
 
     /// <summary>
-    /// Wwise の State 名として使えない文字（2 バイト文字＝非 ASCII）を含むか。
+    /// Wwise の State / State Group 名として使えない文字（2 バイト文字＝非 ASCII）を含むか。
     /// Wwise は該当文字を <c>_</c> に置換するため、パス参照がずれる。
     /// </summary>
     public static bool ContainsUnusableStateNameChars(string? name)
@@ -122,11 +122,11 @@ internal static class WwiseObjectNames
     }
 
     /// <summary>
-    /// Switch State の代替名。<paramref name="count"/> が 1 桁なら <c>Music_1</c>、
+    /// Switch State / State Group の代替名。<paramref name="count"/> が 1 桁なら <c>Music_1</c>、
     /// 2 桁なら <c>Music_01</c>、3 桁なら <c>Music_001</c>。
     /// </summary>
     /// <param name="oneBasedIndex">1 始まりの番号。</param>
-    /// <param name="count">State 総数（桁数の根拠）。</param>
+    /// <param name="count">総数（桁数の根拠）。</param>
     public static string BuildFallbackSwitchStateName(int oneBasedIndex, int count)
     {
         var total = Math.Max(1, count);
@@ -135,6 +135,15 @@ internal static class WwiseObjectNames
         return FallbackSwitchStatePrefix
             + index.ToString("D" + width, CultureInfo.InvariantCulture);
     }
+
+    /// <summary>
+    /// 希望名が State / State Group として使えるならそのまま、2 バイト文字を含むなら
+    /// <see cref="BuildFallbackSwitchStateName"/>。
+    /// </summary>
+    public static string ResolveUsableStateObjectName(string? name, int oneBasedIndex, int count) =>
+        ContainsUnusableStateNameChars(name)
+            ? BuildFallbackSwitchStateName(oneBasedIndex, count)
+            : name ?? string.Empty;
 
     /// <summary>Windows 予約デバイス名（CON / COM1 など）か。</summary>
     private static bool IsReservedWindowsFileName(string name)

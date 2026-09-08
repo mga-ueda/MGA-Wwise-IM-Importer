@@ -79,12 +79,19 @@ internal sealed class WwisePlaylistPlan
 
 /// <summary>
 /// グループ化 Playlist 向け State Group。
-/// グループ名と同名の State Group に、メンバー数分の State（A, B, C…）を持つ。
+/// 通常はグループ名と同名の State Group に、メンバー数分の State（A, B, C…）を持つ。
+/// Playlist 名が 2 バイト文字を含むときは State Group 名だけ <c>Music_N</c> にする。
 /// </summary>
 internal sealed class WwiseGroupStatePlan
 {
-    /// <summary>State Group 名（通常は Playlist／グループ名と同じ）。</summary>
+    /// <summary>
+    /// State Group 名。Playlist／グループ名と同じ。ただし 2 バイト文字を含むときは
+    /// <c>Music_N</c>（<see cref="UsesFallbackName"/>）。
+    /// </summary>
     public required string Name { get; init; }
+
+    /// <summary>State Group 名を Playlist 名から <c>Music_N</c> へ差し替えたか。</summary>
+    public bool UsesFallbackName { get; init; }
 
     /// <summary>State 名一覧（A, B, C…。メンバー Playlist 数と一致）。</summary>
     public required IReadOnlyList<string> StateNames { get; init; }

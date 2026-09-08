@@ -157,13 +157,123 @@ public class WwiseMusicPlanBuilderTests
         Assert.Equal("曲01", plan.Playlists[0].Name);
     }
 
+    [Fact]
+    public void Build_GroupedAsciiParts_KeepPlaylistNameAsGroupStateName()
+    {
+        var plan = BuildGroupedPlan(
+            @"C:\music\battle.wav",
+            "battle.wav",
+            "normal.wav");
+
+        Assert.False(plan.IsMultiPart);
+        var playlist = Assert.Single(plan.Playlists);
+        Assert.Equal("battle", playlist.Name);
+        Assert.NotNull(playlist.GroupState);
+        Assert.Equal("battle", playlist.GroupState.Name);
+        Assert.False(playlist.GroupState.UsesFallbackName);
+        Assert.Equal(["A", "B"], playlist.GroupState.StateNames);
+    }
+
+    [Fact]
+    public void Build_GroupedTwoBytePlaylistName_UsesFallbackGroupStateName()
+    {
+        var plan = BuildGroupedPlan(
+            @"C:\music\荒廃したタカマガハラ戦闘.wav",
+            "荒廃したタカマガハラ戦闘.wav",
+            "荒廃したタカマガハラ通常.wav");
+
+        Assert.False(plan.IsMultiPart);
+        var playlist = Assert.Single(plan.Playlists);
+        Assert.Equal("荒廃したタカマガハラ戦闘", playlist.Name);
+        Assert.Equal("荒廃したタカマガハラ戦闘", playlist.StateName);
+        Assert.NotNull(playlist.GroupState);
+        Assert.Equal("Music_1", playlist.GroupState.Name);
+        Assert.True(playlist.GroupState.UsesFallbackName);
+        Assert.Equal(["A", "B"], playlist.GroupState.StateNames);
+    }
+
+    [Fact]
+    public void Build_TwoGroupedTwoBytePlaylists_UsesIndexedFallbackGroupStateNames()
+    {
+        const uint sampleRate = 48000;
+        var fileNames = new[]
+        {
+            "戦闘_a.wav",
+            "通常_a.wav",
+            "戦闘_b.wav",
+            "通常_b.wav",
+        };
+        var parts = new WaveformOutputPart[fileNames.Length];
+        var regions = new WaveformRegionMark[fileNames.Length];
+        var overrides = new Dictionary<int, string>();
+        var partGroupIds = new Dictionary<int, int>
+        {
+            [1] = 1,
+            [2] = 1,
+            [3] = 2,
+            [4] = 2,
+        };
+        for (var i = 0; i < fileNames.Length; i++)
+        {
+            var start = i * 48000L;
+            var end = start + 48000L;
+            var number = i + 1;
+            parts[i] = new WaveformOutputPart(
+                number,
+                start,
+                end,
+                fileNames[i],
+                Path.Combine(@"C:\music", fileNames[i]));
+            regions[i] = new WaveformRegionMark(start, end);
+            overrides[number] = Path.GetFileNameWithoutExtension(fileNames[i]);
+        }
+
+        var plan = WwiseMusicPlanBuilder.Build(
+            sourcePath: @"C:\music\曲.wav",
+            sampleRate: sampleRate,
+            outputParts: parts,
+            regions: regions,
+            bars: [new WaveformBarMark(0, 1, 120, 4, 4)],
+            markers: [],
+            partGroupIds: partGroupIds,
+            playlistNameOverrides: overrides);
+
+        Assert.True(plan.IsMultiPart);
+        Assert.Equal(2, plan.Playlists.Count);
+        Assert.Equal("Music_1", plan.Playlists[0].GroupState!.Name);
+        Assert.Equal("Music_2", plan.Playlists[1].GroupState!.Name);
+        Assert.True(plan.Playlists[0].GroupState!.UsesFallbackName);
+        Assert.True(plan.Playlists[1].GroupState!.UsesFallbackName);
+        Assert.Equal("Music_1", plan.Playlists[0].StateName);
+        Assert.Equal("Music_2", plan.Playlists[1].StateName);
+    }
+
     private static WwiseMusicPlan BuildTwoPartPlan(
         string sourcePath,
         string fileName1,
         string fileName2) =>
         BuildMultiPartPlan(sourcePath, [fileName1, fileName2]);
 
-    private static WwiseMusicPlan BuildMultiPartPlan(string sourcePath, string[] fileNames)
+    private static WwiseMusicPlan BuildGroupedPlan(
+        string sourcePath,
+        string fileName1,
+        string fileName2) =>
+        BuildMultiPartPlan(
+            sourcePath,
+            [fileName1, fileName2],
+            partGroupIds: new Dictionary<int, int>
+            {
+                [1] = 1,
+                [2] = 1,
+            });
+
+    private static WwiseMusicPlan BuildMultiPartPlan(string sourcePath, string[] fileNames) =>
+        BuildMultiPartPlan(sourcePath, fileNames, partGroupIds: null);
+
+    private static WwiseMusicPlan BuildMultiPartPlan(
+        string sourcePath,
+        string[] fileNames,
+        IReadOnlyDictionary<int, int>? partGroupIds)
     {
         const uint sampleRate = 48000;
         var parts = new WaveformOutputPart[fileNames.Length];
@@ -191,6 +301,7 @@ public class WwiseMusicPlanBuilderTests
             regions: regions,
             bars: [new WaveformBarMark(0, 1, 120, 4, 4)],
             markers: [],
-            playlistNameOverrides: overrides);
+            playlistNameOverrides: overrides,
+            partGroupIds: partGroupIds);
     }
 }

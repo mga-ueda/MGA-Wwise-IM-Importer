@@ -7,7 +7,9 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <list type="bullet">
 /// <item>未グループのパート 1 つ = Music Playlist Container 1 つ。</item>
 /// <item>グループ（2 パート以上）= Music Playlist Container 1 つ（同期 Segment 内に複数 Music Track）。
-/// あわせてグループ名の State Group と State（A/B/C…）を作る。Group Fade が全員同一なら Default Transition Time のみ、
+/// あわせてグループ名の State Group と State（A/B/C…）を作る。
+/// Playlist 名が 2 バイト文字を含むときは State Group 名だけ <c>Music_N</c> にする。
+/// Group Fade が全員同一なら Default Transition Time のみ、
 /// 異なれば Custom TransitionList（遷移先ごと）。各 Music Track へ割当し、
 /// 既定は対応 State のみ 0dB・他は -108dB。Additive Layers 時は累積再生（下位レイヤー以降を 0dB）にする。</item>
 /// <item>最終 Playlist が複数なら Music Switch Container の下に並べる。</item>
@@ -144,6 +146,10 @@ internal static class WwiseMusicPlanBuilder
                 playlists.Add(BuildLayeredPlaylist(
                     playlistName,
                     stateName,
+                    WwiseObjectNames.ResolveUsableStateObjectName(
+                        playlistName,
+                        unitIndex + 1,
+                        units.Count),
                     unit.Parts,
                     directory,
                     sampleRate,
@@ -578,6 +584,7 @@ internal static class WwiseMusicPlanBuilder
     private static WwisePlaylistPlan BuildLayeredPlaylist(
         string playlistName,
         string stateName,
+        string groupStateName,
         IReadOnlyList<WaveformOutputPart> parts,
         string directory,
         uint sampleRate,
@@ -741,7 +748,11 @@ internal static class WwiseMusicPlanBuilder
             PlayPostExit = playPostExit,
             GroupState = new WwiseGroupStatePlan
             {
-                Name = playlistName,
+                Name = groupStateName,
+                UsesFallbackName = !string.Equals(
+                    groupStateName,
+                    playlistName,
+                    StringComparison.Ordinal),
                 StateNames = stateNames,
                 UseDefaultTransitionOnly = useDefaultOnly,
                 DefaultTransitionSeconds = defaultTransitionSeconds,

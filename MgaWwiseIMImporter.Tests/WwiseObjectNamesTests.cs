@@ -37,4 +37,21 @@ public class WwiseObjectNamesTests
     {
         Assert.Equal(expected, WwiseObjectNames.BuildFallbackSwitchStateName(index, count));
     }
+
+    [Theory]
+    [InlineData("intro", 1, 1, "intro")]
+    [InlineData("ジングル03", 1, 1, "Music_1")]
+    [InlineData("荒廃したタカマガハラ戦闘", 1, 2, "Music_1")]
+    [InlineData("荒廃したタカマガハラ戦闘", 2, 2, "Music_2")]
+    [InlineData("battle", 2, 2, "battle")]
+    public void ResolveUsableStateObjectName_FallsBackWhenNonAscii(
+        string name,
+        int index,
+        int count,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            WwiseObjectNames.ResolveUsableStateObjectName(name, index, count));
+    }
 }

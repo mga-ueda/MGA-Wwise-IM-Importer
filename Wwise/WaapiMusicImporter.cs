@@ -380,6 +380,11 @@ internal static partial class WaapiMusicImporter
         {
             if (playlist.GroupState is { } groupState)
             {
+                if (groupState.UsesFallbackName)
+                {
+                    Log(UiStrings.LogGroupStateFallback(groupState.Name));
+                }
+
                 Log(
                     UiStrings.LogGroupStateSummary(
                         groupState.Name,
@@ -493,6 +498,11 @@ internal static partial class WaapiMusicImporter
             }
             if (playlist.GroupState is { } groupState)
             {
+                if (groupState.UsesFallbackName)
+                {
+                    sb.AppendLine(UiStrings.LogGroupStateFallback(groupState.Name));
+                }
+
                 sb.AppendLine(
                     UiStrings.LogGroupStateSummary(
                         groupState.Name,

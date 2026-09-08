@@ -564,6 +564,11 @@ internal static partial class UiStrings
         "State names: file names contain 2-byte characters; using {0}.",
         stateNames);
 
+    public static string LogGroupStateFallback(string groupName) => Format(
+        "Group State Group: ファイル名に 2 バイト文字があるため {0} を使用します。",
+        "Group State Group: file names contain 2-byte characters; using {0}.",
+        groupName);
+
     public static string LogPlaylistSwitchState(string stateName) => Format(
         "  State: {0}",
         "  State: {0}",
