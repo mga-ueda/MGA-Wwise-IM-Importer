@@ -105,16 +105,7 @@ internal sealed partial class WaveAudioPlayer
             return;
         }
 
-        if (output is AsioOut)
-        {
-            _asioAdapter = new AsioCallbackAdapter(_provider, message => Trace(message));
-            output.Init(_asioAdapter);
-        }
-        else
-        {
-            _asioAdapter = null;
-            output.Init(_provider);
-        }
+        output.Init(_provider);
     }
 
     /// <summary>
@@ -135,7 +126,6 @@ internal sealed partial class WaveAudioPlayer
     private void DisposeOutputOnly()
     {
         _isPlaying = false;
-        _asioAdapter = null;
         if (_output is null)
         {
             return;

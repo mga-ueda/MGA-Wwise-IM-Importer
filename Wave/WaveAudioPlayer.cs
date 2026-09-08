@@ -27,9 +27,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     private PlaybackPcm? _pcm;
     private IWavePlayer? _output;
     private StereoFloatWaveProvider? _provider;
-    /// <summary>ASIO 出力時のコールバック計測アダプタ（他 API では null）。</summary>
-    private AsioCallbackAdapter? _asioAdapter;
-
     /// <summary>ASIO 初期化時の UI 同期コンテキスト（ドライバリセット要求の退避先）。</summary>
     private SynchronizationContext? _outputSyncContext;
     private string? _path;
@@ -451,7 +448,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         _activePlan = plan;
         _discardOutputBufferBeforePlay = false;
         EnterLowLatencyGc();
-        _asioAdapter?.MarkDiscontinuity();
         _output.Play();
         _isPlaying = true;
         Trace($"playlist.start accepted start={startSample} end={endSample} voice={clockVoiceId} loopPlan={plan?.ToString() ?? "none"}");
@@ -990,7 +986,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         }
 
         EnterLowLatencyGc();
-        _asioAdapter?.MarkDiscontinuity();
         _output.Play();
         _isPlaying = true;
         Trace($"transport.play sample={_provider.CurrentMainSample}");
@@ -1029,7 +1024,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         ExitLowLatencyGc();
         _provider?.ResetOutputPeak();
         Trace($"transport.pause sample={_provider?.CurrentMainSample ?? 0}");
-        TraceAsioStats();
     }
 
     public void Stop()
@@ -1060,7 +1054,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         _discardOutputBufferBeforePlay = true;
         _provider?.ResetOutputPeak();
         Trace("transport.stop");
-        TraceAsioStats();
     }
 
     /// <summary>再生中なら一時停止、停止中なら再生。</summary>
@@ -1189,7 +1182,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         ExitLowLatencyGc();
         _provider?.ResetOutputPeak();
         Trace($"playback.ended playlistEnded={playlistEnded} sample={_provider?.CurrentMainSample ?? 0}");
-        TraceAsioStats();
         PlaybackEnded?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1272,20 +1264,6 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             _gcLatencyBackup = null;
             GCSettings.LatencyMode = mode;
         }
-    }
-
-    /// <summary>ASIO 再生区間の計測サマリ（コールバック計測＋ミックス内訳）を出力する。</summary>
-    private void TraceAsioStats()
-    {
-        if (_asioAdapter is null)
-        {
-            return;
-        }
-
-        var hotPath = _provider is null
-            ? string.Empty
-            : " " + _provider.DescribeAndResetHotPathStats();
-        Trace(_asioAdapter.DescribeAndResetStats() + hotPath);
     }
 
     private void Trace(string message) => Diagnostic?.Invoke(this, message);

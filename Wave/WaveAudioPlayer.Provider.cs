@@ -1,5 +1,4 @@
-using System.Diagnostics;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using NAudio.Wave;
 using MgaWwiseIMImporter.UI;
 
@@ -75,11 +74,6 @@ internal sealed partial class WaveAudioPlayer
         /// </summary>
         private readonly float[] _monitorRing = new float[8192];
         private long _monitorWriteCount;
-
-        // ホットパス診断: ロック待ちとミックス本体の最大時間（オーディオスレッドのみ書く）。
-        private double _maxReadGateWaitMs;
-        private double _maxGateWaitMs;
-        private double _maxMixMs;
 
         private bool _metronomeEnabled;
         private float _metronomeVolume = MetronomePlayer.DefaultVolume;
@@ -1306,62 +1300,9 @@ internal sealed partial class WaveAudioPlayer
             }
         }
 
-        /// <summary>直近再生区間のホットパス計測を返してリセットする（audio.stats 用）。</summary>
-        public string DescribeAndResetHotPathStats()
-        {
-            var text =
-                $"readGateWaitMaxMs={_maxReadGateWaitMs:F2}"
-                + $" gateWaitMaxMs={_maxGateWaitMs:F2}"
-                + $" mixMaxMs={_maxMixMs:F2}";
-            _maxReadGateWaitMs = 0;
-            _maxGateWaitMs = 0;
-            _maxMixMs = 0;
-            return text;
-        }
-
-        /// <summary>ホットパス用: _gate をロック待ち時間の計測付きで取得する。</summary>
-        private void EnterGateTimed()
-        {
-            var start = Stopwatch.GetTimestamp();
-            Monitor.Enter(_gate);
-            var waited = (Stopwatch.GetTimestamp() - start) * 1000.0 / Stopwatch.Frequency;
-            if (waited > _maxGateWaitMs)
-            {
-                _maxGateWaitMs = waited;
-            }
-        }
-
         public int Read(byte[] buffer, int offset, int count)
         {
-            var enterStart = Stopwatch.GetTimestamp();
-            Monitor.Enter(_readGate);
-            var mixStart = Stopwatch.GetTimestamp();
-            var waitMs = (mixStart - enterStart) * 1000.0 / Stopwatch.Frequency;
-            if (waitMs > _maxReadGateWaitMs)
-            {
-                _maxReadGateWaitMs = waitMs;
-            }
-
-            try
-            {
-                var result = ReadInner(buffer, offset, count);
-                var mixMs =
-                    (Stopwatch.GetTimestamp() - mixStart) * 1000.0 / Stopwatch.Frequency;
-                if (mixMs > _maxMixMs)
-                {
-                    _maxMixMs = mixMs;
-                }
-
-                return result;
-            }
-            finally
-            {
-                Monitor.Exit(_readGate);
-            }
-        }
-
-        private int ReadInner(byte[] buffer, int offset, int count)
-        {
+            lock (_readGate)
             {
                 if (_silencePrerollFramesRemaining > 0)
                 {
@@ -1458,8 +1399,7 @@ internal sealed partial class WaveAudioPlayer
                 var stopAfterClockFade = false;
                 var forceEndAfterClockFade = false;
                 IReadOnlyList<(long Start, long End)> excludedRanges;
-                EnterGateTimed();
-                try
+                lock (_gate)
                 {
                     plan = _activePlan;
                     exitPlaying = _exitPlaying;
@@ -1472,10 +1412,6 @@ internal sealed partial class WaveAudioPlayer
                     stopAfterClockFade = _stopAfterClockFadeOut;
                     forceEndAfterClockFade = _forceEndAfterClockFadeOut;
                     excludedRanges = _excludedRanges;
-                }
-                finally
-                {
-                    Monitor.Exit(_gate);
                 }
 
                 if (forceEndAfterClockFade || stopAfterClockFade)
@@ -1632,18 +1568,13 @@ internal sealed partial class WaveAudioPlayer
                 IReadOnlyList<WaveformBarMark> metronomeBars;
                 float[] metronomeHigh;
                 float[] metronomeLow;
-                EnterGateTimed();
-                try
+                lock (_gate)
                 {
                     metronomeEnabled = _metronomeEnabled;
                     metronomeVolume = _metronomeVolume;
                     metronomeBars = _metronomeBars;
                     metronomeHigh = _metronomeHigh;
                     metronomeLow = _metronomeLow;
-                }
-                finally
-                {
-                    Monitor.Exit(_gate);
                 }
 
                 // 加算ミックス（簡易クリップ）。-R 区間はタイムラインを進めつつ無音にする。

@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -45,14 +45,6 @@ public partial class MainWindow
         // Diagnostic は ASIO コールバック等の非 UI スレッドから来る。IsChecked を触らない。
         _audioPlayer.Diagnostic += (_, message) =>
         {
-            // コールバック締切超過などの異常と区間集計は、再生ログ設定に関係なく常に残す。
-            if (message.StartsWith("audio.anomaly", StringComparison.Ordinal)
-                || message.StartsWith("audio.stats", StringComparison.Ordinal))
-            {
-                Dispatcher.BeginInvoke(() => AppendColoredLine(message));
-                return;
-            }
-
 #if DEBUG
             if (!_developerSettings.DetailedPlaybackLog)
             {
