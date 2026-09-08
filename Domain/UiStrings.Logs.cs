@@ -256,6 +256,11 @@ internal static partial class UiStrings
         "Group State Group fallback names are exhausted (starting from {0}).",
         requestedName);
 
+    public static string ErrMultiWaveNameExhausted(string requestedName) => Format(
+        "Multi_Wave の連番名が尽きています（起点 {0}）。",
+        "Multi_Wave numbered names are exhausted (starting from {0}).",
+        requestedName);
+
     public static string ErrGroupStateTrackWorkUnitNotFound(string trackPath) => Format(
         "Music Track の Work Unit が見つかりません: {0}",
         "Music Track work unit not found: {0}",

@@ -208,6 +208,77 @@ internal static class WwiseObjectNames
             UiStrings.ErrGroupStateFallbackNameExhausted(desired));
     }
 
+    /// <summary>
+    /// 複数波形コンテナ名。<c>Multi_Wave</c> が 1 件目、<c>Multi_Wave_2</c> が 2 件目。
+    /// </summary>
+    public static string BuildMultiWaveContainerName(int oneBasedIndex)
+    {
+        var index = Math.Max(1, oneBasedIndex);
+        return index == 1
+            ? MultiWaveContainerName
+            : MultiWaveContainerName + "_" + index.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary><c>Multi_Wave</c> / <c>Multi_Wave_2</c> 形式なら番号を返す（1 始まり）。</summary>
+    public static bool TryParseMultiWaveContainerName(string? name, out int index)
+    {
+        index = 0;
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        if (string.Equals(name, MultiWaveContainerName, StringComparison.Ordinal))
+        {
+            index = 1;
+            return true;
+        }
+
+        var prefix = MultiWaveContainerName + "_";
+        if (!name.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var digits = name[prefix.Length..];
+        return digits.Length > 0
+            && int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out index)
+            && index >= 2;
+    }
+
+    /// <summary>複数波形コンテナ名の番号を 1 つ繰り上げる。<c>Multi_Wave</c> → <c>Multi_Wave_2</c>。</summary>
+    public static string NextMultiWaveContainerName(string current)
+    {
+        if (!TryParseMultiWaveContainerName(current, out var index))
+        {
+            throw new ArgumentException(
+                "Multi-wave container name must be Multi_Wave or Multi_Wave_N.",
+                nameof(current));
+        }
+
+        return BuildMultiWaveContainerName(checked(index + 1));
+    }
+
+    /// <summary>
+    /// <paramref name="taken"/> に無い複数波形コンテナ名を返す。希望名が使用中なら番号を繰り上げる。
+    /// </summary>
+    public static string AllocateUnusedMultiWaveName(string desired, ISet<string> taken)
+    {
+        var name = desired;
+        for (var i = 0; i < MaxFallbackNameIncrement; i++)
+        {
+            if (!taken.Contains(name))
+            {
+                return name;
+            }
+
+            name = NextMultiWaveContainerName(name);
+        }
+
+        throw new InvalidOperationException(
+            UiStrings.ErrMultiWaveNameExhausted(desired));
+    }
+
     /// <summary>Windows 予約デバイス名（CON / COM1 など）か。</summary>
     private static bool IsReservedWindowsFileName(string name)
     {

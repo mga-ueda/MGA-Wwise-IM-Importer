@@ -575,6 +575,12 @@ internal static partial class UiStrings
         requestedName,
         allocatedName);
 
+    public static string LogMultiWaveContainerBump(string requestedName, string allocatedName) => Format(
+        "Container: {0} は既にあるため {1} を新規作成します。",
+        "Container: {0} already exists; creating {1}.",
+        requestedName,
+        allocatedName);
+
     public static string LogPlaylistSwitchState(string stateName) => Format(
         "  State: {0}",
         "  State: {0}",

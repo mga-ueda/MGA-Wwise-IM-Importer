@@ -43,6 +43,64 @@ internal static class WaapiObjectUtil
         }
     }
 
+    /// <summary>親の直下にある子オブジェクト名を列挙する。親が無ければ空。</summary>
+    public static async Task<HashSet<string>> QueryChildNamesAsync(
+        WaapiSettings settings,
+        string parentPath,
+        CancellationToken cancellationToken = default)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(parentPath))
+        {
+            return names;
+        }
+
+        using var client = new WaapiHttpClient(
+            settings.Url,
+            TimeSpan.FromMilliseconds(settings.TimeoutMs));
+
+        var parent = parentPath.Trim().TrimEnd('\\');
+        var escaped = parent.Replace("\"", "\\\"", StringComparison.Ordinal);
+        try
+        {
+            var result = await client.CallAsync(
+                    WaapiUris.CoreObjectGet,
+                    new Dictionary<string, object?>
+                    {
+                        ["waql"] = $"$ \"{escaped}\" select children",
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["return"] = new[] { "name" },
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!result.TryGetProperty("return", out var arr)
+                || arr.ValueKind != JsonValueKind.Array)
+            {
+                return names;
+            }
+
+            foreach (var item in arr.EnumerateArray())
+            {
+                var name = item.TryGetProperty("name", out var nameEl)
+                    ? nameEl.GetString()
+                    : null;
+                if (!string.IsNullOrEmpty(name))
+                {
+                    names.Add(name);
+                }
+            }
+
+            return names;
+        }
+        catch (WaapiException ex) when (IsObjectNotFound(ex.Message))
+        {
+            return names;
+        }
+    }
+
     private static bool IsObjectNotFound(string message) =>
         message.Contains("Object not found", StringComparison.OrdinalIgnoreCase)
         || message.Contains("invalid_query", StringComparison.OrdinalIgnoreCase)

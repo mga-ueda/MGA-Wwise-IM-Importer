@@ -6,7 +6,7 @@ namespace MgaWwiseIMImporter.Wwise;
 internal sealed class WwiseMusicPlan
 {
     /// <summary>最上位に作るオブジェクト名（元ファイル名の拡張子抜き）。</summary>
-    public required string ContainerName { get; init; }
+    public required string ContainerName { get; set; }
 
     /// <summary>true なら Music Switch Container の下に複数 Playlist を作る。</summary>
     public required bool IsMultiPart { get; init; }

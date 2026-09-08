@@ -406,6 +406,32 @@ public partial class MainWindow
                 defaultPlayPostExit: false,
                 snapshot.PartAdditiveLayers,
                 containerNameOverride);
+            if (preview.IsMultiWaveOnly
+                && WwiseObjectNames.TryParseMultiWaveContainerName(plan.ContainerName, out _))
+            {
+                var takenNames = await WaapiObjectUtil.QueryChildNamesAsync(
+                    _waapiSettings,
+                    targetPath);
+                if (plan.IsMultiPart)
+                {
+                    var stateGroupNames = await WaapiObjectUtil.QueryChildNamesAsync(
+                        _waapiSettings,
+                        importSettings.StateGroupParentPath);
+                    takenNames.UnionWith(stateGroupNames);
+                }
+
+                var requestedName = plan.ContainerName;
+                var allocatedName = WwiseObjectNames.AllocateUnusedMultiWaveName(
+                    requestedName,
+                    takenNames);
+                plan.ContainerName = allocatedName;
+                if (!string.Equals(allocatedName, requestedName, StringComparison.Ordinal))
+                {
+                    ReportProgress(
+                        UiStrings.LogMultiWaveContainerBump(requestedName, allocatedName));
+                }
+            }
+
             ReportProgress(UiStrings.LogPlanReady(plan.Playlists.Count));
             AppendReport(WaapiMusicImporter.FormatPlanSummary(plan) + Environment.NewLine);
             var exportRegions = _previewSession?.EffectiveRegions ?? preview.Regions;

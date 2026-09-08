@@ -106,4 +106,65 @@ public class WwiseObjectNamesTests
         var taken = new HashSet<string>(StringComparer.Ordinal) { "Music_1", "Music_2" };
         Assert.Equal("Music_3", WwiseObjectNames.AllocateUnusedFallbackName("Music_1", taken));
     }
+
+    [Theory]
+    [InlineData(1, "Multi_Wave")]
+    [InlineData(2, "Multi_Wave_2")]
+    [InlineData(10, "Multi_Wave_10")]
+    public void BuildMultiWaveContainerName_SkipsNumberOnFirst(int index, string expected)
+    {
+        Assert.Equal(expected, WwiseObjectNames.BuildMultiWaveContainerName(index));
+    }
+
+    [Theory]
+    [InlineData("Multi_Wave", 1)]
+    [InlineData("Multi_Wave_2", 2)]
+    [InlineData("Multi_Wave_10", 10)]
+    [InlineData("Multi_Wave_1", 0)]
+    [InlineData("intro", 0)]
+    public void TryParseMultiWaveContainerName_ParsesIndexedNames(string name, int expectedIndex)
+    {
+        var parsed = WwiseObjectNames.TryParseMultiWaveContainerName(name, out var index);
+        if (expectedIndex == 0)
+        {
+            Assert.False(parsed);
+            return;
+        }
+
+        Assert.True(parsed);
+        Assert.Equal(expectedIndex, index);
+    }
+
+    [Theory]
+    [InlineData("Multi_Wave", "Multi_Wave_2")]
+    [InlineData("Multi_Wave_2", "Multi_Wave_3")]
+    [InlineData("Multi_Wave_9", "Multi_Wave_10")]
+    public void NextMultiWaveContainerName_IncrementsFromFirstAsTwo(
+        string current,
+        string expected)
+    {
+        Assert.Equal(expected, WwiseObjectNames.NextMultiWaveContainerName(current));
+    }
+
+    [Fact]
+    public void AllocateUnusedMultiWaveName_KeepsNameIfFree()
+    {
+        var taken = new HashSet<string>(StringComparer.Ordinal) { "Multi_Wave_2" };
+        Assert.Equal(
+            "Multi_Wave",
+            WwiseObjectNames.AllocateUnusedMultiWaveName("Multi_Wave", taken));
+    }
+
+    [Fact]
+    public void AllocateUnusedMultiWaveName_IncrementsWhileTaken()
+    {
+        var taken = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Multi_Wave",
+            "Multi_Wave_2",
+        };
+        Assert.Equal(
+            "Multi_Wave_3",
+            WwiseObjectNames.AllocateUnusedMultiWaveName("Multi_Wave", taken));
+    }
 }
