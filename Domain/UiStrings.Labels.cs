@@ -560,8 +560,8 @@ internal static partial class UiStrings
         segmentCount);
 
     public static string LogSwitchStateFallback(string stateNames) => Format(
-        "State names: ファイル名に 2 バイト文字があるため {0} を使用します。",
-        "State names: file names contain 2-byte characters; using {0}.",
+        "State names: State Group 名に使えない文字があるため {0} を使用します。",
+        "State names: some names cannot be used as a State Group; using {0}.",
         stateNames);
 
     public static string LogGroupStateFallback(string groupName) => Format(
@@ -572,6 +572,12 @@ internal static partial class UiStrings
     public static string LogGroupStateFallbackBump(string requestedName, string allocatedName) => Format(
         "Group State Group: {0} は既にあるため {1} を使用します。",
         "Group State Group: {0} already exists; using {1}.",
+        requestedName,
+        allocatedName);
+
+    public static string LogMultiWaveContainerFallback(string requestedName, string allocatedName) => Format(
+        "Container: “{0}” は State Group 名に使えないため {1} を使用します。",
+        "Container: “{0}” cannot be used as a State Group name; using {1}.",
         requestedName,
         allocatedName);
 

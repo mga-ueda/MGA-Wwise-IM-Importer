@@ -17,7 +17,11 @@ internal sealed class LastWaveSessionState
     /// </summary>
     public List<string> WavePaths { get; set; } = [];
 
-    /// <summary>波形名の手動リネーム（拡張子なし）。null なら元のファイル名を使う。</summary>
+    /// <summary>
+    /// 波形名の手動リネーム（拡張子なし）。null なら元のファイル名を使う。
+    /// 複数波形でも保持する。書き出し時、State Group に使えない文字ならコンテナ名だけ
+    /// <c>Multi_Wave</c> へ落とす。
+    /// </summary>
     public string? SourceBaseNameOverride { get; set; }
 
     public List<LastWavePartSignature> Parts { get; set; } = [];

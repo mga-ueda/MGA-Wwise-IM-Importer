@@ -7,8 +7,10 @@ namespace MgaWwiseIMImporter.Wwise;
 /// <list type="bullet">
 /// <item>未グループのパート 1 つ = Music Playlist Container 1 つ。</item>
 /// <item>グループ（2 パート以上）= Music Playlist Container 1 つ（同期 Segment 内に複数 Music Track）。
-/// あわせてグループ名の State Group と State（A/B/C…）を作る。
-/// Playlist 名が 2 バイト文字を含むときは State Group 名だけ <c>Music_N</c> にする。
+/// あわせて State Group と State（A/B/C…）を作る。
+/// Playlist が 1 つのときはコンテナ名（リネームした波形名）を State Group に使う。
+/// 複数 Playlist のときは各 Playlist 名。State Group に使えるならその名前のまま、
+/// 2 バイト文字を含むときだけ <c>Music_N</c> にする。
 /// Group Fade が全員同一なら Default Transition Time のみ、
 /// 異なれば Custom TransitionList（遷移先ごと）。各 Music Track へ割当し、
 /// 既定は対応 State のみ 0dB・他は -108dB。Additive Layers 時は累積再生（下位レイヤー以降を 0dB）にする。</item>
@@ -84,19 +86,19 @@ internal static class WwiseMusicPlanBuilder
                 playlistNameOverrides);
         }
 
-        // Switch State は Playlist 名を流用するが、2 バイト文字は Wwise 側で _ になる。
-        // ドロップファイル名／Playlist 名のどれか 1 つでも該当すれば Music_1 形式へ揃える。
-        var useFallbackStateNames = units.Count > 1
-            && WwiseObjectNames.ShouldUseFallbackSwitchStateNames(
-                CollectSwitchStateNameSources(sourcePath, outputParts, playlistNames));
+        // Switch State は Playlist 名を流用する。State Group に使える名前はそのまま、
+        // 2 バイト文字を含む Playlist だけ Music_N にする（全部を Music_1 へ揃えない）。
         var playlists = new List<WwisePlaylistPlan>();
 
         for (var unitIndex = 0; unitIndex < units.Count; unitIndex++)
         {
             var unit = units[unitIndex];
             var playlistName = playlistNames[unitIndex];
-            var stateName = useFallbackStateNames
-                ? WwiseObjectNames.BuildFallbackSwitchStateName(unitIndex + 1, units.Count)
+            var stateName = units.Count > 1
+                ? WwiseObjectNames.ResolveUsableStateObjectName(
+                    playlistName,
+                    unitIndex + 1,
+                    units.Count)
                 : playlistName;
             var exitSourceAt = ResolveUnitExitSourceAt(
                 unit.Parts,
@@ -143,13 +145,19 @@ internal static class WwiseMusicPlanBuilder
             }
             else
             {
+                // Playlist 1 つ（複数波形のグループ化など）では、リネームしたコンテナ名を
+                // Group State Group にする。複数 Playlist では各 Playlist 名。
+                var groupStateSourceName = units.Count == 1
+                    ? containerName
+                    : playlistName;
                 playlists.Add(BuildLayeredPlaylist(
                     playlistName,
                     stateName,
                     WwiseObjectNames.ResolveUsableStateObjectName(
-                        playlistName,
+                        groupStateSourceName,
                         unitIndex + 1,
                         units.Count),
+                    groupStateSourceName,
                     unit.Parts,
                     directory,
                     sampleRate,
@@ -476,58 +484,6 @@ internal static class WwiseMusicPlanBuilder
         return units;
     }
 
-    private static IEnumerable<string> CollectSwitchStateNameSources(
-        string sourcePath,
-        IReadOnlyList<WaveformOutputPart> outputParts,
-        IReadOnlyList<string> playlistNames)
-    {
-        foreach (var name in FileNameCandidates(sourcePath))
-        {
-            yield return name;
-        }
-
-        foreach (var part in outputParts)
-        {
-            foreach (var name in FileNameCandidates(part.FileName))
-            {
-                yield return name;
-            }
-
-            foreach (var name in FileNameCandidates(part.SourcePath))
-            {
-                yield return name;
-            }
-        }
-
-        foreach (var playlistName in playlistNames)
-        {
-            if (!string.IsNullOrWhiteSpace(playlistName))
-            {
-                yield return playlistName;
-            }
-        }
-    }
-
-    private static IEnumerable<string> FileNameCandidates(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            yield break;
-        }
-
-        var fileName = Path.GetFileName(path);
-        if (!string.IsNullOrWhiteSpace(fileName))
-        {
-            yield return fileName;
-        }
-
-        var stem = Path.GetFileNameWithoutExtension(path);
-        if (!string.IsNullOrWhiteSpace(stem) && !string.Equals(stem, fileName, StringComparison.Ordinal))
-        {
-            yield return stem;
-        }
-    }
-
     private static WwisePlaylistPlan BuildSinglePartPlaylist(
         string playlistName,
         string stateName,
@@ -585,6 +541,7 @@ internal static class WwiseMusicPlanBuilder
         string playlistName,
         string stateName,
         string groupStateName,
+        string groupStateSourceName,
         IReadOnlyList<WaveformOutputPart> parts,
         string directory,
         uint sampleRate,
@@ -751,7 +708,7 @@ internal static class WwiseMusicPlanBuilder
                 Name = groupStateName,
                 UsesFallbackName = !string.Equals(
                     groupStateName,
-                    playlistName,
+                    groupStateSourceName,
                     StringComparison.Ordinal),
                 StateNames = stateNames,
                 UseDefaultTransitionOnly = useDefaultOnly,

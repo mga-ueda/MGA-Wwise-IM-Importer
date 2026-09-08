@@ -25,10 +25,14 @@ internal static partial class UiStrings
     public static string DialogRenameFailedBody => Get(
         "ファイル名として使用できる、拡張子なしの名前を入力してください。"
         + Environment.NewLine
-        + "（ \\ / : * ? \" < > | や制御文字、末尾の . ／空白、CON／COM1 などの予約名は不可）",
+        + "（ \\ / : * ? \" < > | や制御文字、末尾の . ／空白、CON／COM1 などの予約名は不可）"
+        + Environment.NewLine
+        + "元の名前に戻します。",
         "Enter a valid file name without extension."
         + Environment.NewLine
-        + "(Cannot use \\ / : * ? \" < > |, control chars, trailing . / spaces, or reserved names such as CON / COM1.)");
+        + "(Cannot use \\ / : * ? \" < > |, control chars, trailing . / spaces, or reserved names such as CON / COM1.)"
+        + Environment.NewLine
+        + "Reverting to the previous name.");
 
     public static string DialogRenameStartsWithDigitBody => Get(
         "Wwise では先頭が数字の名前を付けられません。元の名前に戻します。",
@@ -37,6 +41,11 @@ internal static partial class UiStrings
     public static string DialogRenameReservedNameBody => Get(
         "CON／PRN／COM1 など Windows の予約名は使えません。元の名前に戻します。",
         "Windows reserved names such as CON / PRN / COM1 cannot be used. Reverting to the previous name.");
+
+    public static string LogRenameReverted(string attemptedName) => Format(
+        "Message : 名前「{0}」は使えないため、元の名前に戻しました。",
+        "Message : Reverted the name; “{0}” cannot be used.",
+        attemptedName);
 
     public static string LogDropNameStartsWithDigit(string baseName) => Format(
         "Message : Wwise では先頭が数字の名前を使えません（拒否）: {0}",
@@ -52,6 +61,14 @@ internal static partial class UiStrings
         "Message : Windows 予約名のため拒否: {0}",
         "Message : Rejected because the name is a Windows reserved name: {0}",
         baseName);
+
+    public static string LogDropAllRejectedDueToInvalidName => Get(
+        "Message : 不正な名前のファイルが 1 件でもあるため、ドロップしたファイルをすべて拒否しました。"
+        + Environment.NewLine
+        + "Message : 使える名前のファイルだけをドロップし直してください。",
+        "Message : One or more files have invalid names, so every dropped file was rejected."
+        + Environment.NewLine
+        + "Message : Drop only files with usable names.");
 
     public static string DialogClearProjectFailedTitle => Get(
         "プロジェクトのクリアに失敗",

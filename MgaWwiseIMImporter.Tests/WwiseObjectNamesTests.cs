@@ -108,6 +108,24 @@ public class WwiseObjectNamesTests
     }
 
     [Theory]
+    [InlineData("Battle", "Battle")]
+    [InlineData("jingle_04", "jingle_04")]
+    [InlineData("Multi_Wave", "Multi_Wave")]
+    [InlineData("ジングル03", "Multi_Wave")]
+    [InlineData("荒廃したタカマガハラ戦闘", "Multi_Wave")]
+    [InlineData("jingle（宝箱）", "Multi_Wave")]
+    [InlineData("  Battle  ", "Battle")]
+    [InlineData("", "Multi_Wave")]
+    [InlineData("   ", "Multi_Wave")]
+    [InlineData(null, "Multi_Wave")]
+    public void ResolveMultiWaveContainerName_FallsBackWhenUnusableForStateGroup(
+        string? desiredName,
+        string expected)
+    {
+        Assert.Equal(expected, WwiseObjectNames.ResolveMultiWaveContainerName(desiredName));
+    }
+
+    [Theory]
     [InlineData(1, "Multi_Wave")]
     [InlineData(2, "Multi_Wave_2")]
     [InlineData(10, "Multi_Wave_10")]

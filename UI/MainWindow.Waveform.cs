@@ -329,6 +329,8 @@ public partial class MainWindow
         try
         {
             // Bars を渡さないと Tempo / 拍子 / 小節線が空のまま（WinForms SetPreview と同等）
+            // 複数波形でも波形名は編集可。書き出し時、State Group に使えない文字なら
+            // コンテナ名だけ Multi_Wave へ落とす（ResolveMultiWaveContainerName）。
             waveformView.SetPreview(
                 preview.Peaks,
                 preview.SourcePath,
@@ -339,7 +341,7 @@ public partial class MainWindow
                 _previewSession.EffectiveOutputParts,
                 preview.AllowsSessionMarkerEdit,
                 preview.SourceSpans,
-                sourceNameEditable: !preview.IsMultiWaveOnly);
+                sourceNameEditable: true);
             waveformView.SetSourceDisplayName(ResolveSourceDisplayName());
             waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
             waveformView.SetDisabledPlaylistParts(GetDisabledPartNumbers());
@@ -381,7 +383,26 @@ public partial class MainWindow
     private void CommitSourceNameOverride(string name)
     {
         var trimmed = name.Trim();
+        var previousDisplay = ResolveSourceDisplayName();
         var defaultName = Path.GetFileNameWithoutExtension(_loadedPreview?.SourcePath ?? string.Empty);
+
+        // 空欄はリネーム解除（元ファイル名）。Wwise が拒否する名前は確定せず元に戻す。
+        // 2 バイト文字は許可する（State Group だけ Music_N / Multi_Wave へ落とす）。
+        if (trimmed.Length > 0
+            && !string.Equals(trimmed, defaultName, StringComparison.Ordinal)
+            && !WwiseObjectNames.TryValidateBaseName(trimmed, out var reason))
+        {
+            waveformView.SetSourceDisplayName(previousDisplay);
+            AppendReport(UiStrings.LogRenameReverted(trimmed) + Environment.NewLine);
+            OwnerCenteredMessageBox.Show(
+                this,
+                RenameRejectBody(reason),
+                UiStrings.DialogRenameFailedTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         _sourceBaseNameOverride = string.Equals(trimmed, defaultName, StringComparison.Ordinal) || trimmed.Length == 0
             ? null
             : trimmed;
@@ -393,6 +414,13 @@ public partial class MainWindow
 
         SaveLastWaveSessionIfLoaded();
     }
+
+    private static string RenameRejectBody(WwiseBaseNameRejectReason reason) => reason switch
+    {
+        WwiseBaseNameRejectReason.StartsWithDigit => UiStrings.DialogRenameStartsWithDigitBody,
+        WwiseBaseNameRejectReason.ReservedWindowsName => UiStrings.DialogRenameReservedNameBody,
+        _ => UiStrings.DialogRenameFailedBody,
+    };
 
     private void WaveformView_MarkerEditRequested(object? sender, MarkerEditRequestedEventArgs e)
     {

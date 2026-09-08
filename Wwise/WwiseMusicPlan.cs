@@ -21,8 +21,8 @@ internal sealed class WwisePlaylistPlan
 
     /// <summary>
     /// Music Switch に結ぶ State 名。
-    /// ドロップファイル名に 2 バイト文字が 1 つでもあれば <c>Music_1</c> 形式、
-    /// それ以外は <see cref="Name"/> と同じ。
+    /// Playlist 名が State Group に使えるなら <see cref="Name"/> と同じ。
+    /// 2 バイト文字を含むときだけ <c>Music_N</c>。
     /// </summary>
     public required string StateName { get; init; }
 
@@ -79,19 +79,19 @@ internal sealed class WwisePlaylistPlan
 
 /// <summary>
 /// グループ化 Playlist 向け State Group。
-/// 通常はグループ名と同名の State Group に、メンバー数分の State（A, B, C…）を持つ。
-/// Playlist 名が 2 バイト文字を含むときは State Group 名だけ <c>Music_N</c> にする。
+/// Playlist が 1 つならコンテナ名（リネームした波形名）、複数なら各 Playlist 名。
+/// その名前が State Group に使えるならそのまま、2 バイト文字を含むときだけ <c>Music_N</c>。
 /// </summary>
 internal sealed class WwiseGroupStatePlan
 {
     /// <summary>
-    /// State Group 名。Playlist／グループ名と同じ。ただし 2 バイト文字を含むときは
-    /// <c>Music_N</c>（<see cref="UsesFallbackName"/>）。
+    /// State Group 名。使える名前ならコンテナ／Playlist 名と同じ。
+    /// 2 バイト文字を含むときは <c>Music_N</c>（<see cref="UsesFallbackName"/>）。
     /// EXPORT 時、同名が既にあれば番号を繰り上げて書き換えることがある。
     /// </summary>
     public required string Name { get; set; }
 
-    /// <summary>State Group 名を Playlist 名から <c>Music_N</c> へ差し替えたか。</summary>
+    /// <summary>State Group 名を希望名から <c>Music_N</c> へ差し替えたか。</summary>
     public bool UsesFallbackName { get; init; }
 
     /// <summary>State 名一覧（A, B, C…。メンバー Playlist 数と一致）。</summary>

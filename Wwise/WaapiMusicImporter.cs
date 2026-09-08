@@ -131,7 +131,11 @@ internal static partial class WaapiMusicImporter
             {
                 Log(
                     UiStrings.LogSwitchStateFallback(
-                        string.Join(", ", plan.Playlists.Select(p => p.StateName))));
+                        string.Join(
+                            ", ",
+                            plan.Playlists
+                                .Where(p => p.UsesFallbackStateName)
+                                .Select(p => p.StateName))));
             }
         }
 
@@ -486,7 +490,11 @@ internal static partial class WaapiMusicImporter
         {
             sb.AppendLine(
                 UiStrings.LogSwitchStateFallback(
-                    string.Join(", ", plan.Playlists.Select(p => p.StateName))));
+                    string.Join(
+                        ", ",
+                        plan.Playlists
+                            .Where(p => p.UsesFallbackStateName)
+                            .Select(p => p.StateName))));
         }
 
         foreach (var playlist in plan.Playlists)

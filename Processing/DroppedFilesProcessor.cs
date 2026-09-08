@@ -65,6 +65,7 @@ internal static class DroppedFilesProcessor
 
         var pairKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pairs = new List<(string WavPath, string XmlPath)>();
+        var rejectedInvalidName = false;
 
         foreach (var path in dropped.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
         {
@@ -83,17 +84,10 @@ internal static class DroppedFilesProcessor
             var baseName = Path.GetFileNameWithoutExtension(path);
             if (!WwiseObjectNames.TryValidateBaseName(baseName, out var rejectReason))
             {
+                rejectedInvalidName = true;
                 sb.AppendLine(UiStrings.LogErrorHeader);
                 sb.AppendLine($"{UiStrings.KeyPath} {path}");
-                sb.AppendLine(rejectReason switch
-                {
-                    WwiseBaseNameRejectReason.StartsWithDigit =>
-                        UiStrings.LogDropNameStartsWithDigit(baseName),
-                    WwiseBaseNameRejectReason.ReservedWindowsName =>
-                        UiStrings.LogDropNameReservedWindows(baseName),
-                    _ => UiStrings.LogDropNameInvalidFileName(
-                        string.IsNullOrEmpty(baseName) ? "(empty)" : baseName),
-                });
+                sb.AppendLine(FormatDropNameReject(baseName, rejectReason));
                 sb.AppendLine();
                 continue;
             }
@@ -107,6 +101,15 @@ internal static class DroppedFilesProcessor
             var wavPath = Path.Combine(directory, baseName + ".wav");
             var xmlPath = Path.Combine(directory, baseName + ".xml");
             pairs.Add((wavPath, xmlPath));
+        }
+
+        // 不正な名前が 1 件でも混ざるとログを見過ごしやすいので、有効なファイルも含めて全部拒否する。
+        if (rejectedInvalidName)
+        {
+            sb.AppendLine(UiStrings.LogErrorHeader);
+            sb.AppendLine(UiStrings.LogDropAllRejectedDueToInvalidName);
+            sb.AppendLine();
+            return sb.ToString();
         }
 
         // XML なし・WAV 2 本以上 → 複数波形モード（既存単体／XML 経路には混ぜない）
@@ -404,6 +407,17 @@ internal static class DroppedFilesProcessor
     {
         return ppq is null ? "-" : ppq.Value.ToString("0.###");
     }
+
+    private static string FormatDropNameReject(string baseName, WwiseBaseNameRejectReason reason) =>
+        reason switch
+        {
+            WwiseBaseNameRejectReason.StartsWithDigit =>
+                UiStrings.LogDropNameStartsWithDigit(baseName),
+            WwiseBaseNameRejectReason.ReservedWindowsName =>
+                UiStrings.LogDropNameReservedWindows(baseName),
+            _ => UiStrings.LogDropNameInvalidFileName(
+                string.IsNullOrEmpty(baseName) ? "(empty)" : baseName),
+        };
 
     private static void AppendError(StringBuilder sb, string path, Exception ex)
     {

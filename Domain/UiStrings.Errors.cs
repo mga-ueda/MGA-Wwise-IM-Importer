@@ -172,4 +172,33 @@ internal static partial class UiStrings
         "AudioFormat={0} is not supported for waveform display.",
         format);
 
+    public static string ErrWwiseObjectNameRejectedHeader(string name) => Format(
+        "Wwise が「{0}」を作成できませんでした。",
+        "Wwise could not create “{0}”.",
+        name);
+
+    public static string ErrWwiseObjectNameRejectedDigit => Get(
+        "・Wwise は先頭が数字の名前を拒否します。Music Switch / Playlist / Segment / Track / State Group のいずれも付けられません。",
+        "• Wwise rejects names that start with a digit. This applies to Music Switch, Playlist, Segment, Track, and State Group.");
+
+    public static string ErrWwiseObjectNameRejectedTwoByte => Get(
+        "・State Group 名は 2 バイト文字を扱えません。Wwise が _ に置換するため、作ったオブジェクトをパスで参照できなくなります。",
+        "• State Group names cannot use 2-byte characters. Wwise replaces them with _, so the created object cannot be found by path.");
+
+    public static string ErrWwiseObjectNameRejectedFallbackLimit(string name) => Format(
+        "Switch State を Music_01 などに差し替える処理は、Playlist 切替用の State 名だけです。"
+        + Environment.NewLine
+        + "Segment 名（{0}_1 など）や State Group 名には効かないため、この名前ではインポートを完了できません。",
+        "Falling back Switch States to Music_01 etc. only changes Playlist switch State names."
+        + Environment.NewLine
+        + "It does not apply to Segment names (such as {0}_1) or the State Group name, so import cannot finish with this name.",
+        name);
+
+    public static string ErrWwiseObjectNameRejectedWhatToDo => Get(
+        "対応: 波形名をダブルクリックして、先頭が数字でない名前に変えてから EXPORT し直してください。"
+        + Environment.NewLine
+        + "State Group にも同じ名前を使う場合は、ASCII のみにしてください（例: bgm_test）。",
+        "What to do: double-click the waveform name, change it so it does not start with a digit, then EXPORT again."
+        + Environment.NewLine
+        + "If the same name is also used as a State Group, use ASCII only (for example bgm_test).");
 }

@@ -46,6 +46,8 @@ internal static class LogColorHelper
 
         if (t.StartsWith("Message : マーカー名を変更しました:", StringComparison.Ordinal)
             || t.StartsWith("Message : Marker renamed:", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("Message : 名前「", StringComparison.Ordinal)
+            || t.StartsWith("Message : Reverted the name;", StringComparison.OrdinalIgnoreCase)
             || t.StartsWith("Message : 新しいバージョンがあります:", StringComparison.Ordinal)
             || t.StartsWith("Message : Update available:", StringComparison.OrdinalIgnoreCase)
             || t.StartsWith("Message : 規定フォーマット", StringComparison.Ordinal)

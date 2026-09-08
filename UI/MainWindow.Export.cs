@@ -375,11 +375,25 @@ public partial class MainWindow
         try
         {
             ReportProgress(UiStrings.LogBuildingImportPlan);
-            var containerNameOverride = preview.IsMultiWaveOnly
-                ? WwiseObjectNames.MultiWaveContainerName
-                : null;
+            var namingSourcePath = BuildNamingSourcePath(preview.SourcePath);
+            string? containerNameOverride = null;
+            if (preview.IsMultiWaveOnly)
+            {
+                var desiredContainer = Path.GetFileNameWithoutExtension(namingSourcePath);
+                containerNameOverride = WwiseObjectNames.ResolveMultiWaveContainerName(desiredContainer);
+                // Music Switch 名はそのまま Switch 用 State Group 名になる。
+                // 2 バイト文字は Wwise が _ に置換するため、そのときだけ Multi_Wave。
+                if (!string.Equals(containerNameOverride, desiredContainer, StringComparison.Ordinal))
+                {
+                    ReportProgress(
+                        UiStrings.LogMultiWaveContainerFallback(
+                            desiredContainer,
+                            containerNameOverride));
+                }
+            }
+
             plan = WwiseMusicPlanBuilder.Build(
-                BuildNamingSourcePath(preview.SourcePath),
+                namingSourcePath,
                 preview.WavInfo.SampleRate,
                 snapshot.Parts,
                 _previewSession?.EffectiveRegions ?? preview.Regions,
@@ -448,6 +462,15 @@ public partial class MainWindow
             return (false, ex.Message);
         }
 
+        if (WwiseImportFailure.TryDescribeInvalidPlanName(plan, out var invalidNameMessage))
+        {
+            AppendReport(
+                $"{UiStrings.LogWwiseImportHeader}{Environment.NewLine}"
+                + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
+                + $"{UiStrings.KeyMessage} {invalidNameMessage}{Environment.NewLine}{Environment.NewLine}");
+            return (false, invalidNameMessage);
+        }
+
         var updateExistingStateGroup = false;
         if (plan.IsMultiPart)
         {
@@ -509,15 +532,17 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            if (!_closing)
+            if (_closing)
             {
-                AppendReport(
-                    $"{UiStrings.LogWwiseImportHeader}{Environment.NewLine}"
-                    + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
-                    + $"{UiStrings.KeyMessage} {ex.Message}{Environment.NewLine}{Environment.NewLine}");
+                return (false, null);
             }
 
-            return (false, _closing ? null : ex.Message);
+            var message = WwiseImportFailure.Format(ex.Message, plan);
+            AppendReport(
+                $"{UiStrings.LogWwiseImportHeader}{Environment.NewLine}"
+                + $"{UiStrings.KeyStatus} {UiStrings.LogStatusNg}{Environment.NewLine}"
+                + $"{UiStrings.KeyMessage} {message}{Environment.NewLine}{Environment.NewLine}");
+            return (false, message);
         }
     }
 

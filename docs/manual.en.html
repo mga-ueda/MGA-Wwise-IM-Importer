@@ -210,7 +210,7 @@
       </ul>
       <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the Wwise-side implementation is still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
       <div class="note">
-        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>) or are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, ...) are rejected at load. When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
+        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>), are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, …), or contain characters invalid in a file name are rejected at load. <strong>When you drop several files at once, if even one name is invalid, every file is rejected</strong> (the app does not load the valid ones and leave a single error buried in the log). When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
       </div>
 
       <h3 id="prepare-xml">4-2. Method A: preparing a Nuendo / Cubase XML</h3>
@@ -357,7 +357,7 @@
         <li>Sample rate / channel count / bit depth / format must match (mismatch aborts load)</li>
         <li>Per-file embedded markers / sustain loops (smpl) follow the same rules as Wave-only (sustain Start/End → <code>-L</code>/<code>-E</code> preferred; same-timing markers discarded)</li>
         <li>In grouped playlists (vertical layers), markers are projected from the group's anchor playlist onto every member (shown translucent on the synced ones), and <strong>adding, deleting, and moving markers (including pair moves) stay in sync automatically</strong>. Aligning the loop points of all layers takes a single operation — a major highlight</li>
-        <li>Wwise parent name is fixed to <code>Multi_Wave</code> (not editable). Playlist names keep the dropped file names</li>
+        <li>You can double-click the waveform name to edit it. If that name is valid for a State Group (ASCII, etc.), it is used for the Music Switch / group State Group. If it contains 2-byte characters, only the parent name falls back to <code>Multi_Wave</code> (<code>Multi_Wave_2</code>… if that already exists). Playlist names keep the dropped file names</li>
         <li>Export keeps original file names where possible and may reuse source WAVs</li>
         <li>If any file has a matching XML, this mode is not used—pair processing applies instead</li>
       </ul>
@@ -451,7 +451,7 @@
       <p>Measure / Tempo / Signature / Marker lanes, waveform, then Music Segment Name / Music Playlist Name (bar lanes are inactive without XML).</p>
       <ul>
         <li>Click/drag to seek</li>
-        <li>Double-click the waveform name to edit the base name (<code>Multi_Wave</code> parent name is not editable in multi-wave mode)</li>
+        <li>Double-click the waveform name to edit the base name (also in multi-wave mode). Names that start with a digit, Windows reserved names, or invalid file-name characters are not committed: the previous name is restored and an error is shown. Clearing the field restores the original file name. Japanese names are allowed</li>
         <li>Double-click the timeline to zoom into the Music Playlist under the cursor (back to full view when only one intersects)</li>
         <li><kbd>H</kbd> / <span class="ui">SIZE</span> on TRANSPORT cycles waveform height 1×→2×→3×</li>
         <li>White-triangle edge fades are nondestructive and become MusicClip Fade on EXPORT</li>
@@ -535,6 +535,9 @@
         <li>Nuendo/Cubase XML single markers → Custom Cues; tempo/signature Override on Music Segments</li>
       </ul>
       <div class="note">
+        <p><strong>Names and fallbacks</strong>: Playlist and Segment names can stay in Japanese. Only State Group names cannot use 2-byte characters. Usable names are kept; only Switch States whose Playlist name is unusable become <code>Music_N</code> (other names are not forced to <code>Music_1</code>). In multi-wave with a single playlist (a group), the group State Group uses the renamed waveform name. Wwise rejects names that start with a digit on Switch, Playlist, Segment, Track, and State Group, so the app blocks them when you confirm a rename and again before EXPORT. The <code>Music_N</code> fallback applies only to Switch State names — it cannot save Segment names such as <code>1aaa_1</code>.</p>
+      </div>
+      <div class="note">
         <p><strong>Watch out for same-name files</strong>: if the export path already contains WAVs with the same names, EXPORT <strong>overwrites them without asking</strong>.</p>
       </div>
 
@@ -587,8 +590,12 @@
             <td>If any file has a matching <code>.xml</code> next to it, pair processing (XML mode / Wave-only) applies instead. Also, sample rate, channel count, and bit depth must match across all files (details in the log).</td>
           </tr>
           <tr>
-            <td>File-name error at load</td>
-            <td>The file name (without extension) becomes the Wwise object name, so names starting with a digit (e.g. <code>01_Battle</code>) or Windows reserved names (<code>CON</code>, etc.) are rejected. Rename and reload.</td>
+            <td>File-name error at load / valid files were rejected too</td>
+            <td>The file name (without extension) becomes the Wwise object name, so names starting with a digit (e.g. <code>01_Battle</code>) or Windows reserved names (<code>CON</code>, etc.) are rejected. <strong>When dropping several files, if even one name is invalid, every file is rejected</strong>, including the valid ones. Check the log and drop only files with usable names.</td>
+          </tr>
+          <tr>
+            <td>Renaming the waveform name reverts</td>
+            <td>Names that start with a digit, Windows reserved names, or invalid file-name characters cannot be committed. A dialog explains why and the previous name is restored. Clearing the field restores the original file name. Japanese is allowed (at EXPORT, names that cannot be a State Group fall back to <code>Music_N</code> / <code>Multi_Wave</code>).</td>
           </tr>
           <tr>
             <td>“Regions overlap” error</td>

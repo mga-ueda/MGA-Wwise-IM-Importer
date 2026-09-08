@@ -11,11 +11,15 @@ namespace MgaWwiseIMImporter.Wwise;
 /// 公開 Help の命名規約（ベストプラクティス）中心のため、書き出し WAV 名としても
 /// 使う本アプリでは Windows ファイル名として不適切な文字・予約名も拒否する。
 /// State 名および State Group 名は 2 バイト文字を扱えず <c>_</c> に置換されるため、
-/// 該当時は <see cref="BuildFallbackSwitchStateName"/> を使う。
+/// Switch State は <see cref="BuildFallbackSwitchStateName"/>、
+/// 複数波形の Music Switch／その State Group は <see cref="ResolveMultiWaveContainerName"/>。
 /// </remarks>
 internal static class WwiseObjectNames
 {
-    /// <summary>複数波形モードの Music Switch / State Group 名。</summary>
+    /// <summary>
+    /// 複数波形モードの Music Switch／その State Group 名のフォールバック。
+    /// 希望名が State Group に使えない文字（2 バイト）を含むときに使う。
+    /// </summary>
     public const string MultiWaveContainerName = "Multi_Wave";
 
     /// <summary>2 バイト文字を含むときの Switch State / State Group 名プレフィックス。</summary>
@@ -206,6 +210,24 @@ internal static class WwiseObjectNames
 
         throw new InvalidOperationException(
             UiStrings.ErrGroupStateFallbackNameExhausted(desired));
+    }
+
+    /// <summary>
+    /// 複数波形の Music Switch／その State Group 名。
+    /// 希望名が空、または State Group に使えない文字（2 バイト＝非 ASCII）を含むときは
+    /// <see cref="MultiWaveContainerName"/>。それ以外は Trim した希望名。
+    /// </summary>
+    public static string ResolveMultiWaveContainerName(string? desiredName)
+    {
+        if (string.IsNullOrWhiteSpace(desiredName))
+        {
+            return MultiWaveContainerName;
+        }
+
+        var value = desiredName.Trim();
+        return ContainsUnusableStateNameChars(value)
+            ? MultiWaveContainerName
+            : value;
     }
 
     /// <summary>

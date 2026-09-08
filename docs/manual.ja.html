@@ -210,7 +210,7 @@
       </ul>
       <p>なお、マーカーが全く無い WAV でも読み込めます。その場合はアプリ内でループマーカーを打つことになり、手順としては波形エディタでループを打ち込む作業と大差なくなりますが、それでも Wwise 実装は自動化され、ループ位置も取りやすい設計です。可能であれば、マーカーを含めた書き出し（方式 B）までは済ませておくことをおすすめします。</p>
       <div class="note">
-        <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）と <strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）は読み込みエラーになります。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
+        <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）、<strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）、ファイル名に使えない文字は読み込みエラーになります。<strong>複数ファイルを同時にドロップしたとき、不正な名前が 1 件でも混ざっていると、正しいファイルも含めてすべて拒否します</strong>（ログの 1 件を見過ごして残りだけ読み込む、ということはしません）。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
       </div>
 
       <h3 id="prepare-xml">4-2. 方式 A: Nuendo／Cubase の XML を用意する</h3>
@@ -357,7 +357,7 @@
         <li>Sample Rate／チャンネル数／ビット深度などが一致している必要があります（不一致だと読み込み中止）</li>
         <li>ファイルごとの埋め込みマーカー／サステインループ（smpl）は Wave 単体と同じ規則で処理します（サステインの Start／End → <code>-L</code>／<code>-E</code> 優先。同タイミングのマーカーは破棄）</li>
         <li>グループ化した Playlist（縦レイヤー）では、マーカーが基準 Playlist から全メンバーへ投影され（同期先には半透明で表示）、<strong>追加・削除・移動（ペア移動を含む）が自動でシンクロ</strong>します。全レイヤーのループ位置を 1 回の操作で揃えられるのが大きな魅力です</li>
-        <li>Wwise 側の親名は固定で <code>Multi_Wave</code>（編集不可）。Playlist 名はドロップ時のファイル名を維持します</li>
+        <li>波形名はダブルクリックで編集できます。State Group に使える名前（ASCII など）なら、その名前が Music Switch／グループ State Group になります。2 バイト文字を含むときは親名だけ <code>Multi_Wave</code>（既存なら <code>Multi_Wave_2</code>…）へ落とします。Playlist 名はドロップ時のファイル名のままです</li>
         <li>書き出しでは可能な範囲で元 WAV を共用し、ファイル名をむやみに改変しません</li>
         <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
       </ul>
@@ -451,7 +451,7 @@
       <p>Measure／Tempo／Signature／Marker レーン、波形、Music Segment Name／Music Playlist Name レーンで構成されます（XML 無しモードでは小節系レーンは使えません）。</p>
       <ul>
         <li>クリック／ドラッグで再生位置を移動</li>
-        <li>波形ファイル名をダブルクリックで基底名を編集（複数波形モードの親名 <code>Multi_Wave</code> は編集不可）</li>
+        <li>波形ファイル名をダブルクリックで基底名を編集（複数波形でも可）。数字始まり・予約名・ファイル名に使えない文字は確定せず元の名前に戻し、エラーを出します。空欄は元のファイル名に戻します。日本語は使えます</li>
         <li>タイムラインをダブルクリックで直下 Music Playlist を拡大（交差が 1 件だけなら全体表示へ）</li>
         <li><kbd>H</kbd>／TRANSPORT の <span class="ui">SIZE</span> で波形高さ 1×→2×→3×</li>
         <li>リージョン端の白三角フェードは非破壊。EXPORT 時に MusicClip の Fade へ設定</li>
@@ -535,6 +535,9 @@
         <li>Nuendo／Cubase XML モードの単発マーカー → Custom Cue。テンポ・拍子は Music Segment で Override</li>
       </ul>
       <div class="note">
+        <p><strong>名前とフォールバック</strong>: Playlist／Segment は日本語のまま作れます。State Group 名だけ 2 バイト文字を扱えません。使える名前はそのまま使い、使えない Playlist の Switch State だけ <code>Music_N</code> にします（全部を <code>Music_1</code> に揃えたりしません）。複数波形で Playlist が 1 つ（グループ化）のときは、グループ State Group にリネームした波形名を使います。数字始まりの名前は Wwise が Switch／Playlist／Segment／Track／State Group のいずれも拒否するため、リネーム確定時と EXPORT 前に止めます。<code>Music_N</code> への差し替えは Switch State 名だけなので、Segment 名まで救うことはできません。</p>
+      </div>
+      <div class="note">
         <p><strong>同名ファイルの上書きに注意</strong>: 書き出しパスに同名の WAV がある場合、EXPORT は<strong>確認なしで上書き</strong>しますので、ご注意ください。</p>
       </div>
 
@@ -587,8 +590,12 @@
             <td>どれか 1 本に同名の <code>.xml</code> が隣にあると、ペア処理（XML モード／Wave 単体）に切り替わります。また、サンプルレート・チャンネル数・ビット深度が全ファイルで一致していないと読み込みを中止します（ログに詳細）。</td>
           </tr>
           <tr>
-            <td>ファイル名のエラーで読み込めない</td>
-            <td>ファイル名（拡張子を除く）は Wwise オブジェクト名になるため、数字始まり（例: <code>01_Battle</code>）と Windows 予約名（<code>CON</code> など）は使えません。リネームしてから読み込んでください。</td>
+            <td>ファイル名のエラーで読み込めない／正しいファイルまで拒否される</td>
+            <td>ファイル名（拡張子を除く）は Wwise オブジェクト名になるため、数字始まり（例: <code>01_Battle</code>）と Windows 予約名（<code>CON</code> など）は使えません。<strong>複数ドロップ時は不正な名前が 1 件でもあると、正しいファイルも含めてすべて拒否します</strong>。ログを確認し、使える名前だけをドロップし直してください。</td>
+          </tr>
+          <tr>
+            <td>波形名のリネームが元に戻る</td>
+            <td>数字始まり、Windows 予約名、ファイル名に使えない文字は確定できません。ダイアログで理由を出し、表示は元の名前に戻します。空欄は元のファイル名です。日本語は使えます（State Group に使えないときは EXPORT 時に <code>Music_N</code>／<code>Multi_Wave</code> へ落とします）。</td>
           </tr>
           <tr>
             <td>「リージョンが重なっています」のエラー</td>
