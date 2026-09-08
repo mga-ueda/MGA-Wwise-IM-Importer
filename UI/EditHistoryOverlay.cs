@@ -16,6 +16,7 @@ internal sealed class EditHistoryOverlay : Border
     private readonly ScrollViewer _scroll;
 
     public event EventHandler<int>? ItemChosen;
+    public event EventHandler<int>? ItemCommitted;
 
     public EditHistoryOverlay()
     {
@@ -89,6 +90,16 @@ internal sealed class EditHistoryOverlay : Border
                 Foreground = selected ? selectedFore : future ? futureFore : idleFore,
             };
             row.Child = label;
+            row.MouseLeftButtonDown += (_, e) =>
+            {
+                if (e.ClickCount != 2 || row.Tag is not int index)
+                {
+                    return;
+                }
+
+                e.Handled = true;
+                ItemCommitted?.Invoke(this, index);
+            };
             row.MouseLeftButtonUp += (_, e) =>
             {
                 e.Handled = true;

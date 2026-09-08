@@ -77,7 +77,7 @@ public partial class MainWindow : Window
         PreviewMouseWheel += MainWindow_PreviewMouseWheel;
         PreviewMouseDown += MainWindow_PreviewMouseDown;
         PreviewMouseMove += MainWindow_PreviewMouseMoveForPlaylistPaint;
-        PreviewMouseLeftButtonUp += MainWindow_PreviewMouseLeftButtonUpForPlaylistPaint;
+        PreviewMouseLeftButtonUp += MainWindow_PreviewMouseLeftButtonUpForHistoryAndPlaylistPaint;
         SizeChanged += (_, _) =>
         {
             SyncRightSideContentHostHeight();

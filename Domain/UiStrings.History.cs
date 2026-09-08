@@ -7,8 +7,8 @@ internal static partial class UiStrings
     public static string EditHistoryOrigin => Get("初期状態", "Initial state");
 
     public static string EditHistoryHint => Get(
-        "↑↓ 移動　Enter 確定　Esc キャンセル",
-        "↑↓ move  Enter apply  Esc cancel");
+        "↑↓ 移動　Enter／ダブルクリック 確定　Esc／外クリック キャンセル",
+        "↑↓ move  Enter / double-click apply  Esc / click outside cancel");
 
     public const string EditHistoryNameAddMarker = "Add Marker";
     public const string EditHistoryNameDeleteMarkers = "Delete Markers";

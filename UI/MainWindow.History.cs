@@ -8,6 +8,7 @@ public partial class MainWindow
 {
     private int _historyAnchorIndex;
     private int _historySelectedIndex;
+    private bool _historySwallowMouseUp;
 
     private bool HistoryOpen => HistoryOverlay.Visibility == Visibility.Visible;
 
@@ -23,6 +24,7 @@ public partial class MainWindow
         _historyAnchorIndex = _editHistory.CurrentIndex;
         _historySelectedIndex = _historyAnchorIndex;
         RefreshHistoryOverlay();
+        HistoryDismissLayer.Visibility = Visibility.Visible;
         HistoryOverlay.Visibility = Visibility.Visible;
     }
 
@@ -42,15 +44,24 @@ public partial class MainWindow
             SaveLastWaveSessionIfLoaded();
         }
 
-        HistoryOverlay.Visibility = Visibility.Collapsed;
+        HideHistoryOverlay();
     }
 
     private void DismissEditHistory()
     {
-        if (HistoryOpen)
-        {
-            HistoryOverlay.Visibility = Visibility.Collapsed;
-        }
+        HideHistoryOverlay();
+    }
+
+    private void HideHistoryOverlay()
+    {
+        HistoryOverlay.Visibility = Visibility.Collapsed;
+        HistoryDismissLayer.Visibility = Visibility.Collapsed;
+    }
+
+    private void CloseEditHistoryFromMouse(bool commit)
+    {
+        CloseEditHistory(commit);
+        _historySwallowMouseUp = true;
     }
 
     private bool TryProcessHistoryShortcut(Key key, ModifierKeys modifiers)
@@ -187,5 +198,33 @@ public partial class MainWindow
     private void HistoryOverlay_ItemChosen(object sender, int index)
     {
         PreviewHistoryIndex(index);
+    }
+
+    private void HistoryOverlay_ItemCommitted(object sender, int index)
+    {
+        PreviewHistoryIndex(index);
+        CloseEditHistoryFromMouse(commit: true);
+    }
+
+    private void HistoryDismissLayer_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        CloseEditHistoryFromMouse(commit: false);
+    }
+
+    private void TrySwallowHistoryMouseUp(MouseButtonEventArgs e)
+    {
+        if (!_historySwallowMouseUp || e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        _historySwallowMouseUp = false;
+        e.Handled = true;
     }
 }

@@ -397,10 +397,18 @@
 
     </DockPanel>
     </DockPanel>
+    <Border x:Name="HistoryDismissLayer"
+            Visibility="Collapsed"
+            Background="Transparent"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            IsHitTestVisible="True"
+            MouseLeftButtonDown="HistoryDismissLayer_MouseLeftButtonDown" />
     <ui:EditHistoryOverlay x:Name="HistoryOverlay"
                            Visibility="Collapsed"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
-                           ItemChosen="HistoryOverlay_ItemChosen" />
+                           ItemChosen="HistoryOverlay_ItemChosen"
+                           ItemCommitted="HistoryOverlay_ItemCommitted" />
   </Grid>
 </Window>

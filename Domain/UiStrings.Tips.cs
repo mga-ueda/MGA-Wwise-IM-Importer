@@ -192,7 +192,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
-        + "[U] 編集履歴（↑↓ でプレビュー、Enter / U で確定、Esc で戻す）"
+        + "[U] 編集履歴（↑↓ でプレビュー、Enter / U / ダブルクリックで確定、Esc / 外クリックで戻す）"
         + Environment.NewLine
         + "コメント -L: 無限ループ / -R: リムーブ / -E: Exit Cue 以降 / -A: Entry Cue 前"
         + Environment.NewLine
@@ -223,7 +223,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
-        + "[U] edit history (↑↓ preview, Enter / U apply, Esc cancel)"
+        + "[U] edit history (↑↓ preview, Enter / U / double-click apply, Esc / click outside cancel)"
         + Environment.NewLine
         + "Comment -L: loop / -R: remove / -E: after Exit Cue / -A: before Entry Cue"
         + Environment.NewLine
@@ -244,7 +244,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
-        + "[U] 編集履歴（↑↓ でプレビュー、Enter / U で確定、Esc で戻す）",
+        + "[U] 編集履歴（↑↓ でプレビュー、Enter / U / ダブルクリックで確定、Esc / 外クリックで戻す）",
         "Drag white triangle: region-edge fade (non-destructive)"
         + Environment.NewLine
         + "Right-click fade area: choose curve (same names/order as Wwise)"
@@ -257,7 +257,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
-        + "[U] edit history (↑↓ preview, Enter / U apply, Esc cancel)");
+        + "[U] edit history (↑↓ preview, Enter / U / double-click apply, Esc / click outside cancel)");
 
     public static string LabelRegionFadeCurve(RegionFadeCurveKind kind) => kind switch
     {

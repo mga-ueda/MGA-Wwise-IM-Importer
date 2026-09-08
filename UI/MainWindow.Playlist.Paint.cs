@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -129,8 +129,9 @@ public partial class MainWindow
         ApplyPlaylistGroupPaintAtCursor();
     }
 
-    private void MainWindow_PreviewMouseLeftButtonUpForPlaylistPaint(object sender, MouseButtonEventArgs e)
+    private void MainWindow_PreviewMouseLeftButtonUpForHistoryAndPlaylistPaint(object sender, MouseButtonEventArgs e)
     {
+        TrySwallowHistoryMouseUp(e);
         if (e.ChangedButton != MouseButton.Left)
         {
             return;
