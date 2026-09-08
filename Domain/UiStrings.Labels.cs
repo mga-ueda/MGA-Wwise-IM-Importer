@@ -569,6 +569,12 @@ internal static partial class UiStrings
         "Group State Group: file names contain 2-byte characters; using {0}.",
         groupName);
 
+    public static string LogGroupStateFallbackBump(string requestedName, string allocatedName) => Format(
+        "Group State Group: {0} は既にあるため {1} を使用します。",
+        "Group State Group: {0} already exists; using {1}.",
+        requestedName,
+        allocatedName);
+
     public static string LogPlaylistSwitchState(string stateName) => Format(
         "  State: {0}",
         "  State: {0}",

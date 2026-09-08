@@ -251,6 +251,11 @@ internal static partial class UiStrings
         "Group State Group work unit not found: {0}",
         stateGroupPath);
 
+    public static string ErrGroupStateFallbackNameExhausted(string requestedName) => Format(
+        "グループ State Group のフォールバック名が尽きています（起点 {0}）。",
+        "Group State Group fallback names are exhausted (starting from {0}).",
+        requestedName);
+
     public static string ErrGroupStateTrackWorkUnitNotFound(string trackPath) => Format(
         "Music Track の Work Unit が見つかりません: {0}",
         "Music Track work unit not found: {0}",

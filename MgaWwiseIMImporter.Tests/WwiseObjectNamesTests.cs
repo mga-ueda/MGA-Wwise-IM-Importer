@@ -54,4 +54,56 @@ public class WwiseObjectNamesTests
             expected,
             WwiseObjectNames.ResolveUsableStateObjectName(name, index, count));
     }
+
+    [Theory]
+    [InlineData("Music_1", 1, 1)]
+    [InlineData("Music_01", 1, 2)]
+    [InlineData("Music_10", 10, 2)]
+    [InlineData("intro", 0, 0)]
+    [InlineData("Music_", 0, 0)]
+    public void TryParseFallbackSwitchStateName_ParsesMusicN(
+        string name,
+        int expectedIndex,
+        int expectedWidth)
+    {
+        var parsed = WwiseObjectNames.TryParseFallbackSwitchStateName(
+            name,
+            out var index,
+            out var width);
+        if (expectedIndex == 0)
+        {
+            Assert.False(parsed);
+            return;
+        }
+
+        Assert.True(parsed);
+        Assert.Equal(expectedIndex, index);
+        Assert.Equal(expectedWidth, width);
+    }
+
+    [Theory]
+    [InlineData("Music_1", "Music_2")]
+    [InlineData("Music_9", "Music_10")]
+    [InlineData("Music_09", "Music_10")]
+    [InlineData("Music_99", "Music_100")]
+    public void NextFallbackSwitchStateName_IncrementsAndExpandsWidth(
+        string current,
+        string expected)
+    {
+        Assert.Equal(expected, WwiseObjectNames.NextFallbackSwitchStateName(current));
+    }
+
+    [Fact]
+    public void AllocateUnusedFallbackName_KeepsNameIfFree()
+    {
+        var taken = new HashSet<string>(StringComparer.Ordinal) { "Music_2" };
+        Assert.Equal("Music_1", WwiseObjectNames.AllocateUnusedFallbackName("Music_1", taken));
+    }
+
+    [Fact]
+    public void AllocateUnusedFallbackName_IncrementsWhileTaken()
+    {
+        var taken = new HashSet<string>(StringComparer.Ordinal) { "Music_1", "Music_2" };
+        Assert.Equal("Music_3", WwiseObjectNames.AllocateUnusedFallbackName("Music_1", taken));
+    }
 }

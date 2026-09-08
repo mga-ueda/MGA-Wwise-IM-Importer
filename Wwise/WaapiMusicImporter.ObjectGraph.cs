@@ -698,6 +698,7 @@ internal static partial class WaapiMusicImporter
 
     /// <summary>
     /// グループ化 Playlist ごとに State Group（A/B/C…）を作り、各 Music Track へ割当する。
+    /// フォールバック名（Music_N）が既にあれば番号を繰り上げて新規作成する。ASCII 名は merge。
     /// Group Fade が全員同一なら Default Transition Time のみ、異なれば Custom TransitionList。
     /// TransitionList / State Volume は WWU 直編集用パッチとして返す。
     /// </summary>
@@ -722,14 +723,43 @@ internal static partial class WaapiMusicImporter
             return (transitionPatches, volumePatches);
         }
 
+        var takenStateGroupNames = await QueryStateGroupNamesInParentAsync(
+                client,
+                importSettings.StateGroupParentPath,
+                cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var playlist in grouped)
+        {
+            var existingName = playlist.GroupState!.Name;
+            if (!playlist.GroupState.UsesFallbackName
+                && !string.IsNullOrEmpty(existingName))
+            {
+                takenStateGroupNames.Add(existingName);
+            }
+        }
+
         foreach (var playlist in grouped)
         {
             var groupState = playlist.GroupState!;
-            var stateGroupPath = importSettings.ResolveStateGroupPath(groupState.Name);
             if (groupState.UsesFallbackName)
             {
-                log(UiStrings.LogGroupStateFallback(groupState.Name));
+                var requestedName = groupState.Name;
+                var allocatedName = WwiseObjectNames.AllocateUnusedFallbackName(
+                    requestedName,
+                    takenStateGroupNames);
+                groupState.Name = allocatedName;
+                takenStateGroupNames.Add(allocatedName);
+                if (!string.Equals(allocatedName, requestedName, StringComparison.Ordinal))
+                {
+                    log(UiStrings.LogGroupStateFallbackBump(requestedName, allocatedName));
+                }
+                else
+                {
+                    log(UiStrings.LogGroupStateFallback(allocatedName));
+                }
             }
+
+            var stateGroupPath = importSettings.ResolveStateGroupPath(groupState.Name);
 
             log(UiStrings.LogCreatingGroupStateGroup(
                 groupState.Name,
@@ -1103,6 +1133,53 @@ internal static partial class WaapiMusicImporter
             name => name,
             name => found[name],
             StringComparer.Ordinal);
+    }
+
+    /// <summary>State Group 親の直下にある State Group 名を列挙する。</summary>
+    private static async Task<HashSet<string>> QueryStateGroupNamesInParentAsync(
+        WaapiHttpClient client,
+        string parentPath,
+        CancellationToken cancellationToken)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var parent = parentPath.Trim().TrimEnd('\\');
+        if (parent.Length == 0)
+        {
+            parent = WwiseImportSettings.DefaultStateGroupParentPath;
+        }
+
+        var escaped = parent.Replace("\"", "\\\"", StringComparison.Ordinal);
+        var result = await client.CallAsync(
+                WaapiUris.CoreObjectGet,
+                new Dictionary<string, object?>
+                {
+                    ["waql"] = $"$ \"{escaped}\" select children where type = \"StateGroup\"",
+                },
+                new Dictionary<string, object?>
+                {
+                    ["return"] = ReturnFieldsIdNameType,
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!result.TryGetProperty("return", out var arr)
+            || arr.ValueKind != JsonValueKind.Array)
+        {
+            return names;
+        }
+
+        foreach (var item in arr.EnumerateArray())
+        {
+            var name = item.TryGetProperty("name", out var nameEl)
+                ? nameEl.GetString()
+                : null;
+            if (!string.IsNullOrEmpty(name))
+            {
+                names.Add(name);
+            }
+        }
+
+        return names;
     }
 
     private static string ResolvePlaylistObjectPath(

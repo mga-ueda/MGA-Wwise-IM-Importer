@@ -87,8 +87,9 @@ internal sealed class WwiseGroupStatePlan
     /// <summary>
     /// State Group 名。Playlist／グループ名と同じ。ただし 2 バイト文字を含むときは
     /// <c>Music_N</c>（<see cref="UsesFallbackName"/>）。
+    /// EXPORT 時、同名が既にあれば番号を繰り上げて書き換えることがある。
     /// </summary>
-    public required string Name { get; init; }
+    public required string Name { get; set; }
 
     /// <summary>State Group 名を Playlist 名から <c>Music_N</c> へ差し替えたか。</summary>
     public bool UsesFallbackName { get; init; }

@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using MgaWwiseIMImporter.Domain;
 
 namespace MgaWwiseIMImporter.Wwise;
 
@@ -136,6 +137,9 @@ internal static class WwiseObjectNames
             + index.ToString("D" + width, CultureInfo.InvariantCulture);
     }
 
+    /// <summary>フォールバック名の番号を繰り上げる上限（無限ループ防止）。</summary>
+    public const int MaxFallbackNameIncrement = 999;
+
     /// <summary>
     /// 希望名が State / State Group として使えるならそのまま、2 バイト文字を含むなら
     /// <see cref="BuildFallbackSwitchStateName"/>。
@@ -144,6 +148,65 @@ internal static class WwiseObjectNames
         ContainsUnusableStateNameChars(name)
             ? BuildFallbackSwitchStateName(oneBasedIndex, count)
             : name ?? string.Empty;
+
+    /// <summary><c>Music_1</c> / <c>Music_01</c> 形式なら番号を返す。</summary>
+    public static bool TryParseFallbackSwitchStateName(string? name, out int index, out int digitWidth)
+    {
+        index = 0;
+        digitWidth = 0;
+        if (string.IsNullOrEmpty(name)
+            || !name.StartsWith(FallbackSwitchStatePrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var digits = name[FallbackSwitchStatePrefix.Length..];
+        if (digits.Length == 0
+            || !int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out index)
+            || index < 1)
+        {
+            return false;
+        }
+
+        digitWidth = digits.Length;
+        return true;
+    }
+
+    /// <summary>フォールバック名の番号を 1 つ繰り上げる。<c>Music_9</c> → <c>Music_10</c>。</summary>
+    public static string NextFallbackSwitchStateName(string current)
+    {
+        if (!TryParseFallbackSwitchStateName(current, out var index, out var digitWidth))
+        {
+            throw new ArgumentException(
+                "Fallback State Group name must be Music_N.",
+                nameof(current));
+        }
+
+        var next = checked(index + 1);
+        var width = Math.Max(digitWidth, next.ToString(CultureInfo.InvariantCulture).Length);
+        return FallbackSwitchStatePrefix
+            + next.ToString("D" + width, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// <paramref name="taken"/> に無いフォールバック名を返す。希望名が使用中なら番号を繰り上げる。
+    /// </summary>
+    public static string AllocateUnusedFallbackName(string desired, ISet<string> taken)
+    {
+        var name = desired;
+        for (var i = 0; i < MaxFallbackNameIncrement; i++)
+        {
+            if (!taken.Contains(name))
+            {
+                return name;
+            }
+
+            name = NextFallbackSwitchStateName(name);
+        }
+
+        throw new InvalidOperationException(
+            UiStrings.ErrGroupStateFallbackNameExhausted(desired));
+    }
 
     /// <summary>Windows 予約デバイス名（CON / COM1 など）か。</summary>
     private static bool IsReservedWindowsFileName(string name)
