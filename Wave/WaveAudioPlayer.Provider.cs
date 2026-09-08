@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using NAudio.Wave;
 using MgaWwiseIMImporter.UI;
 
@@ -66,10 +67,19 @@ internal sealed partial class WaveAudioPlayer
         private IReadOnlyList<RegionEdgeFade> _regionEdgeFades = [];
         private IReadOnlyList<(long Start, long End)> _excludedRanges = [];
         private float _outputPeak;
-        /// <summary>スペアナ用の直近出力モノラルサンプル（リングバッファ）。</summary>
+        /// <summary>
+        /// スペアナ用の直近出力モノラルサンプル（リングバッファ）。
+        /// 書き手はオーディオスレッドのみ。UI 読み手とロックを共有すると
+        /// 極小 ASIO バッファでコールバック締切を落とすため、ロックなしで運用する
+        /// （UI 側の稀な読み裂けは表示専用なので許容）。
+        /// </summary>
         private readonly float[] _monitorRing = new float[8192];
         private long _monitorWriteCount;
-        private readonly object _monitorGate = new();
+
+        // ホットパス診断: ロック待ちとミックス本体の最大時間（オーディオスレッドのみ書く）。
+        private double _maxReadGateWaitMs;
+        private double _maxGateWaitMs;
+        private double _maxMixMs;
 
         private bool _metronomeEnabled;
         private float _metronomeVolume = MetronomePlayer.DefaultVolume;
@@ -236,16 +246,12 @@ internal sealed partial class WaveAudioPlayer
             }
         }
 
-        public long CurrentMainSample
-        {
-            get
-            {
-                lock (_readGate)
-                {
-                    return CurrentSample(_source);
-                }
-            }
-        }
+        /// <summary>
+        /// 表示用の現在サンプル。x64 の 64bit 読みはアトミックなのでロックしない。
+        /// UI が 16ms ごとに _readGate（ミックス全体で保持）を取りに行くと、
+        /// ロック保持中のプリエンプトで ASIO コールバックが締切を落とすため。
+        /// </summary>
+        public long CurrentMainSample => CurrentSample(_source);
 
         public void SetPlayExitLayer(bool enabled)
         {
@@ -903,7 +909,8 @@ internal sealed partial class WaveAudioPlayer
                 return 0;
             }
 
-            lock (_readGate)
+            // UI ポーリング用。_readGate は取らない（CurrentMainSample と同じ理由）。
+            lock (_gate)
             {
                 var count = 0;
                 foreach (var voice in _overlayVoices)
@@ -937,7 +944,8 @@ internal sealed partial class WaveAudioPlayer
                 return 0;
             }
 
-            lock (_readGate)
+            // UI ポーリング用。_readGate は取らない（CurrentMainSample と同じ理由）。
+            lock (_gate)
             {
                 var count = 0;
                 foreach (var voice in _overlayVoices)
@@ -969,20 +977,18 @@ internal sealed partial class WaveAudioPlayer
                 return false;
             }
 
-            lock (_readGate)
+            // UI ポーリング用。_readGate は取らない（CurrentMainSample と同じ理由）。
+            lock (_gate)
             {
-                lock (_gate)
+                if (!_clockFadeOutPlaying)
                 {
-                    if (!_clockFadeOutPlaying)
-                    {
-                        return false;
-                    }
+                    return false;
                 }
-
-                var sample = CurrentSample(_source);
-                progress = Math.Clamp(sample / (double)frameCount, 0d, 1d);
-                return true;
             }
+
+            var sample = CurrentSample(_source);
+            progress = Math.Clamp(sample / (double)frameCount, 0d, 1d);
+            return true;
         }
 
         public int CopyOverlayExitProgresses(
@@ -995,7 +1001,8 @@ internal sealed partial class WaveAudioPlayer
                 return 0;
             }
 
-            lock (_readGate)
+            // UI ポーリング用。_readGate は取らない（CurrentMainSample と同じ理由）。
+            lock (_gate)
             {
                 var count = 0;
                 foreach (var voice in _overlayVoices)
@@ -1299,9 +1306,62 @@ internal sealed partial class WaveAudioPlayer
             }
         }
 
+        /// <summary>直近再生区間のホットパス計測を返してリセットする（audio.stats 用）。</summary>
+        public string DescribeAndResetHotPathStats()
+        {
+            var text =
+                $"readGateWaitMaxMs={_maxReadGateWaitMs:F2}"
+                + $" gateWaitMaxMs={_maxGateWaitMs:F2}"
+                + $" mixMaxMs={_maxMixMs:F2}";
+            _maxReadGateWaitMs = 0;
+            _maxGateWaitMs = 0;
+            _maxMixMs = 0;
+            return text;
+        }
+
+        /// <summary>ホットパス用: _gate をロック待ち時間の計測付きで取得する。</summary>
+        private void EnterGateTimed()
+        {
+            var start = Stopwatch.GetTimestamp();
+            Monitor.Enter(_gate);
+            var waited = (Stopwatch.GetTimestamp() - start) * 1000.0 / Stopwatch.Frequency;
+            if (waited > _maxGateWaitMs)
+            {
+                _maxGateWaitMs = waited;
+            }
+        }
+
         public int Read(byte[] buffer, int offset, int count)
         {
-            lock (_readGate)
+            var enterStart = Stopwatch.GetTimestamp();
+            Monitor.Enter(_readGate);
+            var mixStart = Stopwatch.GetTimestamp();
+            var waitMs = (mixStart - enterStart) * 1000.0 / Stopwatch.Frequency;
+            if (waitMs > _maxReadGateWaitMs)
+            {
+                _maxReadGateWaitMs = waitMs;
+            }
+
+            try
+            {
+                var result = ReadInner(buffer, offset, count);
+                var mixMs =
+                    (Stopwatch.GetTimestamp() - mixStart) * 1000.0 / Stopwatch.Frequency;
+                if (mixMs > _maxMixMs)
+                {
+                    _maxMixMs = mixMs;
+                }
+
+                return result;
+            }
+            finally
+            {
+                Monitor.Exit(_readGate);
+            }
+        }
+
+        private int ReadInner(byte[] buffer, int offset, int count)
+        {
             {
                 if (_silencePrerollFramesRemaining > 0)
                 {
@@ -1311,10 +1371,18 @@ internal sealed partial class WaveAudioPlayer
                         return 0;
                     }
 
-                    Array.Clear(buffer, offset, frames * 8);
-                    _silencePrerollFramesRemaining -= frames;
-                    Volatile.Write(ref _outputPeak, 0f);
-                    return frames * 8;
+                    var silentFrames = (int)Math.Min(frames, _silencePrerollFramesRemaining);
+                    Array.Clear(buffer, offset, silentFrames * 8);
+                    _silencePrerollFramesRemaining -= silentFrames;
+                    if (_silencePrerollFramesRemaining > 0 || silentFrames >= frames)
+                    {
+                        Volatile.Write(ref _outputPeak, 0f);
+                        return silentFrames * 8;
+                    }
+
+                    // 残りを同じコールバックで続きから混ぜ、無音→音のバッファ境界クリックを避ける。
+                    return silentFrames * 8
+                        + ReadCore(buffer, offset + silentFrames * 8, (frames - silentFrames) * 8);
                 }
 
                 return ReadCore(buffer, offset, count);
@@ -1334,11 +1402,23 @@ internal sealed partial class WaveAudioPlayer
                 return;
             }
 
-            var scratch = new byte[frames * 8];
+            // 実コールバック（極小 ASIO バッファ）と同じ粒度で多数回呼び出し、
+            // Tier-1 昇格しきい値（約 30 回）を再生開始前に越えさせる。
+            // 1 回の大きな Read では呼び出し回数が足りず、再生数秒後の
+            // 再コンパイル切り替えで締切を落とすことがある。
+            const int chunkFrames = 48;
+            var scratch = new byte[chunkFrames * 8];
             lock (_readGate)
             {
                 var restore = _source.Sample;
-                _ = ReadCore(scratch, 0, scratch.Length);
+                var remaining = frames;
+                while (remaining > 0)
+                {
+                    var take = Math.Min(chunkFrames, remaining);
+                    _ = ReadCore(scratch, 0, take * 8);
+                    remaining -= take;
+                }
+
                 _source.SeekToSample(restore);
                 lock (_gate)
                 {
@@ -1346,12 +1426,9 @@ internal sealed partial class WaveAudioPlayer
                 }
             }
 
-            // 読み捨て分をスペアナ用リングに残さない。
-            lock (_monitorGate)
-            {
-                Array.Clear(_monitorRing, 0, _monitorRing.Length);
-                _monitorWriteCount = 0;
-            }
+            // 読み捨て分をスペアナ用リングに残さない（再生前なので競合しない）。
+            Array.Clear(_monitorRing, 0, _monitorRing.Length);
+            Volatile.Write(ref _monitorWriteCount, 0);
 
             Volatile.Write(ref _outputPeak, 0f);
         }
@@ -1381,7 +1458,8 @@ internal sealed partial class WaveAudioPlayer
                 var stopAfterClockFade = false;
                 var forceEndAfterClockFade = false;
                 IReadOnlyList<(long Start, long End)> excludedRanges;
-                lock (_gate)
+                EnterGateTimed();
+                try
                 {
                     plan = _activePlan;
                     exitPlaying = _exitPlaying;
@@ -1394,6 +1472,10 @@ internal sealed partial class WaveAudioPlayer
                     stopAfterClockFade = _stopAfterClockFadeOut;
                     forceEndAfterClockFade = _forceEndAfterClockFadeOut;
                     excludedRanges = _excludedRanges;
+                }
+                finally
+                {
+                    Monitor.Exit(_gate);
                 }
 
                 if (forceEndAfterClockFade || stopAfterClockFade)
@@ -1550,13 +1632,18 @@ internal sealed partial class WaveAudioPlayer
                 IReadOnlyList<WaveformBarMark> metronomeBars;
                 float[] metronomeHigh;
                 float[] metronomeLow;
-                lock (_gate)
+                EnterGateTimed();
+                try
                 {
                     metronomeEnabled = _metronomeEnabled;
                     metronomeVolume = _metronomeVolume;
                     metronomeBars = _metronomeBars;
                     metronomeHigh = _metronomeHigh;
                     metronomeLow = _metronomeLow;
+                }
+                finally
+                {
+                    Monitor.Exit(_gate);
                 }
 
                 // 加算ミックス（簡易クリップ）。-R 区間はタイムラインを進めつつ無音にする。
@@ -1830,37 +1917,38 @@ internal sealed partial class WaveAudioPlayer
                 return;
             }
 
+            // ロックなし単一書き手。サンプルを書き切ってからカウントを公開する
+            //（Volatile.Write の release で読み手に順序を保証）。
             var src = MemoryMarshal.Cast<byte, float>(buffer.AsSpan(offset, frames * 8));
-            lock (_monitorGate)
+            var writeCount = _monitorWriteCount;
+            var writeIndex = (int)(writeCount % _monitorRing.Length);
+            for (var i = 0; i < frames; i++)
             {
-                var writeIndex = (int)(_monitorWriteCount % _monitorRing.Length);
-                for (var i = 0; i < frames; i++)
+                _monitorRing[writeIndex] = (src[i * 2] + src[i * 2 + 1]) * 0.5f;
+                writeIndex++;
+                if (writeIndex == _monitorRing.Length)
                 {
-                    _monitorRing[writeIndex] = (src[i * 2] + src[i * 2 + 1]) * 0.5f;
-                    writeIndex++;
-                    if (writeIndex == _monitorRing.Length)
-                    {
-                        writeIndex = 0;
-                    }
+                    writeIndex = 0;
                 }
-
-                _monitorWriteCount += frames;
             }
+
+            Volatile.Write(ref _monitorWriteCount, writeCount + frames);
         }
 
         /// <summary>直近サンプルを destination の末尾詰めでコピー（不足分は先頭を 0 埋め）。</summary>
         public int CopyRecentOutputSamples(float[] destination)
         {
-            lock (_monitorGate)
             {
+                // ロックなし読み手（表示専用）。コピー中にオーディオスレッドが
+                // 追い越した場合は一部が新旧混在するが、スペアナ描画では許容する。
+                var writeCount = Volatile.Read(ref _monitorWriteCount);
                 var available = (int)Math.Min(
-                    _monitorWriteCount,
+                    writeCount,
                     Math.Min(destination.Length, _monitorRing.Length));
                 if (available > 0)
                 {
-                    // オーディオスレッドと共有するロック内なので Array.Copy 2 回で済ませ、保持時間を最小化する。
                     var destStart = destination.Length - available;
-                    var start = (int)((_monitorWriteCount - available) % _monitorRing.Length);
+                    var start = (int)((writeCount - available) % _monitorRing.Length);
                     var firstLen = Math.Min(available, _monitorRing.Length - start);
                     Array.Copy(_monitorRing, start, destination, destStart, firstLen);
                     if (firstLen < available)

@@ -1,4 +1,5 @@
-﻿using NAudio.Wave;
+﻿using System.Runtime;
+using NAudio.Wave;
 using MgaWwiseIMImporter.UI;
 
 namespace MgaWwiseIMImporter.Wave;
@@ -26,6 +27,11 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     private PlaybackPcm? _pcm;
     private IWavePlayer? _output;
     private StereoFloatWaveProvider? _provider;
+    /// <summary>ASIO 出力時のコールバック計測アダプタ（他 API では null）。</summary>
+    private AsioCallbackAdapter? _asioAdapter;
+
+    /// <summary>ASIO 初期化時の UI 同期コンテキスト（ドライバリセット要求の退避先）。</summary>
+    private SynchronizationContext? _outputSyncContext;
     private string? _path;
     private bool _isPlaying;
     private bool _disposed;
@@ -41,6 +47,15 @@ internal sealed partial class WaveAudioPlayer : IDisposable
 
     /// <summary>プロセス初回の再生を無音プリロールで開始したか（JIT スパイク吸収は一度で足りる）。</summary>
     private static bool _firstPlaybackPrimed;
+
+    /// <summary>再生前の GC レイテンシモード（再生中は SustainedLowLatency へ切り替える）。</summary>
+    private GCLatencyMode? _gcLatencyBackup;
+
+    /// <summary>ASIO 再生中の No-GC リージョンが有効か（GC 全停止によるコールバック欠落対策）。</summary>
+    private bool _noGcRegionActive;
+
+    /// <summary>No-GC リージョンの割り当て予算。UI の割り当て速度なら数十分持つ。</summary>
+    private const long NoGcRegionBudgetBytes = 64L * 1024 * 1024;
 
     private LoopPlaybackPlan[] _loopPlans = [];
     private LoopPlaybackPlan? _activePlan;
@@ -428,19 +443,15 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             return false;
         }
 
-        // Pause／Stop 後はデバイス側の先読みを捨てるため、出力を作り直してから再生する。
+        // ASIO を再生ごとに作り直すと、旧ドライバ破棄の遅延が一発ノイズになる。
         _provider.ClearPlaylistPlayback();
-        RecreateOutputDevice();
-        if (_output is null || _provider is null)
-        {
-            Trace($"playlist.start rejected after recreate provider={_provider is not null} output={_output is not null}");
-            return false;
-        }
 
         var plan = FindPlanAtSample(startSample);
         _provider.StartPlaylistRange(startSample, endSample, plan, clockVoiceId);
         _activePlan = plan;
         _discardOutputBufferBeforePlay = false;
+        EnterLowLatencyGc();
+        _asioAdapter?.MarkDiscontinuity();
         _output.Play();
         _isPlaying = true;
         Trace($"playlist.start accepted start={startSample} end={endSample} voice={clockVoiceId} loopPlan={plan?.ToString() ?? "none"}");
@@ -957,9 +968,9 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             _provider.SeekMain(0);
         }
 
-        // ASIO 等は Stop/Play だけではハード／ドライバ先読みが残ることがあるため、
-        // 出力デバイスを作り直してから再生する。
-        if (_discardOutputBufferBeforePlay)
+        // WaveOut／WASAPI は Stop 後に先読みが残ることがあるので作り直す。
+        // ASIO は再生ごとに作り直すと、旧ドライバ破棄が開始直後の一発ノイズになる。
+        if (_discardOutputBufferBeforePlay && _output is not AsioOut)
         {
             RecreateOutputDevice();
             if (_output is null)
@@ -978,9 +989,11 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             _provider.BeginSilencePreroll(Math.Max(1, _pcm.SampleRate / 5));
         }
 
+        EnterLowLatencyGc();
+        _asioAdapter?.MarkDiscontinuity();
         _output.Play();
         _isPlaying = true;
-        Trace($"transport.play sample={_provider?.CurrentMainSample ?? 0}");
+        Trace($"transport.play sample={_provider.CurrentMainSample}");
     }
 
     public void Pause()
@@ -992,12 +1005,20 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             return;
         }
 
-        // ASIO の Pause はドライバ停止だけでハードウェア先読みを捨てない。
-        // Stop 相当にしてから、次の再生でデバイス再生成する。
+        // ASIO は Pause のままドライバを生かす（Stop＋再生成は開始直後のノイズになる）。
+        // 他 API は Stop 相当にして、次の再生で先読みを捨てる。
         _suppressPlaybackEnded = true;
         try
         {
-            _output.Stop();
+            if (_output is AsioOut)
+            {
+                _output.Pause();
+            }
+            else
+            {
+                _output.Stop();
+                _discardOutputBufferBeforePlay = true;
+            }
         }
         finally
         {
@@ -1005,9 +1026,10 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         }
 
         _isPlaying = false;
-        _discardOutputBufferBeforePlay = true;
+        ExitLowLatencyGc();
         _provider?.ResetOutputPeak();
         Trace($"transport.pause sample={_provider?.CurrentMainSample ?? 0}");
+        TraceAsioStats();
     }
 
     public void Stop()
@@ -1034,9 +1056,11 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         _provider?.SeekMain(0);
         _provider?.StopExitLayer();
         _isPlaying = false;
+        ExitLowLatencyGc();
         _discardOutputBufferBeforePlay = true;
         _provider?.ResetOutputPeak();
         Trace("transport.stop");
+        TraceAsioStats();
     }
 
     /// <summary>再生中なら一時停止、停止中なら再生。</summary>
@@ -1097,6 +1121,7 @@ internal sealed partial class WaveAudioPlayer : IDisposable
         }
 
         _disposed = true;
+        ExitLowLatencyGc();
         StopAndRelease();
     }
 
@@ -1161,8 +1186,10 @@ internal sealed partial class WaveAudioPlayer : IDisposable
     {
         _provider?.StopExitLayer();
         _isPlaying = false;
+        ExitLowLatencyGc();
         _provider?.ResetOutputPeak();
         Trace($"playback.ended playlistEnded={playlistEnded} sample={_provider?.CurrentMainSample ?? 0}");
+        TraceAsioStats();
         PlaybackEnded?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1183,6 +1210,82 @@ internal sealed partial class WaveAudioPlayer : IDisposable
             _output.Dispose();
             _output = null;
         }
+    }
+
+    /// <summary>
+    /// 再生中の GC 全停止（数 ms）は極小 ASIO バッファ（例: 48 サンプル＝1ms）で
+    /// 一発ノイズになる。ASIO では再生区間を No-GC リージョンで覆って GC を止め、
+    /// 確保できない場合や他 API では SustainedLowLatency で停止を抑える。
+    /// </summary>
+    private void EnterLowLatencyGc()
+    {
+        if (_noGcRegionActive || _gcLatencyBackup is not null)
+        {
+            return;
+        }
+
+        if (_output is AsioOut && GCSettings.LatencyMode != GCLatencyMode.NoGCRegion)
+        {
+            try
+            {
+                if (GC.TryStartNoGCRegion(NoGcRegionBudgetBytes))
+                {
+                    _noGcRegionActive = true;
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentOutOfRangeException)
+            {
+                Trace($"audio.gc no-gc-region unavailable: {ex.Message}");
+            }
+        }
+
+        _gcLatencyBackup = GCSettings.LatencyMode;
+        GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
+    }
+
+    private void ExitLowLatencyGc()
+    {
+        if (_noGcRegionActive)
+        {
+            _noGcRegionActive = false;
+            try
+            {
+                if (GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+                {
+                    GC.EndNoGCRegion();
+                }
+                else
+                {
+                    // 予算超過で GC が走りリージョンが自然終了していた場合。
+                    Trace("audio.gc no-gc-region budget-exhausted");
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // リージョン外で End を呼んだ場合は無視してよい。
+            }
+        }
+
+        if (_gcLatencyBackup is { } mode)
+        {
+            _gcLatencyBackup = null;
+            GCSettings.LatencyMode = mode;
+        }
+    }
+
+    /// <summary>ASIO 再生区間の計測サマリ（コールバック計測＋ミックス内訳）を出力する。</summary>
+    private void TraceAsioStats()
+    {
+        if (_asioAdapter is null)
+        {
+            return;
+        }
+
+        var hotPath = _provider is null
+            ? string.Empty
+            : " " + _provider.DescribeAndResetHotPathStats();
+        Trace(_asioAdapter.DescribeAndResetStats() + hotPath);
     }
 
     private void Trace(string message) => Diagnostic?.Invoke(this, message);

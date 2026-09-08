@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -20,6 +20,9 @@
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <!-- 公開版は事前コンパイル（R2R）。初回再生時の JIT スパイクが
+         極小 ASIO バッファでコールバック欠落＝一発ノイズになるのを防ぐ。 -->
+    <PublishReadyToRun>true</PublishReadyToRun>
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     <NoWarn>$(NoWarn);SYSLIB1054</NoWarn>
     <DefaultItemExcludes>$(DefaultItemExcludes);MgaWwiseIMImporter.Tests\**</DefaultItemExcludes>
