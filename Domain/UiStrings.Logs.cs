@@ -43,10 +43,6 @@ internal static partial class UiStrings
         fromName,
         toName);
 
-    public static string DialogDeleteProjectFailedTitle => Get(
-        "プロジェクトの削除に失敗",
-        "Failed to delete project");
-
     public static string LogExportPreflightHeader => Get("=== Export Preflight ===", "=== Export Preflight ===");
     public static string LogStatusOk => Get("OK", "OK");
     public static string LogStatusNg => Get("NG", "NG");

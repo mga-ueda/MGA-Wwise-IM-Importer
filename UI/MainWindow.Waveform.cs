@@ -375,10 +375,18 @@ public partial class MainWindow
         AutosaveCurrentProject();
     }
 
-    private string ResolveSourceDisplayName() =>
-        !string.IsNullOrWhiteSpace(_sourceBaseNameOverride)
-            ? _sourceBaseNameOverride!
-            : Path.GetFileNameWithoutExtension(_loadedPreview?.SourcePath ?? string.Empty);
+    private string ResolveSourceDisplayName()
+    {
+        if (!string.IsNullOrWhiteSpace(_sourceBaseNameOverride))
+        {
+            return _sourceBaseNameOverride!;
+        }
+
+        var fileName = Path.GetFileNameWithoutExtension(_loadedPreview?.SourcePath ?? string.Empty);
+        return WwiseObjectNames.TryNormalizeRenameName(fileName, out var sanitized, out _)
+            ? sanitized
+            : fileName;
+    }
 
     private void CommitSourceNameOverride(string name)
     {
@@ -386,24 +394,34 @@ public partial class MainWindow
         var previousDisplay = ResolveSourceDisplayName();
         var defaultName = Path.GetFileNameWithoutExtension(_loadedPreview?.SourcePath ?? string.Empty);
 
-        // 空欄はリネーム解除（元ファイル名）。Wwise が拒否する名前は確定せず元に戻す。
-        // 2 バイト文字は許可する（State Group だけ Music_N / Multi_Wave へ落とす）。
-        if (trimmed.Length > 0
-            && !string.Equals(trimmed, defaultName, StringComparison.Ordinal)
-            && !WwiseObjectNames.TryValidateBaseName(trimmed, out var reason))
+        // 空欄はリネーム解除（表示はファイル名の ASCII 記号を正規化した形）。
+        // ASCII 記号は _ へ置換。日本語は許可（State Group は Multi_Wave へ落とす）。
+        // 半角カナ・数字始まり・予約名は直前の表示名に戻す。
+        if (trimmed.Length > 0)
         {
-            waveformView.SetSourceDisplayName(previousDisplay);
-            AppendReport(UiStrings.LogRenameReverted(trimmed) + Environment.NewLine);
-            OwnerCenteredMessageBox.Show(
-                this,
-                RenameRejectBody(reason),
-                UiStrings.DialogRenameFailedTitle,
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
+            if (!WwiseObjectNames.TryNormalizeRenameName(trimmed, out var normalized, out var reason))
+            {
+                waveformView.SetSourceDisplayName(previousDisplay);
+                AppendReport(UiStrings.LogRenameReverted(trimmed) + Environment.NewLine);
+                OwnerCenteredMessageBox.Show(
+                    this,
+                    RenameRejectBody(reason),
+                    UiStrings.DialogRenameFailedTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!string.Equals(normalized, trimmed, StringComparison.Ordinal))
+            {
+                AppendReport(UiStrings.LogRenameSpacesConverted(trimmed, normalized) + Environment.NewLine);
+            }
+
+            trimmed = normalized;
         }
 
-        _sourceBaseNameOverride = string.Equals(trimmed, defaultName, StringComparison.Ordinal) || trimmed.Length == 0
+        _sourceBaseNameOverride = trimmed.Length == 0
+                || string.Equals(trimmed, defaultName, StringComparison.Ordinal)
             ? null
             : trimmed;
         waveformView.SetSourceDisplayName(ResolveSourceDisplayName());
@@ -419,6 +437,8 @@ public partial class MainWindow
     {
         WwiseBaseNameRejectReason.StartsWithDigit => UiStrings.DialogRenameStartsWithDigitBody,
         WwiseBaseNameRejectReason.ReservedWindowsName => UiStrings.DialogRenameReservedNameBody,
+        WwiseBaseNameRejectReason.NonAsciiChars => UiStrings.DialogRenameNonAsciiBody,
+        WwiseBaseNameRejectReason.SymbolChars => UiStrings.DialogRenameSymbolBody,
         _ => UiStrings.DialogRenameFailedBody,
     };
 

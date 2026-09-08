@@ -1,12 +1,4 @@
-﻿using MgaWwiseIMImporter.Domain;
-
-namespace MgaWwiseIMImporter.UI;
-
-internal static class PlaylistUiNames
-{
-    /// <summary>Exit Source At ラジオの表示名。</summary>
-    public static string ToUiName(this PlaylistExitSourceMode mode) => UiStrings.LabelExitSource(mode);
-}
+﻿namespace MgaWwiseIMImporter.UI;
 
 [Flags]
 internal enum UiInteractionLock
@@ -15,15 +7,13 @@ internal enum UiInteractionLock
     SourceNameEdit = 1,
     Export = 2,
     Load = 4,
-    MarkerOptionsEdit = 8,
-    MarkerCommentEdit = 16,
+    MarkerCommentEdit = 8,
 }
 
 /// <summary>ログ行の色分けセクション（MainWindow / ExportGlassOverlay 共通）。</summary>
 internal enum LogColorSection
 {
     Default,
-    Header,
     Warning,
     Error,
 }

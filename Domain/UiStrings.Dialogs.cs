@@ -23,14 +23,15 @@ internal static partial class UiStrings
         "Cannot rename");
 
     public static string DialogRenameFailedBody => Get(
-        "ファイル名として使用できる、拡張子なしの名前を入力してください。"
+        "半角英数字とアンダースコア（_）だけの名前を入力してください。"
         + Environment.NewLine
-        + "（ \\ / : * ? \" < > | や制御文字、末尾の . ／空白、CON／COM1 などの予約名は不可）"
+        + "（先頭の数字、CON／COM1 などの予約名は不可。半角の記号・スペースは _ に置換されます）"
         + Environment.NewLine
         + "元の名前に戻します。",
-        "Enter a valid file name without extension."
+        "Enter a name using only half-width letters, digits, and underscores (_)."
         + Environment.NewLine
-        + "(Cannot use \\ / : * ? \" < > |, control chars, trailing . / spaces, or reserved names such as CON / COM1.)"
+        + "(A leading digit and reserved names such as CON / COM1 are not allowed."
+        + " Half-width symbols and spaces are replaced with _.)"
         + Environment.NewLine
         + "Reverting to the previous name.");
 
@@ -42,10 +43,33 @@ internal static partial class UiStrings
         "CON／PRN／COM1 など Windows の予約名は使えません。元の名前に戻します。",
         "Windows reserved names such as CON / PRN / COM1 cannot be used. Reverting to the previous name.");
 
+    public static string DialogRenameNonAsciiBody => Get(
+        "半角カナは使えません。日本語はそのままで構いません（State Group 名だけ Multi_Wave 等へ落とします）。"
+        + Environment.NewLine
+        + "元の名前に戻します。",
+        "Half-width katakana cannot be used. Japanese is fine"
+        + " (only the State Group name falls back to Multi_Wave or similar)."
+        + Environment.NewLine
+        + "Reverting to the previous name.");
+
+    public static string DialogRenameSymbolBody => Get(
+        "半角の記号・スペースはアンダースコア（_）に置換しても、この名前は使えません。"
+        + Environment.NewLine
+        + "元の名前に戻します。",
+        "This name cannot be used even after replacing half-width symbols and spaces with _."
+        + Environment.NewLine
+        + "Reverting to the previous name.");
+
     public static string LogRenameReverted(string attemptedName) => Format(
         "Message : 名前「{0}」は使えないため、元の名前に戻しました。",
         "Message : Reverted the name; “{0}” cannot be used.",
         attemptedName);
+
+    public static string LogRenameSpacesConverted(string fromName, string toName) => Format(
+        "Message : 半角の記号・スペースを _ に置換しました: 「{0}」→「{1}」",
+        "Message : Replaced half-width symbols / spaces with _: “{0}” → “{1}”",
+        fromName,
+        toName);
 
     public static string LogDropNameStartsWithDigit(string baseName) => Format(
         "Message : Wwise では先頭が数字の名前を使えません（拒否）: {0}",
@@ -53,8 +77,9 @@ internal static partial class UiStrings
         baseName);
 
     public static string LogDropNameInvalidFileName(string baseName) => Format(
-        "Message : ファイル名として不適切な文字を含むため拒否: {0}",
-        "Message : Rejected because the name contains characters invalid for a file name: {0}",
+        "Message : ファイル名（拡張子を除く）に使えない文字（ : < > * ? \" \\ / | . % や制御文字）を含むため拒否: {0}",
+        "Message : Rejected because the base name contains forbidden characters"
+        + " ( : < > * ? \" \\ / | . % or control chars): {0}",
         baseName);
 
     public static string LogDropNameReservedWindows(string baseName) => Format(

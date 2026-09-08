@@ -89,6 +89,7 @@
           <ol>
             <li><a href="#log-tips">Log / Tips</a></li>
             <li><a href="#fade-options">Fade In / Fade Out / Options</a></li>
+            <li><a href="#additive-layer">Additive Layer order</a></li>
             <li><a href="#group-exit">Group Fade / Exit Source At / Chg Occ At</a></li>
             <li><a href="#playlist-list">Music Playlist list</a></li>
             <li><a href="#more-options">More Options</a></li>
@@ -210,7 +211,7 @@
       </ul>
       <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the Wwise-side implementation is still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
       <div class="note">
-        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>), are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, …), or contain characters invalid in a file name are rejected at load. <strong>When you drop several files at once, if even one name is invalid, every file is rejected</strong> (the app does not load the valid ones and leave a single error buried in the log). When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
+        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>), are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, …), or contain the <strong>forbidden characters <code>: &lt; &gt; * ? " \ / | . %</code></strong> (including control characters; a <code>.</code> inside the base name is also rejected, e.g. <code>Song.v2.wav</code>) are rejected at load. <strong>When you drop several files at once, if even one name is invalid, every file is rejected</strong> (the app does not load the valid ones and leave a single error buried in the log). When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
       </div>
 
       <h3 id="prepare-xml">4-2. Method A: preparing a Nuendo / Cubase XML</h3>
@@ -356,8 +357,9 @@
       <ul>
         <li>Sample rate / channel count / bit depth / format must match (mismatch aborts load)</li>
         <li>Per-file embedded markers / sustain loops (smpl) follow the same rules as Wave-only (sustain Start/End → <code>-L</code>/<code>-E</code> preferred; same-timing markers discarded)</li>
+        <li>Playlists are listed in <strong>filename ascending order</strong>. With <span class="ui">Additive Layer</span>, the first playlist is the parent (the bed), so name files so the bed comes before overlays (see <a href="#additive-layer">chapter 11</a>)</li>
         <li>In grouped playlists (vertical layers), markers are projected from the group's anchor playlist onto every member (shown translucent on the synced ones), and <strong>adding, deleting, and moving markers (including pair moves) stay in sync automatically</strong>. Aligning the loop points of all layers takes a single operation — a major highlight</li>
-        <li>You can double-click the waveform name to edit it. If that name is valid for a State Group (ASCII, etc.), it is used for the Music Switch / group State Group. If it contains 2-byte characters, only the parent name falls back to <code>Multi_Wave</code> (<code>Multi_Wave_2</code>… if that already exists). Playlist names keep the dropped file names</li>
+        <li>You can double-click the waveform name to edit it. Half-width symbols and spaces are replaced with <code>_</code>. Japanese is allowed. If the name contains 2-byte characters, only the parent name falls back to <code>Multi_Wave</code> (<code>Multi_Wave_2</code>… if that already exists). Playlist names keep the dropped file names (see <a href="#waveform">chapter 9</a>)</li>
         <li>Export keeps original file names where possible and may reuse source WAVs</li>
         <li>If any file has a matching XML, this mode is not used—pair processing applies instead</li>
       </ul>
@@ -451,7 +453,7 @@
       <p>Measure / Tempo / Signature / Marker lanes, waveform, then Music Segment Name / Music Playlist Name (bar lanes are inactive without XML).</p>
       <ul>
         <li>Click/drag to seek</li>
-        <li>Double-click the waveform name to edit the base name (also in multi-wave mode). Names that start with a digit, Windows reserved names, or invalid file-name characters are not committed: the previous name is restored and an error is shown. Clearing the field restores the original file name. Japanese names are allowed</li>
+        <li>Double-click the waveform name to edit the base name (also in multi-wave mode). Half-width symbols and spaces (such as <code>()</code>, <code>-</code>, and <code>[]</code>) are automatically replaced with <code>_</code>. Japanese is allowed (only the State Group name falls back to <code>Multi_Wave</code> or similar). You do not need to rename the file on disk. Half-width katakana, a leading digit, and Windows reserved names are not committed: a dialog explains why and the previous display name is restored. Clearing the field restores the original file name (after the same replacement)</li>
         <li>Double-click the timeline to zoom into the Music Playlist under the cursor (back to full view when only one intersects)</li>
         <li><kbd>H</kbd> / <span class="ui">SIZE</span> on TRANSPORT cycles waveform height 1×→2×→3×</li>
         <li>White-triangle edge fades are nondestructive and become MusicClip Fade on EXPORT</li>
@@ -477,10 +479,24 @@
           <tr><td class="ui">Fade In</td><td><code>None / 0.5 / 1.0 / 3.0 / 6.0 Sec.</code> (default None). Curve icon picks MusicFade curve. EXPORT → Destination Fade-in.</td></tr>
           <tr><td class="ui">Fade Out</td><td>Same seconds. EXPORT → Source Fade-out.</td></tr>
           <tr><td class="ui">Options / Play -E</td><td>Default off. EXPORT → Play post-exit on the playlist container's default rule (Any to Any), and on the switch's Any → Object rules for multi-part.</td></tr>
-          <tr><td class="ui">Options / Additive Layer</td><td>Default off. Per group. Additive playback (normal click toggles overlay). EXPORT uses cumulative State Volume (e.g. A = first only, B = both).</td></tr>
+          <tr><td class="ui">Options / Additive Layer</td><td>Default off. Per group. Additive playback (normal click toggles overlay). EXPORT uses cumulative State Volume (e.g. A = first only, B = first + second). <strong>The first playlist in the list is the parent</strong> (see <a href="#additive-layer">order</a>).</td></tr>
         </tbody>
       </table>
       <p>Normal Fade In / Fade Out / Exit Source At / Play -E / Additive Layer are shared within the same group ID.</p>
+      <div class="note" id="additive-layer">
+        <p><strong>Additive Layer and playlist order</strong>: In this mode the first playlist in the list is the parent (the bed that always plays), and later playlists stack on top of it. EXPORT writes State Volumes in the same order (first = State A plays one track; second = State B plays first + second; …). In multi-wave mode playlists are listed in <strong>filename ascending order</strong>. If that order is the opposite of what you intended, the Wwise implementation can sound as if nothing is transitioning.</p>
+        <p>For example, with these two files <code>battle</code> sorts before <code>normal</code>, so the battle track becomes the parent and the field track stacks on top of it:</p>
+        <ul>
+          <li><code>bgm_field_battle</code></li>
+          <li><code>bgm_field_normal</code></li>
+        </ul>
+        <p>To keep the field as the bed and battle as the overlay, lock the order in the file names:</p>
+        <ul>
+          <li><code>bgm_field_1_normal</code></li>
+          <li><code>bgm_field_2_battle</code></li>
+        </ul>
+        <p>If you cannot rename the files, reassign each State’s volumes in Wwise after EXPORT.</p>
+      </div>
       <h3 id="group-exit">Group Fade / Exit Source At / Chg Occ At</h3>
       <table>
         <thead><tr><th>UI</th><th>Details</th></tr></thead>
@@ -494,7 +510,7 @@
       <ul>
         <li>Click to transition. While playing, follows Exit Source At. Same-group uses Same Time; otherwise Entry Cue</li>
         <li><kbd>Shift</kbd> group / <kbd>Ctrl</kbd> ungroup / <kbd>Ctrl</kbd>+<kbd>Shift</kbd> exclude (<code>Excluded Region n</code>)</li>
-        <li>Layer on/off inside a group … with <span class="ui">Additive Layer</span> on, click a playlist in the playing group (max 8, Group Fade)</li>
+        <li>Layer on/off inside a group … with <span class="ui">Additive Layer</span> on, click a playlist in the playing group (max 8, Group Fade). The first playlist is the parent (see <a href="#additive-layer">order</a>)</li>
         <li><span class="ui">Compact Num.</span> renumbers export IDs (default off)</li>
       </ul>
       <h3 id="more-options">More Options</h3>
@@ -528,14 +544,14 @@
       <ul>
         <li>One part or one group → one Music Playlist Container</li>
         <li>Two or more playlists → Music Switch Container + matching State Group (location: <a href="#export-state-group">13-1</a>)</li>
-        <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…; same location)</li>
+        <li>Group (2+ parts) → multiple Music Tracks in one Music Segment + group State Group (A/B/C…; same location). With <span class="ui">Additive Layer</span> on, State Volume accumulates from the first playlist in the list (first only / first + second / …). The wrong order can make transitions inaudible (see <a href="#additive-layer">chapter 11</a>)</li>
         <li>Any → Any (Exit Source At = Immediate) plus per-playlist Any → Object (Fade / Exit Source At / Play post-exit)</li>
         <li>Default rule (Any to Any) inside each playlist container → Play post-exit follows Play -E</li>
         <li>Edge fades → MusicClip Fade; Keep Layer Balance → Make-Up Gain</li>
         <li>Nuendo/Cubase XML single markers → Custom Cues; tempo/signature Override on Music Segments</li>
       </ul>
       <div class="note">
-        <p><strong>Names and fallbacks</strong>: Playlist and Segment names can stay in Japanese. Only State Group names cannot use 2-byte characters. Usable names are kept; only Switch States whose Playlist name is unusable become <code>Music_N</code> (other names are not forced to <code>Music_1</code>). In multi-wave with a single playlist (a group), the group State Group uses the renamed waveform name. Wwise rejects names that start with a digit on Switch, Playlist, Segment, Track, and State Group, so the app blocks them when you confirm a rename and again before EXPORT. The <code>Music_N</code> fallback applies only to Switch State names — it cannot save Segment names such as <code>1aaa_1</code>.</p>
+        <p><strong>Names and fallbacks</strong>: Playlist and Segment names can stay in Japanese. Only State Group names cannot use 2-byte characters. Usable names are kept; only Switch States whose Playlist name is unusable become <code>Music_N</code> (other names are not forced to <code>Music_1</code>). In multi-wave with a single playlist (a group), the group State Group uses the renamed waveform name. Renames allow Japanese and replace half-width symbols / spaces with <code>_</code> (see <a href="#waveform">chapter 9</a>). Wwise rejects names that start with a digit on Switch, Playlist, Segment, Track, and State Group, so the app blocks them when you confirm a rename and again before EXPORT. The <code>Music_N</code> fallback applies only to Switch State names — it cannot save Segment names such as <code>1aaa_1</code>. Also note that Wwise lowercases State / Switch names before hashing them into runtime IDs (ShortID), so <strong>names that differ only in letter case (e.g. <code>BGM_A</code> and <code>bgm_a</code>) are treated as the same at runtime</strong>. Do not rely on case alone to distinguish names.</p>
       </div>
       <div class="note">
         <p><strong>Watch out for same-name files</strong>: if the export path already contains WAVs with the same names, EXPORT <strong>overwrites them without asking</strong>.</p>
@@ -591,11 +607,15 @@
           </tr>
           <tr>
             <td>File-name error at load / valid files were rejected too</td>
-            <td>The file name (without extension) becomes the Wwise object name, so names starting with a digit (e.g. <code>01_Battle</code>) or Windows reserved names (<code>CON</code>, etc.) are rejected. <strong>When dropping several files, if even one name is invalid, every file is rejected</strong>, including the valid ones. Check the log and drop only files with usable names.</td>
+            <td>The file name (without extension) becomes the Wwise object name, so names starting with a digit (e.g. <code>01_Battle</code>), Windows reserved names (<code>CON</code>, etc.), or the forbidden characters <code>: &lt; &gt; * ? " \ / | . %</code> (including control characters) are rejected. <strong>When dropping several files, if even one name is invalid, every file is rejected</strong>, including the valid ones. Check the log and drop only files with usable names.</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Additive Layer</span> transitions are barely audible</td>
+            <td>The first playlist in the list is the parent (the bed). In multi-wave mode that order is filename ascending, so <code>bgm_field_battle</code> plus <code>bgm_field_normal</code> stacks the field on top of battle. To put the bed first, rename to <code>bgm_field_1_normal</code> / <code>bgm_field_2_battle</code>, or reassign State volumes in Wwise after EXPORT. See <a href="#additive-layer">chapter 11</a>.</td>
           </tr>
           <tr>
             <td>Renaming the waveform name reverts</td>
-            <td>Names that start with a digit, Windows reserved names, or invalid file-name characters cannot be committed. A dialog explains why and the previous name is restored. Clearing the field restores the original file name. Japanese is allowed (at EXPORT, names that cannot be a State Group fall back to <code>Music_N</code> / <code>Multi_Wave</code>).</td>
+            <td>Half-width symbols and spaces are automatically replaced with <code>_</code>. Japanese is allowed. Half-width katakana, a leading digit, and Windows reserved names cannot be committed: a dialog explains why and the previous display name is restored. Clearing the field restores the original file name (after the same replacement). At EXPORT, names that cannot be a State Group fall back to <code>Music_N</code> / <code>Multi_Wave</code>.</td>
           </tr>
           <tr>
             <td>“Regions overlap” error</td>

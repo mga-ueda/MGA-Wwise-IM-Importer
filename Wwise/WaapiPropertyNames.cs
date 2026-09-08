@@ -1,9 +1,6 @@
 ﻿namespace MgaWwiseIMImporter.Wwise;
 
-/// <summary>
-/// WAAPI object.set 用の @ プロパティ名と、
-/// setProperty / setReference / WWU PropertyList 用の bare 名。
-/// </summary>
+/// <summary>WAAPI object.set 用の @ プロパティ名。</summary>
 internal static class WaapiPropertyNames
 {
     public const string Arguments = "@Arguments";
@@ -44,27 +41,4 @@ internal static class WaapiPropertyNames
     public const string TimeSignatureLower = "@TimeSignatureLower";
     public const string TimeSignatureUpper = "@TimeSignatureUpper";
     public const string TransitionRoot = "@TransitionRoot";
-
-    public static class Bare
-    {
-        public const string BeginTrimOffset = "BeginTrimOffset";
-        public const string DestinationContextObject = "DestinationContextObject";
-        public const string DestinationContextType = "DestinationContextType";
-        public const string DestinationFadeIn = "DestinationFadeIn";
-        public const string EnableDestinationFadeIn = "EnableDestinationFadeIn";
-        public const string EnableSourceFadeOut = "EnableSourceFadeOut";
-        public const string EndTrimOffset = "EndTrimOffset";
-        public const string FadeInDuration = "FadeInDuration";
-        public const string FadeInMode = "FadeInMode";
-        public const string FadeInShape = "FadeInShape";
-        public const string FadeOutDuration = "FadeOutDuration";
-        public const string FadeOutMode = "FadeOutMode";
-        public const string FadeOutShape = "FadeOutShape";
-        public const string MusicSyncType = "MusicSyncType";
-        public const string PlayAt = "PlayAt";
-        public const string PlaySourcePostExit = "PlaySourcePostExit";
-        public const string SourceContextType = "SourceContextType";
-        public const string SourceFadeOut = "SourceFadeOut";
-        public const string Volume = "Volume";
-    }
 }

@@ -36,6 +36,35 @@ public class DroppedFilesProcessorTests
     }
 
     [Fact]
+    public void Process_PercentAndDotNames_RejectsEntireDrop()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "mga-drop-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var valid = TestWavFactory.WriteSilentPcm16Mono(
+                Path.Combine(dir, "battle.wav"), 48000, 480);
+            var percent = TestWavFactory.WriteSilentPcm16Mono(
+                Path.Combine(dir, "bad%name.wav"), 48000, 480);
+            var dotted = TestWavFactory.WriteSilentPcm16Mono(
+                Path.Combine(dir, "bad.take2.wav"), 48000, 480);
+
+            var report = DroppedFilesProcessor.Process(
+                [valid, percent, dotted],
+                out var preview);
+
+            Assert.Null(preview);
+            Assert.Contains(UiStrings.LogDropNameInvalidFileName("bad%name"), report);
+            Assert.Contains(UiStrings.LogDropNameInvalidFileName("bad.take2"), report);
+            Assert.Contains(UiStrings.LogDropAllRejectedDueToInvalidName, report);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Process_TwoValidWaves_LoadsMultiWave()
     {
         var dir = Path.Combine(Path.GetTempPath(), "mga-drop-" + Guid.NewGuid().ToString("N"));

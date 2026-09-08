@@ -89,6 +89,7 @@
           <ol>
             <li><a href="#log-tips">ログ／Tips</a></li>
             <li><a href="#fade-options">Fade In／Fade Out／Options</a></li>
+            <li><a href="#additive-layer">Additive Layer の並び順</a></li>
             <li><a href="#group-exit">Group Fade／Exit Source At／Chg Occ At</a></li>
             <li><a href="#playlist-list">Music Playlist 一覧</a></li>
             <li><a href="#more-options">More Options</a></li>
@@ -210,7 +211,7 @@
       </ul>
       <p>なお、マーカーが全く無い WAV でも読み込めます。その場合はアプリ内でループマーカーを打つことになり、手順としては波形エディタでループを打ち込む作業と大差なくなりますが、それでも Wwise 実装は自動化され、ループ位置も取りやすい設計です。可能であれば、マーカーを含めた書き出し（方式 B）までは済ませておくことをおすすめします。</p>
       <div class="note">
-        <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）、<strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）、ファイル名に使えない文字は読み込みエラーになります。<strong>複数ファイルを同時にドロップしたとき、不正な名前が 1 件でも混ざっていると、正しいファイルも含めてすべて拒否します</strong>（ログの 1 件を見過ごして残りだけ読み込む、ということはしません）。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
+        <p><strong>WAV の共通条件</strong>: 非圧縮 PCM の <code>.wav</code> を使ってください。ファイル名（拡張子を除く）はそのまま Wwise のオブジェクト名になるため、<strong>数字始まり</strong>（例: <code>01_Battle.wav</code>）、<strong>Windows 予約名</strong>（<code>CON</code>、<code>AUX</code> など）、<strong>使えない文字 <code>: &lt; &gt; * ? " \ / | . %</code></strong>（制御文字を含む。基底名の <code>.</code> も不可。例: <code>Song.v2.wav</code>）は読み込みエラーになります。<strong>複数ファイルを同時にドロップしたとき、不正な名前が 1 件でも混ざっていると、正しいファイルも含めてすべて拒否します</strong>（ログの 1 件を見過ごして残りだけ読み込む、ということはしません）。複数の WAV を同時にドロップする場合は、サンプルレート・チャンネル数・ビット深度が全ファイルで一致している必要があります。</p>
       </div>
 
       <h3 id="prepare-xml">4-2. 方式 A: Nuendo／Cubase の XML を用意する</h3>
@@ -356,8 +357,9 @@
       <ul>
         <li>Sample Rate／チャンネル数／ビット深度などが一致している必要があります（不一致だと読み込み中止）</li>
         <li>ファイルごとの埋め込みマーカー／サステインループ（smpl）は Wave 単体と同じ規則で処理します（サステインの Start／End → <code>-L</code>／<code>-E</code> 優先。同タイミングのマーカーは破棄）</li>
+        <li>Playlist の並びは<strong>ファイル名の昇順</strong>です。<span class="ui">Additive Layer</span> では先頭が親（土台）になるため、土台 → 上乗せの順になるよう名前を付けてください（→ <a href="#additive-layer">11 章</a>）</li>
         <li>グループ化した Playlist（縦レイヤー）では、マーカーが基準 Playlist から全メンバーへ投影され（同期先には半透明で表示）、<strong>追加・削除・移動（ペア移動を含む）が自動でシンクロ</strong>します。全レイヤーのループ位置を 1 回の操作で揃えられるのが大きな魅力です</li>
-        <li>波形名はダブルクリックで編集できます。State Group に使える名前（ASCII など）なら、その名前が Music Switch／グループ State Group になります。2 バイト文字を含むときは親名だけ <code>Multi_Wave</code>（既存なら <code>Multi_Wave_2</code>…）へ落とします。Playlist 名はドロップ時のファイル名のままです</li>
+        <li>波形名はダブルクリックで編集できます。半角の記号・スペースは <code>_</code> に置換します。日本語はそのまま使えます。State Group に使えない文字（2 バイト）を含むときは親名だけ <code>Multi_Wave</code>（既存なら <code>Multi_Wave_2</code>…）へ落とします。Playlist 名はドロップ時のファイル名のままです（→ <a href="#waveform">9 章</a>）</li>
         <li>書き出しでは可能な範囲で元 WAV を共用し、ファイル名をむやみに改変しません</li>
         <li>1 本でも同名 XML があると、このモードには入らず後述のペア処理になります</li>
       </ul>
@@ -451,7 +453,7 @@
       <p>Measure／Tempo／Signature／Marker レーン、波形、Music Segment Name／Music Playlist Name レーンで構成されます（XML 無しモードでは小節系レーンは使えません）。</p>
       <ul>
         <li>クリック／ドラッグで再生位置を移動</li>
-        <li>波形ファイル名をダブルクリックで基底名を編集（複数波形でも可）。数字始まり・予約名・ファイル名に使えない文字は確定せず元の名前に戻し、エラーを出します。空欄は元のファイル名に戻します。日本語は使えます</li>
+        <li>波形ファイル名をダブルクリックで基底名を編集（複数波形でも可）。半角の記号・スペース（<code>()</code>、<code>-</code>、<code>[]</code> など）は自動で <code>_</code> に置換します。日本語はそのまま使えます（State Group 名だけ <code>Multi_Wave</code> 等へ落とします）。ディスク上の改名は不要です。半角カナ・先頭の数字・Windows 予約名は確定せず、ダイアログで理由を出して直前の表示名に戻します。空欄は元のファイル名（同じ置換をかけた形）に戻します</li>
         <li>タイムラインをダブルクリックで直下 Music Playlist を拡大（交差が 1 件だけなら全体表示へ）</li>
         <li><kbd>H</kbd>／TRANSPORT の <span class="ui">SIZE</span> で波形高さ 1×→2×→3×</li>
         <li>リージョン端の白三角フェードは非破壊。EXPORT 時に MusicClip の Fade へ設定</li>
@@ -477,10 +479,24 @@
           <tr><td class="ui">Fade In</td><td><code>None / 0.5 / 1.0 / 3.0 / 6.0 Sec.</code>（既定 None）。カーブアイコンで MusicFade カーブ選択。EXPORT 時は Destination Fade-in。</td></tr>
           <tr><td class="ui">Fade Out</td><td>同様。EXPORT 時は Source Fade-out。</td></tr>
           <tr><td class="ui">Options / Play -E</td><td>既定オフ。EXPORT 時は Playlist Container 既定ルール（Any to Any）の Play post-exit に反映（複数パート時は Switch の Any → Object にも）。</td></tr>
-          <tr><td class="ui">Options / Additive Layer</td><td>既定オフ。グループ単位。追加再生タイプ（通常クリックで上乗せ／停止）。EXPORT 時は累積 State Volume（例: A=1 本、B=2 本同時）。</td></tr>
+          <tr><td class="ui">Options / Additive Layer</td><td>既定オフ。グループ単位。追加再生タイプ（通常クリックで上乗せ／停止）。EXPORT 時は累積 State Volume（例: A=先頭 1 本、B=先頭＋2 番目）。<strong>一覧の先頭が親</strong>になります（→ <a href="#additive-layer">並び順</a>）。</td></tr>
         </tbody>
       </table>
       <p>通常の Fade In／Fade Out／Exit Source At／Play -E／Additive Layer は同一グループ ID で共有されます。</p>
+      <div class="note" id="additive-layer">
+        <p><strong>Additive Layer と Playlist の並び順</strong>: このモードは「一覧の先頭 Playlist が親（常に鳴る土台）」で、後続はその上に重なる実装です。EXPORT 時の State Volume も同じ順で累積します（先頭＝State A は 1 本だけ、2 番目＝State B は先頭＋2 番目、…）。複数波形モードでは Playlist は<strong>ファイル名の昇順</strong>で並ぶため、この順が意図と違うと、Wwise 上ではほとんど推移していないように聴こえることがあります。</p>
+        <p>たとえば次の 2 本だと、<code>battle</code> が <code>normal</code> より前に来るため、バトル曲が親になり、その上にフィールド曲が重なります。</p>
+        <ul>
+          <li><code>bgm_field_battle</code></li>
+          <li><code>bgm_field_normal</code></li>
+        </ul>
+        <p>フィールドを土台、バトルを上乗せにしたいときは、ファイル名で順を固定してください。</p>
+        <ul>
+          <li><code>bgm_field_1_normal</code></li>
+          <li><code>bgm_field_2_battle</code></li>
+        </ul>
+        <p>並びを変えられないときは、EXPORT 後に Wwise 上で各 State の音量を付け直してください。</p>
+      </div>
       <h3 id="group-exit">Group Fade／Exit Source At／Chg Occ At</h3>
       <table>
         <thead><tr><th>UI</th><th>内容</th></tr></thead>
@@ -494,7 +510,7 @@
       <ul>
         <li>クリックで遷移。再生中は Exit Source At に従う。同一グループ内は Same Time、以外は Entry Cue</li>
         <li><kbd>Shift</kbd> … グループ化（縦レイヤー）／<kbd>Ctrl</kbd> … 解除／<kbd>Ctrl</kbd>+<kbd>Shift</kbd> … 除外（<code>Excluded Region n</code>）</li>
-        <li>グループ内上乗せ／停止 … <span class="ui">Additive Layer</span> オン時、再生中の同一グループ内を通常クリック（最大 8、Group Fade）</li>
+        <li>グループ内上乗せ／停止 … <span class="ui">Additive Layer</span> オン時、再生中の同一グループ内を通常クリック（最大 8、Group Fade）。先頭 Playlist が親になる（→ <a href="#additive-layer">並び順</a>）</li>
         <li><span class="ui">Compact Num.</span> … 書き出し番号を詰める（既定オフ）</li>
       </ul>
       <h3 id="more-options">More Options</h3>
@@ -528,14 +544,14 @@
       <ul>
         <li>パートまたはグループ 1 つ → Music Playlist Container 1 つ</li>
         <li>Playlist が 2 つ以上 → Music Switch Container ＋ 同名 State Group（作成先は <a href="#export-state-group">13-1</a>）</li>
-        <li>グループ（2 パート以上）→ 1 Music Segment 内の複数 Music Track ＋ グループ State Group（A／B／C…。作成先は同じ）</li>
+        <li>グループ（2 パート以上）→ 1 Music Segment 内の複数 Music Track ＋ グループ State Group（A／B／C…。作成先は同じ）。<span class="ui">Additive Layer</span> オン時は State Volume を Playlist 一覧の先頭から累積（先頭だけ／先頭＋2 番目…）。並びが逆だと推移が聴こえないことがある（→ <a href="#additive-layer">11 章</a>）</li>
         <li>Any → Any（Exit Source At = Immediate）と各 Playlist 向け Any → Object（Fade／Exit Source At／Play post-exit）</li>
         <li>各 Playlist Container 内の既定ルール（Any to Any）→ Play -E に応じた Play post-exit</li>
         <li>リージョン端フェード → MusicClip Fade／Keep Layer Balance → Make-Up Gain</li>
         <li>Nuendo／Cubase XML モードの単発マーカー → Custom Cue。テンポ・拍子は Music Segment で Override</li>
       </ul>
       <div class="note">
-        <p><strong>名前とフォールバック</strong>: Playlist／Segment は日本語のまま作れます。State Group 名だけ 2 バイト文字を扱えません。使える名前はそのまま使い、使えない Playlist の Switch State だけ <code>Music_N</code> にします（全部を <code>Music_1</code> に揃えたりしません）。複数波形で Playlist が 1 つ（グループ化）のときは、グループ State Group にリネームした波形名を使います。数字始まりの名前は Wwise が Switch／Playlist／Segment／Track／State Group のいずれも拒否するため、リネーム確定時と EXPORT 前に止めます。<code>Music_N</code> への差し替えは Switch State 名だけなので、Segment 名まで救うことはできません。</p>
+        <p><strong>名前とフォールバック</strong>: Playlist／Segment は日本語のまま作れます。State Group 名だけ 2 バイト文字を扱えません。使える名前はそのまま使い、使えない Playlist の Switch State だけ <code>Music_N</code> にします（全部を <code>Music_1</code> に揃えたりしません）。複数波形で Playlist が 1 つ（グループ化）のときは、グループ State Group にリネームした波形名を使います。リネームでは日本語を許可し、半角の記号・スペースは <code>_</code> に置換します（→ <a href="#waveform">9 章</a>）。数字始まりの名前は Wwise が Switch／Playlist／Segment／Track／State Group のいずれも拒否するため、リネーム確定時と EXPORT 前に止めます。<code>Music_N</code> への差し替えは Switch State 名だけなので、Segment 名まで救うことはできません。また、Wwise は State／Switch などの名前を小文字化してハッシュ ID（ShortID）にするため、<strong>大文字小文字だけが違う名前（例: <code>BGM_A</code> と <code>bgm_a</code>）は実行時に同じものとして扱われます</strong>。名前の区別に大文字小文字だけの差を使わないでください。</p>
       </div>
       <div class="note">
         <p><strong>同名ファイルの上書きに注意</strong>: 書き出しパスに同名の WAV がある場合、EXPORT は<strong>確認なしで上書き</strong>しますので、ご注意ください。</p>
@@ -591,11 +607,15 @@
           </tr>
           <tr>
             <td>ファイル名のエラーで読み込めない／正しいファイルまで拒否される</td>
-            <td>ファイル名（拡張子を除く）は Wwise オブジェクト名になるため、数字始まり（例: <code>01_Battle</code>）と Windows 予約名（<code>CON</code> など）は使えません。<strong>複数ドロップ時は不正な名前が 1 件でもあると、正しいファイルも含めてすべて拒否します</strong>。ログを確認し、使える名前だけをドロップし直してください。</td>
+            <td>ファイル名（拡張子を除く）は Wwise オブジェクト名になるため、数字始まり（例: <code>01_Battle</code>）、Windows 予約名（<code>CON</code> など）、使えない文字 <code>: &lt; &gt; * ? " \ / | . %</code>（制御文字を含む）は使えません。<strong>複数ドロップ時は不正な名前が 1 件でもあると、正しいファイルも含めてすべて拒否します</strong>。ログを確認し、使える名前だけをドロップし直してください。</td>
+          </tr>
+          <tr>
+            <td><span class="ui">Additive Layer</span> で推移がほとんど聴こえない</td>
+            <td>一覧の先頭 Playlist が親（土台）です。複数波形ではファイル名の昇順なので、<code>bgm_field_battle</code> と <code>bgm_field_normal</code> だとバトルの上にフィールドが重なります。土台を先にしたいときは <code>bgm_field_1_normal</code>／<code>bgm_field_2_battle</code> のように名前を変えるか、EXPORT 後に Wwise 上で State の音量を付け直してください。→ <a href="#additive-layer">11 章</a></td>
           </tr>
           <tr>
             <td>波形名のリネームが元に戻る</td>
-            <td>数字始まり、Windows 予約名、ファイル名に使えない文字は確定できません。ダイアログで理由を出し、表示は元の名前に戻します。空欄は元のファイル名です。日本語は使えます（State Group に使えないときは EXPORT 時に <code>Music_N</code>／<code>Multi_Wave</code> へ落とします）。</td>
+            <td>半角の記号・スペースは自動で <code>_</code> に置換します。日本語はそのまま使えます。半角カナ・先頭の数字・Windows 予約名は確定できず、ダイアログで理由を出して直前の表示名に戻します。空欄は元のファイル名（同じ置換をかけた形）です。State Group に使えないときは EXPORT 時に <code>Music_N</code>／<code>Multi_Wave</code> へ落とします。</td>
           </tr>
           <tr>
             <td>「リージョンが重なっています」のエラー</td>

@@ -89,6 +89,112 @@ internal static class WwiseObjectNames
     }
 
     /// <summary>
+    /// リネーム名の正規化と検証。
+    /// 半角英数字と <c>_</c> 以外の ASCII（スペース・括弧・ハイフン等）は <c>_</c> へ置換する。
+    /// 日本語などの 2 バイト文字は表示名として許可し、State Group は
+    /// <see cref="ResolveMultiWaveContainerName"/> 側で <c>Multi_Wave</c> へ落とす。
+    /// 半角カナは不可。先頭の数字も不可（Wwise が拒否）。
+    /// Windows 予約名は書き出し WAV 名を兼ねるため不可。
+    /// </summary>
+    public static bool TryNormalizeRenameName(
+        string? name,
+        out string normalized,
+        out WwiseBaseNameRejectReason reason)
+    {
+        normalized = (name ?? string.Empty).Trim();
+        if (normalized.Length == 0)
+        {
+            reason = WwiseBaseNameRejectReason.Empty;
+            return false;
+        }
+
+        // 救済: ドロップ可能な ASCII 記号は _ に置換してから再判定する。
+        normalized = SalvageRenameSeparatorChars(normalized);
+
+        if (StartsWithDigit(normalized))
+        {
+            reason = WwiseBaseNameRejectReason.StartsWithDigit;
+            return false;
+        }
+
+        foreach (var ch in normalized)
+        {
+            if (!char.IsAscii(ch))
+            {
+                // 日本語は許可。半角カナだけは State Group／表示のどちらでも使わない。
+                if (IsHalfwidthKatakana(ch))
+                {
+                    reason = WwiseBaseNameRejectReason.NonAsciiChars;
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (!char.IsAsciiLetterOrDigit(ch) && ch != '_')
+            {
+                reason = WwiseBaseNameRejectReason.SymbolChars;
+                return false;
+            }
+        }
+
+        if (IsReservedWindowsFileName(normalized))
+        {
+            reason = WwiseBaseNameRejectReason.ReservedWindowsName;
+            return false;
+        }
+
+        reason = WwiseBaseNameRejectReason.None;
+        return true;
+    }
+
+    /// <summary>
+    /// ファイル名では使えるが State Group では使えない ASCII 記号を <c>_</c> にする。
+    /// 非 ASCII はそのまま残し、呼び出し側で拒否する。連続・末尾の <c>_</c> は畳む。
+    /// </summary>
+    private static string SalvageRenameSeparatorChars(string value)
+    {
+        var buffer = new char[value.Length];
+        var length = 0;
+        var lastUnderscore = false;
+        foreach (var ch in value)
+        {
+            if (!char.IsAscii(ch))
+            {
+                buffer[length++] = ch;
+                lastUnderscore = false;
+                continue;
+            }
+
+            if (char.IsAsciiLetterOrDigit(ch) || ch == '_')
+            {
+                buffer[length++] = ch;
+                lastUnderscore = ch == '_';
+                continue;
+            }
+
+            if (lastUnderscore)
+            {
+                continue;
+            }
+
+            buffer[length++] = '_';
+            lastUnderscore = true;
+        }
+
+        // song(loop) → song_loop_ にならないよう、救済で付いた末尾 _ だけ落とす。
+        while (length > 1 && buffer[length - 1] == '_')
+        {
+            length--;
+        }
+
+        return new string(buffer, 0, length);
+    }
+
+    /// <summary>半角カナ（U+FF61..FF9F）。UTF-8 では非 ASCII。</summary>
+    private static bool IsHalfwidthKatakana(char ch) => ch is >= '\uFF61' and <= '\uFF9F';
+
+    /// <summary>
     /// Wwise の State / State Group 名として使えない文字（2 バイト文字＝非 ASCII）を含むか。
     /// Wwise は該当文字を <c>_</c> に置換するため、パス参照がずれる。
     /// </summary>
@@ -102,22 +208,6 @@ internal static class WwiseObjectNames
         foreach (var ch in name)
         {
             if (!char.IsAscii(ch))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// ドロップファイル名など、State 名の候補に 2 バイト文字が 1 つでもあれば true。
-    /// </summary>
-    public static bool ShouldUseFallbackSwitchStateNames(IEnumerable<string?> names)
-    {
-        foreach (var name in names)
-        {
-            if (ContainsUnusableStateNameChars(name))
             {
                 return true;
             }
@@ -328,6 +418,13 @@ internal static class WwiseObjectNames
             return true;
         }
 
+        // 基底名（拡張子除く）の . は Wwise オブジェクト名／拡張子解釈が壊れるため不可。
+        // % はパイプラインの変数展開と衝突しやすいため不可。
+        if (name.Contains('.') || name.Contains('%'))
+        {
+            return true;
+        }
+
         if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
             return true;
@@ -353,4 +450,10 @@ internal enum WwiseBaseNameRejectReason
     StartsWithDigit,
     InvalidFileNameChars,
     ReservedWindowsName,
+
+    /// <summary>2 バイト文字・半角カナなど非 ASCII（リネーム検証のみ）。</summary>
+    NonAsciiChars,
+
+    /// <summary>アンダースコア以外の記号（リネーム検証のみ）。</summary>
+    SymbolChars,
 }

@@ -16,11 +16,62 @@ public class WwiseObjectNamesTests
         Assert.Equal(expected, WwiseObjectNames.ContainsUnusableStateNameChars(name));
     }
 
-    [Fact]
-    public void ShouldUseFallbackSwitchStateNames_TrueIfAnyNameHasTwoByteChars()
+    [Theory]
+    [InlineData("Battle", "Battle")]
+    [InlineData("jingle_04", "jingle_04")]
+    [InlineData("_intro", "_intro")]
+    [InlineData("My Song", "My_Song")]
+    [InlineData("  loop  ", "loop")]
+    [InlineData("a b c", "a_b_c")]
+    [InlineData("song(loop)", "song_loop")]
+    [InlineData("song (loop)", "song_loop")]
+    [InlineData("bgm_field(battle)", "bgm_field_battle")]
+    [InlineData("(intro)", "_intro")]
+    [InlineData("boss-final", "boss_final")]
+    [InlineData("BGM [Loop]", "BGM_Loop")]
+    [InlineData("take-02", "take_02")]
+    [InlineData("boss!", "boss")]
+    [InlineData("king's", "king_s")]
+    [InlineData("a+b&c", "a_b_c")]
+    [InlineData("take.2", "take_2")]
+    [InlineData("ジングル03", "ジングル03")]
+    [InlineData("荒廃したタカマガハラ", "荒廃したタカマガハラ")]
+    [InlineData("荒廃したタカマガハラ_a (aaa)", "荒廃したタカマガハラ_a_aaa")]
+    [InlineData("荒廃したタカマガハラ_b (bbb)", "荒廃したタカマガハラ_b_bbb")]
+    [InlineData("jingle（宝箱）", "jingle（宝箱）")]
+    public void TryNormalizeRenameName_AcceptsAsciiWordChars(string input, string expected)
     {
-        Assert.False(WwiseObjectNames.ShouldUseFallbackSwitchStateNames(["intro", "loop"]));
-        Assert.True(WwiseObjectNames.ShouldUseFallbackSwitchStateNames(["intro", "ジングル04"]));
+        Assert.True(WwiseObjectNames.TryNormalizeRenameName(input, out var normalized, out var reason));
+        Assert.Equal(expected, normalized);
+        Assert.Equal(WwiseBaseNameRejectReason.None, reason);
+    }
+
+    [Theory]
+    [InlineData("ﾎﾞｽ戦", nameof(WwiseBaseNameRejectReason.NonAsciiChars))] // 半角カナ
+    [InlineData("ﾊﾞﾄﾙ", nameof(WwiseBaseNameRejectReason.NonAsciiChars))] // 半角カナのみ
+    [InlineData("1battle", nameof(WwiseBaseNameRejectReason.StartsWithDigit))]
+    [InlineData("boss2", nameof(WwiseBaseNameRejectReason.None))] // 数字は先頭以外 OK
+    [InlineData("CON", nameof(WwiseBaseNameRejectReason.ReservedWindowsName))]
+    [InlineData("", nameof(WwiseBaseNameRejectReason.Empty))]
+    [InlineData("   ", nameof(WwiseBaseNameRejectReason.Empty))]
+    [InlineData(null, nameof(WwiseBaseNameRejectReason.Empty))]
+    public void TryNormalizeRenameName_RejectsUnusableNames(
+        string? input,
+        string expectedReasonName)
+    {
+        var expectedReason = Enum.Parse<WwiseBaseNameRejectReason>(expectedReasonName);
+        var ok = WwiseObjectNames.TryNormalizeRenameName(input, out _, out var reason);
+        Assert.Equal(expectedReason == WwiseBaseNameRejectReason.None, ok);
+        Assert.Equal(expectedReason, reason);
+    }
+
+    [Theory]
+    [InlineData("song.v2")] // 基底名の . は不可
+    [InlineData("song%take")] // % は不可
+    public void TryValidateBaseName_RejectsDotAndPercent(string name)
+    {
+        Assert.False(WwiseObjectNames.TryValidateBaseName(name, out var reason));
+        Assert.Equal(WwiseBaseNameRejectReason.InvalidFileNameChars, reason);
     }
 
     [Theory]

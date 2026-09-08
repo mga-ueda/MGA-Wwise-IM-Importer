@@ -622,8 +622,10 @@ public partial class MainWindow
 
     private string BuildNamingSourcePath(string sourcePath)
     {
-        var baseName = _sourceBaseNameOverride;
-        if (string.IsNullOrWhiteSpace(baseName))
+        var baseName = ResolveSourceDisplayName();
+        var fileName = Path.GetFileNameWithoutExtension(sourcePath);
+        if (string.IsNullOrWhiteSpace(baseName)
+            || string.Equals(baseName, fileName, StringComparison.Ordinal))
         {
             return sourcePath;
         }
