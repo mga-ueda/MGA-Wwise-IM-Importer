@@ -165,7 +165,7 @@
         <li><strong>本アプリを起動する</strong><br />画面下の WAAPI ステータスバーに Wwise のバージョンとプロジェクト名、選択中の作成先が表示されれば接続できています。</li>
         <li><strong>書き出しパスを設定する</strong><br />プロジェクトバーの書き出しパスに、Wwise プロジェクトの <code>Originals</code> フォルダ配下（例: <code>Originals\Music</code>。無ければエクスプローラーで作成）を指定します。</li>
         <li><strong>WAV を 1 本ドラッグ＆ドロップする</strong><br />ログに <code>=== Wave 単体モード ===</code> と表示され、波形が出ます。<kbd>Space</kbd> で再生できます。</li>
-        <li><strong>（ループさせたい場合）マーカーを 2 本打つ</strong><br />波形をクリックしてループ開始位置へシークし、<kbd>Insert</kbd> でマーカーを追加。ループ終了位置でも同様に追加します。<strong>マーカーがちょうど 2 本なら、その間が自動でループ区間になります</strong>（先頭〜1 本目はイントロ、2 本目〜末尾は余韻として扱われます）。マーカーは ▼ のドラッグで微調整できます。</li>
+        <li><strong>（ループさせたい場合）マーカーを 2 本打つ</strong><br />波形をクリックしてループ開始位置へシークし、<kbd>Insert</kbd> または <kbd>M</kbd> でマーカーを追加。ループ終了位置でも同様に追加します。<strong>マーカーがちょうど 2 本なら、その間が自動でループ区間になります</strong>（先頭〜1 本目はイントロ、2 本目〜末尾は余韻として扱われます）。マーカーは ▼ のドラッグで微調整できます。</li>
         <li><strong>聴いて確認する</strong><br /><kbd>Space</kbd> で再生するとループ区間は無限ループします。<kbd>L</kbd> でループエンドの少し手前（1 小節前。小節管理がないときは 3 秒前）へジャンプできるので、つなぎ目の確認に便利です。位置が気になったらマーカーを動かして詰めます。</li>
         <li><strong><span class="ui">EXPORT</span>（または <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>）</strong><br />元 WAV が書き出しパスへコピーされ、Wwise 側に Music Playlist Container 一式が自動生成されます。Wwise 側で再生して確認してみてください。</li>
       </ol>
@@ -306,7 +306,7 @@
       <h3 id="prepare-none">4-4. 方式 C: WAV だけで始める（アプリ内でマーカーを打つ）</h3>
       <p>準備は不要です。<code>.wav</code> をそのままドロップし、アプリ内でマーカーを打って区間を決めます。操作は波形下のマーカーレーンで行います（元の WAV には一切書き込みません）。</p>
       <ul>
-        <li><kbd>Insert</kbd> …… シーク位置にマーカーを追加</li>
+        <li><kbd>Insert</kbd>／<kbd>M</kbd> …… シーク位置にマーカーを追加</li>
         <li>▼ をドラッグ …… マーカーを移動（<kbd>Alt</kbd>＋ドラッグで 1 つ前のマーカーも同量移動——ループ範囲の長さを保ったままのスライドに便利です）</li>
         <li>▼ やコメントをダブルクリック …… 名前（コメント）を編集。<code>-L</code>／<code>-E</code>／<code>-R</code>／<code>-A</code> の意味は方式 B と同じです</li>
         <li><kbd>Delete</kbd> …… 選択したマーカーを削除、<kbd>Ctrl</kbd>+<kbd>Z</kbd>／<kbd>Y</kbd> …… Undo／Redo</li>
@@ -453,7 +453,7 @@
         <li>クリック／ドラッグで再生位置を移動</li>
         <li>波形ファイル名をダブルクリックで基底名を編集（複数波形モードの親名 <code>Multi_Wave</code> は編集不可）</li>
         <li>タイムラインをダブルクリックで直下 Music Playlist を拡大（交差が 1 件だけなら全体表示へ）</li>
-        <li><kbd>Z</kbd>／TRANSPORT の <span class="ui">SIZE</span> で波形高さ 1×→2×→3×</li>
+        <li><kbd>H</kbd>／TRANSPORT の <span class="ui">SIZE</span> で波形高さ 1×→2×→3×</li>
         <li>リージョン端の白三角フェードは非破壊。EXPORT 時に MusicClip の Fade へ設定</li>
       </ul>
 
@@ -463,7 +463,7 @@
         <li><kbd>Space</kbd> … 再生／一時停止。<code>-L</code> 区間は無限ループ</li>
         <li><span class="ui">Play -E</span> オン時、<code>-L</code> 直後に <code>-E</code> があれば Exit をワンショット二重再生（Play post-exit のプレビュー）</li>
         <li><kbd>G</kbd> … 小節ジャンプ（小節情報があるとき）</li>
-        <li><kbd>M</kbd>／位置表示の音符＋テンポ … メトロノームのオン／オフ（既定オフ。テンポ／拍子がある XML 有りモード限定。再生中は波形再生ストリームにサンプル同期で加算。一拍目 High、他拍 Low。オン時は音符とテンポがシアン。ホイールで音量・最大〜10%・10% 刻み・既定 30%・Tips に現在値を約 1 秒表示・音量はアプリ設定に保存／オンオフは起動時オフ）</li>
+        <li><kbd>C</kbd>／位置表示の音符＋テンポ … メトロノームのオン／オフ（既定オフ。テンポ／拍子がある XML 有りモード限定。再生中は波形再生ストリームにサンプル同期で加算。一拍目 High、他拍 Low。オン時は音符とテンポがシアン。ホイールで音量・最大〜10%・10% 刻み・既定 30%・Tips に現在値を約 1 秒表示・音量はアプリ設定に保存／オンオフは起動時オフ）</li>
         <li><kbd>L</kbd> … ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）</li>
       </ul>
 
@@ -614,7 +614,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>約 3 秒前から再生</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>直前の再生開始位置から再生し直し</td></tr>
           <tr><td><kbd>E</kbd></td><td>Play -E のオン／オフ（表示中の Playlist）</td></tr>
-          <tr><td><kbd>M</kbd></td><td>メトロノームのオン／オフ（波形再生位置の拍に同期。テンポ／拍子があるとき）</td></tr>
+          <tr><td><kbd>C</kbd></td><td>メトロノームのオン／オフ（波形再生位置の拍に同期。テンポ／拍子があるとき）</td></tr>
         </tbody>
       </table>
       <h3>シーク／ナビゲーション</h3>
@@ -630,7 +630,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd></td><td>前／次のマーカーへ（マーカー編集が可能なモード）</td></tr>
           <tr><td><kbd>G</kbd></td><td>小節ジャンプ（小節情報があるとき）</td></tr>
           <tr><td><kbd>L</kbd></td><td>ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）</td></tr>
-          <tr><td><kbd>C</kbd>／<kbd>.</kbd></td><td>再生位置を表示の中央へ寄せる（シーク位置は変わらない）</td></tr>
+          <tr><td><kbd>Z</kbd>／<kbd>.</kbd></td><td>再生位置を表示の中央へ寄せる（シーク位置は変わらない）</td></tr>
         </tbody>
       </table>
       <h3>表示／ズーム</h3>
@@ -638,10 +638,10 @@
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
           <tr><td><kbd>↑</kbd>／<kbd>↓</kbd></td><td>時間ズームイン／アウト</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>↑</kbd>／<kbd>Ctrl</kbd>+<kbd>↓</kbd></td><td>時間ズーム最大／リセット</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>↑</kbd>／<kbd>Ctrl</kbd>+<kbd>↓</kbd></td><td>時間ズーム 32倍→最大／リセット</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd>／<kbd>Shift</kbd>+<kbd>↓</kbd></td><td>振幅ズームイン／アウト</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↑</kbd>／<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↓</kbd></td><td>振幅ズーム最大／リセット</td></tr>
-          <tr><td><kbd>Z</kbd></td><td>波形高さ循環（1×→2×→3×）</td></tr>
+          <tr><td><kbd>H</kbd></td><td>波形高さ循環（1×→2×→3×）</td></tr>
           <tr><td>ログ／Tips 上で <kbd>Ctrl</kbd>+ホイール／<kbd>Ctrl</kbd>+<kbd>+</kbd>／<kbd>-</kbd></td><td>ログと Tips の文字サイズを拡大／縮小（両方同時。6〜18pt。アプリ設定に保存）</td></tr>
           <tr><td>ログ／Tips 上で <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>ログと Tips の文字サイズを既定（8.5pt）に戻す</td></tr>
         </tbody>
@@ -650,7 +650,7 @@
       <table>
         <thead><tr><th>キー</th><th>動作</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Insert</kbd></td><td>シーク位置にマーカー追加</td></tr>
+          <tr><td><kbd>Insert</kbd>／<kbd>M</kbd></td><td>シーク位置にマーカー追加</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>選択したマーカーを削除（アプリ上のみ）</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>再生位置上のマーカーを削除</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>再生位置上のマーカー名を変更</td></tr>

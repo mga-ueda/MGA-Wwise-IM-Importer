@@ -1,4 +1,4 @@
-namespace MgaWwiseIMImporter.Domain;
+﻿namespace MgaWwiseIMImporter.Domain;
 
 internal static partial class UiStrings
 {
@@ -81,8 +81,8 @@ internal static partial class UiStrings
         "[↓] Zoom out time");
 
     public static string TipTransportTimeZoomMax => WithKeyRepeat(
-        "[Ctrl+↑] 時間軸を最大拡大",
-        "[Ctrl+↑] Max time zoom");
+        "[Ctrl+↑] 時間軸を 32倍／最大拡大",
+        "[Ctrl+↑] Time zoom 32× / max");
 
     public static string TipTransportTimeZoomReset => WithKeyRepeat(
         "[Ctrl+↓] 時間軸を全体表示",
@@ -105,14 +105,14 @@ internal static partial class UiStrings
         "[Ctrl+Shift+↓] Reset amplitude zoom");
 
     public static string TipTransportCycleWaveformHeight => Get(
-        "[Z] 波形表示エリアの高さを切替（1倍→2倍→3倍）",
-        "[Z] Cycle waveform height (1×→2×→3×)");
+        "[H] 波形表示エリアの高さを切替（1倍→2倍→3倍）",
+        "[H] Cycle waveform height (1×→2×→3×)");
 
     public static string TipTransportMetronome => Get(
-        "[M] メトロノームのオン／オフ（テンポ／拍子があるとき）"
+        "[C] メトロノームのオン／オフ（テンポ／拍子があるとき）"
         + Environment.NewLine
         + "ホイール … 音量（最大〜10%、10% 刻み。既定 30%。アプリ設定に保存）",
-        "[M] Toggle metronome (note or tempo; synced to waveform playback beats when tempo / time signature is available)"
+        "[C] Toggle metronome (note or tempo; synced to waveform playback beats when tempo / time signature is available)"
         + Environment.NewLine
         + "Wheel … volume (max to 10%, 10% steps; default 30%; saved in app settings)");
 

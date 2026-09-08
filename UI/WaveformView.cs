@@ -119,10 +119,12 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     // 時間軸ズーム（1=全体表示。既定より縮小しない）
     private const double TimeZoomMin = 1.0;
     private const double TimeZoomMax = 81920.0;
-    // 旧 2^(1/8) の 3 段階分 = 2^(3/8)。キーボード拡縮。
-    private const double TimeZoomStep = 1.2968395546510096;
-    // 旧 2^(1/4) の 3 段階分 = 2^(3/4)。ホイール拡縮。
-    private const double TimeZoomWheelStep = 1.681792830507429;
+    // Ctrl+↑ の1段目（Sonic Anvil と同じ 32 倍）。2段目で TimeZoomMax。
+    private const double TimeZoomStepMax = 32.0;
+    // 旧 2^(1/8) の 5 段階分 = 2^(5/8)。キーボード拡縮（Sonic Anvil と同値）。
+    private const double TimeZoomStep = 1.5422108254079407;
+    // 旧 2^(1/4) の 5 段階分 = 2^(5/4)。ホイール拡縮（Sonic Anvil と同値）。
+    private const double TimeZoomWheelStep = 2.378414230005442;
     private double _timeZoom = TimeZoomMin;
     private double _viewStart; // 表示左端の絶対進捗 0..1
     /// <summary>
@@ -153,8 +155,8 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     // 振幅ズーム（1=既定。既定より縮小しない）
     private const double AmpZoomMin = 1.0;
     private const double AmpZoomMax = 128.0;
-    private const double AmpZoomStep = 1.2968395546510096;
-    private const double AmpZoomWheelStep = 1.681792830507429;
+    private const double AmpZoomStep = 1.5422108254079407;
+    private const double AmpZoomWheelStep = 2.378414230005442;
     /// <summary>
     /// 1px あたりこのサンプル数以下なら縦棒ではなくサンプル折れ線にする
     /// （MGA Sonic Anvil と同値。1 サンプル/px 以下だけ折れ線化する）。
@@ -1189,8 +1191,12 @@ internal sealed partial class WaveformView : System.Windows.FrameworkElement
     /// <summary>時間軸ズームを既定（全体表示）に戻す。</summary>
     public void ResetTimeZoom() => ResetTimeZoom(refresh: true);
 
-    /// <summary>時間軸を最大倍率にする。</summary>
-    public void ZoomTimeToMax() => SetTimeZoomAbsolute(TimeZoomMax, AnchorProgressForTimeZoom());
+    /// <summary>時間軸を 32 倍、すでに 32 倍以上なら最大倍率にする。</summary>
+    public void ZoomTimeToMax()
+    {
+        var next = _timeZoom + 1e-9 < TimeZoomStepMax ? TimeZoomStepMax : TimeZoomMax;
+        SetTimeZoomAbsolute(next, AnchorProgressForTimeZoom());
+    }
 
     /// <summary>振幅を拡大（既定より縮小しない）。</summary>
     public void ZoomAmpIn() => AdjustAmpZoom(AmpZoomStep);

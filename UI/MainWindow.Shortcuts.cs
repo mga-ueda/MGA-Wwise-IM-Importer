@@ -60,13 +60,13 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.M && modifiers == ModifierKeys.None && !IsTextEntryFocusActive())
+        if (key == Key.C && modifiers == ModifierKeys.None && !IsTextEntryFocusActive())
         {
             TryToggleMetronome();
             return true;
         }
 
-        if ((key is Key.C or Key.OemPeriod or Key.Decimal)
+        if ((key is Key.Z or Key.OemPeriod or Key.Decimal)
             && modifiers == ModifierKeys.None
             && !IsTextEntryFocusActive())
         {
@@ -80,14 +80,14 @@ public partial class MainWindow
             return true;
         }
 
-        if (key == Key.Z && modifiers == ModifierKeys.None && TryCycleWaveformHeightScale())
-        {
-            return true;
-        }
-
         if (key == Key.U && modifiers == ModifierKeys.None && !IsTextEntryFocusActive())
         {
             OpenEditHistory();
+            return true;
+        }
+
+        if (key == Key.H && modifiers == ModifierKeys.None && TryCycleWaveformHeightScale())
+        {
             return true;
         }
 
@@ -285,7 +285,7 @@ public partial class MainWindow
             (Key.Down, ModifierKeys.Shift) => TransportCommand.AmpZoomOut,
             (Key.Up, ModifierKeys.Control | ModifierKeys.Shift) => TransportCommand.AmpZoomMax,
             (Key.Down, ModifierKeys.Control | ModifierKeys.Shift) => TransportCommand.AmpZoomReset,
-            (Key.Z, ModifierKeys.None) => TransportCommand.CycleWaveformHeight,
+            (Key.H, ModifierKeys.None) => TransportCommand.CycleWaveformHeight,
             _ => null,
         };
 

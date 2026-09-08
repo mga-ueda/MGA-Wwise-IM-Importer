@@ -165,7 +165,7 @@
         <li><strong>Start this app</strong><br />If the WAAPI status bar at the bottom shows the Wwise version, project name, and the selected destination, you are connected.</li>
         <li><strong>Set the export path</strong><br />In the project bar, point the export path at a folder under your Wwise project’s <code>Originals</code> folder (e.g. <code>Originals\Music</code>; create it in Explorer if needed).</li>
         <li><strong>Drag and drop one WAV</strong><br />The log shows <code>=== Wave-only mode ===</code> and the waveform appears. <kbd>Space</kbd> plays it.</li>
-        <li><strong>(To loop it) place two markers</strong><br />Click the waveform to seek to the loop start and press <kbd>Insert</kbd> to add a marker; do the same at the loop end. <strong>With exactly two markers, the span between them automatically becomes the loop</strong> (before the first marker = intro, after the second = tail). Drag the ▼ handles to fine-tune.</li>
+        <li><strong>(To loop it) place two markers</strong><br />Click the waveform to seek to the loop start and press <kbd>Insert</kbd> or <kbd>M</kbd> to add a marker; do the same at the loop end. <strong>With exactly two markers, the span between them automatically becomes the loop</strong> (before the first marker = intro, after the second = tail). Drag the ▼ handles to fine-tune.</li>
         <li><strong>Listen</strong><br />Press <kbd>Space</kbd>; the loop region repeats endlessly. Press <kbd>L</kbd> to jump just before the loop end (1 bar before, or 3 seconds before without bar data) — handy for checking the seam. Nudge the markers until it feels right.</li>
         <li><strong><span class="ui">EXPORT</span> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>E</kbd>)</strong><br />The source WAV is copied to the export path and a full Music Playlist Container setup is generated in Wwise. Play it in Wwise to confirm.</li>
       </ol>
@@ -306,7 +306,7 @@
       <h3 id="prepare-none">4-4. Method C: starting from a plain WAV (markers in the app)</h3>
       <p>No preparation needed. Drop the <code>.wav</code> as-is and define ranges by placing markers in the app, on the marker lane below the waveform (the original WAV is never written to).</p>
       <ul>
-        <li><kbd>Insert</kbd> — add a marker at the seek position</li>
+        <li><kbd>Insert</kbd> / <kbd>M</kbd> — add a marker at the seek position</li>
         <li>Drag ▼ — move a marker (<kbd>Alt</kbd>+drag also moves the previous marker by the same amount — handy for sliding a loop range while keeping its length)</li>
         <li>Double-click ▼ or the comment — edit the name (comment); <code>-L</code> / <code>-E</code> / <code>-R</code> / <code>-A</code> mean the same as in Method B</li>
         <li><kbd>Delete</kbd> — remove the selected marker; <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd> — Undo / Redo</li>
@@ -453,7 +453,7 @@
         <li>Click/drag to seek</li>
         <li>Double-click the waveform name to edit the base name (<code>Multi_Wave</code> parent name is not editable in multi-wave mode)</li>
         <li>Double-click the timeline to zoom into the Music Playlist under the cursor (back to full view when only one intersects)</li>
-        <li><kbd>Z</kbd> / <span class="ui">SIZE</span> on TRANSPORT cycles waveform height 1×→2×→3×</li>
+        <li><kbd>H</kbd> / <span class="ui">SIZE</span> on TRANSPORT cycles waveform height 1×→2×→3×</li>
         <li>White-triangle edge fades are nondestructive and become MusicClip Fade on EXPORT</li>
       </ul>
 
@@ -463,7 +463,7 @@
         <li><kbd>Space</kbd> play/pause; <code>-L</code> regions loop</li>
         <li>With <span class="ui">Play -E</span> on, a following <code>-E</code> one-shots at loop wrap (Play post-exit preview)</li>
         <li><kbd>G</kbd> bar jump when bar data exists</li>
-        <li><kbd>M</kbd> / note + tempo on the position display — toggle metronome (default off; XML mode with tempo / time signature only; while playing, mixed sample-accurately into the waveform playback stream; beat 1 High, other beats Low; note and tempo turn cyan when on; mouse wheel adjusts volume from max to 10% in 10% steps, default 30%, with a ~1s Tips readout; volume is saved in app settings; on/off starts off)</li>
+        <li><kbd>C</kbd> / note + tempo on the position display — toggle metronome (default off; XML mode with tempo / time signature only; while playing, mixed sample-accurately into the waveform playback stream; beat 1 High, other beats Low; note and tempo turn cyan when on; mouse wheel adjusts volume from max to 10% in 10% steps, default 30%, with a ~1s Tips readout; volume is saved in app settings; on/off starts off)</li>
         <li><kbd>L</kbd> jump to 1 bar before loop end (or 3 seconds before without bar data)</li>
       </ul>
 
@@ -614,7 +614,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Play from ~3 seconds earlier</td></tr>
           <tr><td><kbd>Alt</kbd>+<kbd>Enter</kbd></td><td>Restart from last play start</td></tr>
           <tr><td><kbd>E</kbd></td><td>Toggle Play -E (for the current playlist)</td></tr>
-          <tr><td><kbd>M</kbd></td><td>Toggle metronome (synced to waveform playback beats when tempo / time signature is available)</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Toggle metronome (synced to waveform playback beats when tempo / time signature is available)</td></tr>
         </tbody>
       </table>
       <h3>Seek / navigation</h3>
@@ -630,7 +630,7 @@
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>←</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>→</kbd></td><td>Previous / next marker (modes that allow marker editing)</td></tr>
           <tr><td><kbd>G</kbd></td><td>Bar jump (when bar data exists)</td></tr>
           <tr><td><kbd>L</kbd></td><td>Jump to 1 bar before loop end (or 3 seconds before without bar data)</td></tr>
-          <tr><td><kbd>C</kbd> / <kbd>.</kbd></td><td>Center the view on the playhead (the seek position does not change)</td></tr>
+          <tr><td><kbd>Z</kbd> / <kbd>.</kbd></td><td>Center the view on the playhead (the seek position does not change)</td></tr>
         </tbody>
       </table>
       <h3>View / zoom</h3>
@@ -638,10 +638,10 @@
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
           <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Time zoom in / out</td></tr>
-          <tr><td><kbd>Ctrl</kbd>+<kbd>↑</kbd> / <kbd>Ctrl</kbd>+<kbd>↓</kbd></td><td>Time zoom max / reset</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>↑</kbd> / <kbd>Ctrl</kbd>+<kbd>↓</kbd></td><td>Time zoom 32× → max / reset</td></tr>
           <tr><td><kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>Shift</kbd>+<kbd>↓</kbd></td><td>Amplitude zoom in / out</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↑</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>↓</kbd></td><td>Amplitude zoom max / reset</td></tr>
-          <tr><td><kbd>Z</kbd></td><td>Cycle waveform height (1× → 2× → 3×)</td></tr>
+          <tr><td><kbd>H</kbd></td><td>Cycle waveform height (1× → 2× → 3×)</td></tr>
           <tr><td>Over log / Tips: <kbd>Ctrl</kbd>+wheel / <kbd>Ctrl</kbd>+<kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom log and Tips font size together (6–18pt; saved in app settings)</td></tr>
           <tr><td>Over log / Tips: <kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Reset log and Tips font size to default (8.5pt)</td></tr>
         </tbody>
@@ -650,7 +650,7 @@
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Insert</kbd></td><td>Add a marker at the seek position</td></tr>
+          <tr><td><kbd>Insert</kbd> / <kbd>M</kbd></td><td>Add a marker at the seek position</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Remove the selected marker (app session only)</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>Remove the marker at the playhead</td></tr>
           <tr><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Rename the marker at the playhead</td></tr>

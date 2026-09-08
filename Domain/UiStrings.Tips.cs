@@ -188,7 +188,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Delete] / [Ctrl+Del] 選択したマーカーを削除（アプリ上のみ）"
         + Environment.NewLine
-        + "[Insert] シーク位置にマーカー追加"
+        + "[Insert] / [M] シーク位置にマーカー追加"
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
@@ -198,7 +198,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[0〜9] 表示中画面内の 0%〜90% へジャンプ（数字キー／テンキー）"
         + Environment.NewLine
-        + "[C] / [.] シーク位置を変えずに表示を中央寄せ",
+        + "[Z] / [.] シーク位置を変えずに表示を中央寄せ",
         "Drag ▼: move marker"
         + Environment.NewLine
         + "[Alt]+drag ▼: also move previous marker by the same delta"
@@ -219,7 +219,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[Delete] / [Ctrl+Del] remove selected marker (app session only)"
         + Environment.NewLine
-        + "[Insert] add marker at seek position (no comment)"
+        + "[Insert] / [M] add marker at seek position (no comment)"
         + Environment.NewLine
         + "[Ctrl+Z] / [Ctrl+Shift+Z] / [Ctrl+Y] Undo / Redo"
         + Environment.NewLine
@@ -229,7 +229,7 @@ internal static partial class UiStrings
         + Environment.NewLine
         + "[0–9] jump to 0%–90% within the current view (number keys)"
         + Environment.NewLine
-        + "[C] / [.] center the view on the seek position (seek unchanged)");
+        + "[Z] / [.] center the view on the seek position (seek unchanged)");
 
     public static string TipWaveformRegionFadeHandle => Get(
         "白三角をドラッグ: リージョン端フェード（非破壊）"
@@ -295,22 +295,26 @@ internal static partial class UiStrings
     public static string TipWaveformCommonKeys => Get(
         "[0〜9] 表示中画面内の 0%〜90% へジャンプ（数字キー／テンキー）"
         + Environment.NewLine
-        + "[C] / [.] シーク位置を変えずに表示を中央寄せ"
+        + "[Z] / [.] シーク位置を変えずに表示を中央寄せ"
         + Environment.NewLine
         + "[L] ループエンドの 1 小節前へ（小節管理がないときは 3 秒前）"
         + Environment.NewLine
         + "[E] 再生中（またはシークバー位置）の Playlist の Play -E をトグル"
         + Environment.NewLine
-        + "[Z] 波形表示エリアの高さを 1倍 → 2倍 → 3倍 → 1倍",
+        + "[C] メトロノームのオン／オフ（テンポ／拍子があるとき）"
+        + Environment.NewLine
+        + "[H] 波形表示エリアの高さを 1倍 → 2倍 → 3倍 → 1倍",
         "[0–9] jump to 0%–90% within the current view (number keys)"
         + Environment.NewLine
-        + "[C] / [.] center the view on the seek position (seek unchanged)"
+        + "[Z] / [.] center the view on the seek position (seek unchanged)"
         + Environment.NewLine
         + "[L] jump to 1 bar before loop end (or 3 seconds before without bar data)"
         + Environment.NewLine
         + "[E] toggle Play -E for the playing (or seek-bar) playlist"
         + Environment.NewLine
-        + "[Z] cycle waveform height 1× → 2× → 3× → 1×");
+        + "[C] toggle metronome (when tempo / time signature is available)"
+        + Environment.NewLine
+        + "[H] cycle waveform height 1× → 2× → 3× → 1×");
 
     public static string TipWaveformZoomFitAll => Get(
         "ダブルクリックでタイムライン全体を表示",

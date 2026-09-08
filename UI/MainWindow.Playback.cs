@@ -120,7 +120,7 @@ public partial class MainWindow
             TransportCommand.AmpZoomOut => Key.Down,
             TransportCommand.AmpZoomMax => Key.Up,
             TransportCommand.AmpZoomReset => Key.Down,
-            TransportCommand.CycleWaveformHeight => Key.Z,
+            TransportCommand.CycleWaveformHeight => Key.H,
             _ => Key.None,
         };
 
@@ -902,7 +902,9 @@ public partial class MainWindow
             return;
         }
 
-        if (key == Key.Insert && modifiers == ModifierKeys.None && TryAddWaveOnlyMarkerAtPlayhead())
+        if (key is Key.Insert or Key.M
+            && modifiers == ModifierKeys.None
+            && TryAddWaveOnlyMarkerAtPlayhead())
         {
             e.Handled = true;
             return;
