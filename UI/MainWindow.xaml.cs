@@ -227,6 +227,10 @@ public partial class MainWindow : Window
         InitializeLocalizedText();
         RefreshProjectComboItems(_loadedProjectName);
         RefreshWaapiStatusDisplay();
+        if (HistoryOpen)
+        {
+            RefreshHistoryOverlay();
+        }
     }
 
     private static void SetFadeRadioLabels(FlatOptionRadioButton radio, double seconds) =>

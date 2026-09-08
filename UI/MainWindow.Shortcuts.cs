@@ -85,6 +85,12 @@ public partial class MainWindow
             return true;
         }
 
+        if (key == Key.U && modifiers == ModifierKeys.None && !IsTextEntryFocusActive())
+        {
+            OpenEditHistory();
+            return true;
+        }
+
         if (key == Key.Up && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
         {
             waveformView.ZoomAmpToMax();

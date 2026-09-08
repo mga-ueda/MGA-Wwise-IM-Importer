@@ -9,9 +9,11 @@ public partial class MainWindow
 {
     private WaveformPreviewData? _loadedPreview;
     private WaveformPreviewSession? _previewSession;
-    private readonly WaveOnlyMarkerHistory _waveOnlyMarkerHistory = new();
-    private readonly RegionEdgeFadeHistory _regionEdgeFadeHistory = new();
+    private readonly EditHistory _editHistory = new();
     private bool _pendingWaveOnlySessionPersist;
+    private bool _markerMoveHistoryOpen;
+    private IReadOnlyList<WaveformMarkerMark>? _markerMoveHistoryMarkersBefore;
+    private IReadOnlyList<RegionEdgeFade>? _markerMoveHistoryFadesBefore;
     private IReadOnlyList<string> _lastInputFiles = [];
     private string? _sourceBaseNameOverride;
     private int _nextGroupId = 1;
@@ -279,8 +281,9 @@ public partial class MainWindow
         ApplyMetronomeBarsFromPreview(null);
         _loadedPreview = null;
         _previewSession = null;
-        _waveOnlyMarkerHistory.Clear();
-        _regionEdgeFadeHistory.Clear();
+        DismissEditHistory();
+        CancelMarkerMoveHistorySession();
+        _editHistory.Clear();
         _pendingWaveOnlySessionPersist = false;
         _sourceBaseNameOverride = null;
         _lastPlaybackStartProgress = null;
@@ -310,8 +313,9 @@ public partial class MainWindow
         _previewSession = new WaveformPreviewSession(preview);
         _previewSession.SetCommentRule(_markerSettings.ToCommentRule());
         waveformView.MarkerGridOverride = _markerSettings.GridOverride;
-        _waveOnlyMarkerHistory.Clear();
-        _regionEdgeFadeHistory.Clear();
+        DismissEditHistory();
+        CancelMarkerMoveHistorySession();
+        _editHistory.Clear();
         _pendingWaveOnlySessionPersist = false;
         RememberLoadedWavePaths(preview);
 
@@ -427,11 +431,21 @@ public partial class MainWindow
     /// </summary>
     private bool TryMutateWaveOnlyMarkers(
         Func<WaveformPreviewSession, bool> mutate,
-        bool persistSession = true)
+        bool persistSession = true,
+        bool recordHistory = true)
     {
         if (_previewSession is not { AllowsSessionMarkerEdit: true } session)
         {
             return false;
+        }
+
+        if (recordHistory)
+        {
+            CommitMarkerMoveHistorySession();
+        }
+        else
+        {
+            BeginMarkerMoveHistorySession();
         }
 
         var before = session.GetWaveOnlySessionMarkers();
@@ -440,13 +454,18 @@ public partial class MainWindow
             return false;
         }
 
+        var fadesBefore = session.RegionEdgeFades;
         var beforeParts = session.EffectiveOutputParts.ToArray();
         if (!mutate(session))
         {
             return false;
         }
 
-        _waveOnlyMarkerHistory.PushBeforeChange(before);
+        if (recordHistory)
+        {
+            RecordMarkerHistory(before, fadesBefore, session);
+        }
+
         ApplyWaveOnlySessionPresentation(
             session,
             refreshPlaylists: !AreOutputPartsEquivalent(beforeParts, session.EffectiveOutputParts));
@@ -455,62 +474,6 @@ public partial class MainWindow
             SaveLastWaveSessionIfLoaded();
         }
 
-        return true;
-    }
-
-    private bool TryUndoWaveOnlyMarkerEdit()
-    {
-        if (_previewSession is not { AllowsSessionMarkerEdit: true } session)
-        {
-            return false;
-        }
-
-        var current = session.GetWaveOnlySessionMarkers();
-        if (current is null
-            || !_waveOnlyMarkerHistory.TryUndo(current, out var restored))
-        {
-            return false;
-        }
-
-        var beforeParts = session.EffectiveOutputParts.ToArray();
-        if (!session.TryReplaceWaveOnlySessionMarkers(restored))
-        {
-            return false;
-        }
-
-        ApplyWaveOnlySessionPresentation(
-            session,
-            refreshPlaylists: !AreOutputPartsEquivalent(beforeParts, session.EffectiveOutputParts));
-        waveformView.SetSelectedMarkerSampleOffset(null);
-        SaveLastWaveSessionIfLoaded();
-        return true;
-    }
-
-    private bool TryRedoWaveOnlyMarkerEdit()
-    {
-        if (_previewSession is not { AllowsSessionMarkerEdit: true } session)
-        {
-            return false;
-        }
-
-        var current = session.GetWaveOnlySessionMarkers();
-        if (current is null
-            || !_waveOnlyMarkerHistory.TryRedo(current, out var restored))
-        {
-            return false;
-        }
-
-        var beforeParts = session.EffectiveOutputParts.ToArray();
-        if (!session.TryReplaceWaveOnlySessionMarkers(restored))
-        {
-            return false;
-        }
-
-        ApplyWaveOnlySessionPresentation(
-            session,
-            refreshPlaylists: !AreOutputPartsEquivalent(beforeParts, session.EffectiveOutputParts));
-        waveformView.SetSelectedMarkerSampleOffset(null);
-        SaveLastWaveSessionIfLoaded();
         return true;
     }
 
@@ -619,51 +582,115 @@ public partial class MainWindow
             return;
         }
 
-        _regionEdgeFadeHistory.PushBeforeChange(_previewSession.RegionEdgeFades);
+        CommitMarkerMoveHistorySession();
+        var fadesBefore = _previewSession.RegionEdgeFades;
+        var markersBefore = _previewSession.GetWaveOnlySessionMarkers();
         _previewSession.UpsertRegionEdgeFade(fade);
+        var (name, summary) = EditHistory.DescribeFadeChange();
+        _editHistory.Record(
+            markersBefore,
+            fadesBefore,
+            _previewSession.GetWaveOnlySessionMarkers(),
+            _previewSession.RegionEdgeFades,
+            name,
+            summary);
         waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
         _audioPlayer.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
         SaveLastWaveSessionIfLoaded();
     }
 
-    private bool TryUndoRegionEdgeFade()
+    private void BeginMarkerMoveHistorySession()
     {
-        if (_previewSession is null)
+        if (_markerMoveHistoryOpen || _previewSession is null)
+        {
+            return;
+        }
+
+        var markers = _previewSession.GetWaveOnlySessionMarkers();
+        if (markers is null)
+        {
+            return;
+        }
+
+        _markerMoveHistoryOpen = true;
+        _markerMoveHistoryMarkersBefore = markers;
+        _markerMoveHistoryFadesBefore = _previewSession.RegionEdgeFades;
+    }
+
+    private void CommitMarkerMoveHistorySession()
+    {
+        if (!_markerMoveHistoryOpen)
+        {
+            return;
+        }
+
+        var markersBefore = _markerMoveHistoryMarkersBefore;
+        var fadesBefore = _markerMoveHistoryFadesBefore;
+        CancelMarkerMoveHistorySession();
+        if (_previewSession is null || markersBefore is null || fadesBefore is null)
+        {
+            return;
+        }
+
+        var markersAfter = _previewSession.GetWaveOnlySessionMarkers();
+        if (markersAfter is null || AreMarkersEquivalent(markersBefore, markersAfter))
+        {
+            return;
+        }
+
+        RecordMarkerHistory(markersBefore, fadesBefore, _previewSession);
+    }
+
+    private void CancelMarkerMoveHistorySession()
+    {
+        _markerMoveHistoryOpen = false;
+        _markerMoveHistoryMarkersBefore = null;
+        _markerMoveHistoryFadesBefore = null;
+    }
+
+    private static bool AreMarkersEquivalent(
+        IReadOnlyList<WaveformMarkerMark> left,
+        IReadOnlyList<WaveformMarkerMark> right)
+    {
+        if (left.Count != right.Count)
         {
             return false;
         }
 
-        var current = _previewSession.RegionEdgeFades;
-        if (!_regionEdgeFadeHistory.TryUndo(current, out var restored))
+        for (var i = 0; i < left.Count; i++)
         {
-            return false;
+            if (left[i].SampleOffset != right[i].SampleOffset
+                || !string.Equals(left[i].Comment, right[i].Comment, StringComparison.Ordinal))
+            {
+                return false;
+            }
         }
 
-        _previewSession.SetRegionEdgeFades(restored);
-        waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
-        _audioPlayer.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
-        SaveLastWaveSessionIfLoaded();
         return true;
     }
 
-    private bool TryRedoRegionEdgeFade()
+    private void RecordMarkerHistory(
+        IReadOnlyList<WaveformMarkerMark> markersBefore,
+        IReadOnlyList<RegionEdgeFade> fadesBefore,
+        WaveformPreviewSession session)
     {
-        if (_previewSession is null)
+        var markersAfter = session.GetWaveOnlySessionMarkers() ?? markersBefore;
+        if (AreMarkersEquivalent(markersBefore, markersAfter))
         {
-            return false;
+            return;
         }
 
-        var current = _previewSession.RegionEdgeFades;
-        if (!_regionEdgeFadeHistory.TryRedo(current, out var restored))
-        {
-            return false;
-        }
-
-        _previewSession.SetRegionEdgeFades(restored);
-        waveformView.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
-        _audioPlayer.SetRegionEdgeFades(_previewSession.RegionEdgeFades);
-        SaveLastWaveSessionIfLoaded();
-        return true;
+        var (name, summary) = EditHistory.DescribeMarkerChange(
+            markersBefore,
+            markersAfter,
+            (int)(_loadedPreview?.WavInfo.SampleRate ?? 0));
+        _editHistory.Record(
+            markersBefore,
+            fadesBefore,
+            markersAfter,
+            session.RegionEdgeFades,
+            name,
+            summary);
     }
 
     private void MarkerOptionsPanel_SettingsChanged(object? sender, EventArgs e)

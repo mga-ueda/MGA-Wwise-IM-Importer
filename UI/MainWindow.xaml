@@ -396,6 +396,11 @@
       </Border>
 
     </DockPanel>
-  </DockPanel>
+    </DockPanel>
+    <ui:EditHistoryOverlay x:Name="HistoryOverlay"
+                           Visibility="Collapsed"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           ItemChosen="HistoryOverlay_ItemChosen" />
   </Grid>
 </Window>

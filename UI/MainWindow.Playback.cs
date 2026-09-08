@@ -858,6 +858,12 @@ public partial class MainWindow
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var modifiers = Keyboard.Modifiers;
 
+        if (TryProcessHistoryShortcut(key, modifiers))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // プロジェクト名編集中は Home／End／矢印などをキャレット操作用に残す。
         if (projectNameComboBox.IsKeyboardFocusWithin)
         {
@@ -969,7 +975,7 @@ public partial class MainWindow
 
         if (key == Key.Z
             && modifiers == ModifierKeys.Control
-            && (TryUndoRegionEdgeFade() || TryUndoWaveOnlyMarkerEdit()))
+            && TryUndoEditHistory())
         {
             e.Handled = true;
             return;
@@ -977,7 +983,7 @@ public partial class MainWindow
 
         if (((key == Key.Z && modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
                 || (key == Key.Y && modifiers == ModifierKeys.Control))
-            && (TryRedoRegionEdgeFade() || TryRedoWaveOnlyMarkerEdit()))
+            && TryRedoEditHistory())
         {
             e.Handled = true;
             return;
@@ -1466,7 +1472,8 @@ public partial class MainWindow
 
             if (!TryMutateWaveOnlyMarkers(
                     current => current.TryMoveWaveOnlyMarkerWithPrevious(fromSample, toSample),
-                    persistSession: false))
+                    persistSession: false,
+                    recordHistory: false))
             {
                 if (session.HasWaveOnlyMarkerAt(toSample))
                 {
@@ -1492,7 +1499,8 @@ public partial class MainWindow
 
             if (!TryMutateWaveOnlyMarkers(
                     current => current.TryMoveWaveOnlyMarker(fromSample, toSample),
-                    persistSession: false))
+                    persistSession: false,
+                    recordHistory: false))
             {
                 return true;
             }
@@ -1599,6 +1607,7 @@ public partial class MainWindow
         _markerNudgeRepeatStarted = false;
         if (flushPersist)
         {
+            CommitMarkerMoveHistorySession();
             FlushPendingWaveOnlySessionPersist();
         }
     }
