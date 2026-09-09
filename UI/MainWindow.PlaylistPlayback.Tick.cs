@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 using System.Windows.Threading;
 using MgaWwiseIMImporter.Wave;
 
@@ -125,14 +125,19 @@ public partial class MainWindow
 
     private void UpdateGroupFadeRadioEnabled()
     {
-        IEnumerable<int> playingParts = _playingPlaylistPartNumbers.Count > 0
-            ? _playingPlaylistPartNumbers
-            : _manualPlaylistPartNumber is int manualPart
-                ? [manualPart]
-                : [];
-        var enabled = playingParts.Any(part =>
-            _partGroupIds.ContainsKey(part)
-            && !_disabledPartNumbers.Contains(part));
+        // 再生中だけでなく、選択中のグループ（2 パート以上）でも設定できるようにする。
+        // 停止すると playing / manual が消えるため、以前は Group / Chg Occ At だけ灰色になっていた。
+        var enabled = IsPartInEnabledGroup(_selectedPlaylistPartNumber);
+        if (!enabled && _playingPlaylistPartNumbers.Count > 0)
+        {
+            enabled = _playingPlaylistPartNumbers.Any(IsPartInEnabledGroup);
+        }
+
+        if (!enabled && _manualPlaylistPartNumber is int manualPart)
+        {
+            enabled = IsPartInEnabledGroup(manualPart);
+        }
+
         var waveOnly = _previewSession?.AllowsSessionMarkerEdit == true;
 
         foreach (var radio in FadeInGroupRadios)

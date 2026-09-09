@@ -1004,12 +1004,27 @@ public partial class MainWindow
         UpdateAdditiveLayersOptionEnabled();
     }
 
+    /// <summary>
+    /// 有効パートが 2 つ以上あるグループに属しているか（除外パートは数えない）。
+    /// </summary>
+    private bool IsPartInEnabledGroup(int? partNumber) =>
+        partNumber is int part && IsPartInEnabledGroup(part);
+
+    private bool IsPartInEnabledGroup(int partNumber)
+    {
+        if (_disabledPartNumbers.Contains(partNumber)
+            || !_partGroupIds.TryGetValue(partNumber, out var groupId))
+        {
+            return false;
+        }
+
+        return _partGroupIds.Count(
+            pair => pair.Value == groupId && !_disabledPartNumbers.Contains(pair.Key)) >= 2;
+    }
+
     private void UpdateAdditiveLayersOptionEnabled()
     {
-        var enabled = _selectedPlaylistPartNumber is { } part
-            && _partGroupIds.TryGetValue(part, out var groupId)
-            && !_disabledPartNumbers.Contains(part)
-            && _partGroupIds.Count(pair => pair.Value == groupId && !_disabledPartNumbers.Contains(pair.Key)) >= 2;
+        var enabled = IsPartInEnabledGroup(_selectedPlaylistPartNumber);
         additiveLayersCheckBox.IsEnabled = enabled;
         if (!enabled && additiveLayersCheckBox.IsChecked == true && !_suppressProjectUiEvents)
         {
@@ -1071,6 +1086,8 @@ public partial class MainWindow
         {
             _suppressProjectUiEvents = false;
         }
+
+        UpdateGroupFadeRadioEnabled();
 
         if (!seekAndPlay || _previewSession is null)
         {
