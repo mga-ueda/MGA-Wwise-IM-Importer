@@ -220,17 +220,23 @@ internal static partial class UiStrings
         uint sampleRateA,
         ushort channelsA,
         ushort bitsA,
+        ushort formatA,
         uint sampleRateB,
         ushort channelsB,
-        ushort bitsB) => Format(
-        "Message : A={0} Hz / {1} ch / {2} bit  vs  B={3} Hz / {4} ch / {5} bit",
-        "Message : A={0} Hz / {1} ch / {2} bit  vs  B={3} Hz / {4} ch / {5} bit",
+        ushort bitsB,
+        ushort formatB) => Format(
+        "Message : A={0} Hz / {1} ch / {2} bit / {3} ({4})  vs  B={5} Hz / {6} ch / {7} bit / {8} ({9})",
+        "Message : A={0} Hz / {1} ch / {2} bit / {3} ({4})  vs  B={5} Hz / {6} ch / {7} bit / {8} ({9})",
         sampleRateA,
         channelsA,
         bitsA,
+        AudioFormatName(formatA),
+        formatA,
         sampleRateB,
         channelsB,
-        bitsB);
+        bitsB,
+        AudioFormatName(formatB),
+        formatB);
 
     public static string LogMultiWaveOnlyEmptyWave => Get(
         "Message : フレーム数が 0 の WAV は複数波形モードに含められません。",

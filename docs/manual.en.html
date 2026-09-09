@@ -211,7 +211,7 @@
       </ul>
       <p>A WAV with no markers at all still loads. You would then place loop markers inside the app, which is not much different from punching them in a waveform editor — but the Wwise-side implementation is still automated, and loops are easy to dial in. If you can, at least export with markers included (Method B).</p>
       <div class="note">
-        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>), are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, …), or contain the <strong>forbidden characters <code>: &lt; &gt; * ? " \ / | . %</code></strong> (including control characters; a <code>.</code> inside the base name is also rejected, e.g. <code>Song.v2.wav</code>) are rejected at load. <strong>When you drop several files at once, if even one name is invalid, every file is rejected</strong> (the app does not load the valid ones and leave a single error buried in the log). When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files.</p>
+        <p><strong>Common WAV requirements</strong>: use uncompressed PCM <code>.wav</code>. The file name (without extension) becomes the Wwise object name, so names that <strong>start with a digit</strong> (e.g. <code>01_Battle.wav</code>), are <strong>Windows reserved names</strong> (<code>CON</code>, <code>AUX</code>, …), or contain the <strong>forbidden characters <code>: &lt; &gt; * ? " \ / | . %</code></strong> (including control characters; a <code>.</code> inside the base name is also rejected, e.g. <code>Song.v2.wav</code>) are rejected at load. <strong>When you drop several files at once, if even one name is invalid, every file is rejected</strong> (the app does not load the valid ones and leave a single error buried in the log). When dropping multiple WAVs together, sample rate, channel count, and bit depth must match across all files (PCM and Extensible may be mixed when those and Block Align match, as the same integer PCM).</p>
       </div>
 
       <h3 id="prepare-xml">4-2. Method A: preparing a Nuendo / Cubase XML</h3>
@@ -603,7 +603,7 @@
           </tr>
           <tr>
             <td>Dropped several WAVs but multi-wave mode did not start</td>
-            <td>If any file has a matching <code>.xml</code> next to it, pair processing (XML mode / Wave-only) applies instead. Also, sample rate, channel count, and bit depth must match across all files (details in the log).</td>
+            <td>If any file has a matching <code>.xml</code> next to it, pair processing (XML mode / Wave-only) applies instead. Also, sample rate, channel count, and bit depth must match across all files (details in the log). A PCM vs Extensible tag difference alone does not abort.</td>
           </tr>
           <tr>
             <td>File-name error at load / valid files were rejected too</td>

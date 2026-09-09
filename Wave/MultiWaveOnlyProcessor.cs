@@ -221,11 +221,7 @@ internal static class MultiWaveOnlyProcessor
         for (var i = 1; i < infos.Count; i++)
         {
             var other = infos[i];
-            if (other.SampleRate != reference.SampleRate
-                || other.Channels != reference.Channels
-                || other.BitsPerSample != reference.BitsPerSample
-                || other.AudioFormat != reference.AudioFormat
-                || other.BlockAlign != reference.BlockAlign)
+            if (!AreCompatibleForMultiWave(reference, other))
             {
                 sb.AppendLine(UiStrings.LogErrorHeader);
                 sb.AppendLine(UiStrings.LogMultiWaveOnlyFormatMismatch(reference.Path, other.Path));
@@ -234,9 +230,11 @@ internal static class MultiWaveOnlyProcessor
                         reference.SampleRate,
                         reference.Channels,
                         reference.BitsPerSample,
+                        reference.AudioFormat,
                         other.SampleRate,
                         other.Channels,
-                        other.BitsPerSample));
+                        other.BitsPerSample,
+                        other.AudioFormat));
                 sb.AppendLine();
                 return false;
             }
@@ -244,6 +242,25 @@ internal static class MultiWaveOnlyProcessor
 
         return true;
     }
+
+    /// <summary>
+    /// PCM (1) と Extensible (65534) は、レート／ch／bit／BlockAlign が同じなら同一の整数 PCM として扱う。
+    /// </summary>
+    internal static bool AreCompatibleForMultiWave(WavFileInfo left, WavFileInfo right)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        return left.SampleRate == right.SampleRate
+            && left.Channels == right.Channels
+            && left.BitsPerSample == right.BitsPerSample
+            && left.BlockAlign == right.BlockAlign
+            && AreAudioFormatsCompatible(left.AudioFormat, right.AudioFormat);
+    }
+
+    private static bool AreAudioFormatsCompatible(ushort left, ushort right) =>
+        left == right || (IsIntegerPcmTag(left) && IsIntegerPcmTag(right));
+
+    private static bool IsIntegerPcmTag(ushort audioFormat) => audioFormat is 1 or 65534;
 
     /// <summary>概要ピークバケットをフレーム数比で割り当て（合計 ≈ totalBuckets）。</summary>
     private static int[] AllocatePeakBuckets(int totalBuckets, IReadOnlyList<WavFileInfo> infos)
